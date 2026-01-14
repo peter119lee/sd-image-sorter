@@ -1,0 +1,31 @@
+# SD Image Sorter - .gitignore
+
+# Python virtual environment
+backend/venv/
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Database (contains user-specific file paths)
+backend/images.db
+
+# Downloaded AI models (large files, auto-downloaded on first use)
+models/wd14-tagger/
+
+# Test images (may contain personal images)
+testimage/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

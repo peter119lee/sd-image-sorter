@@ -1,0 +1,1018 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SD Image Sorter</title>
+    <meta name="description"
+        content="Powerful image management tool for Stable Diffusion users - tag, filter, and sort your AI-generated images">
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <link rel="stylesheet" href="/static/css/censor-v2.css">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Orbitron:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+</head>
+
+<body>
+    <div id="app">
+        <!-- Navigation -->
+        <nav class="nav-bar">
+            <div class="nav-brand">
+                <span class="brand-icon">🎨</span>
+                <span class="brand-text">SD Image Sorter</span>
+            </div>
+            <div class="nav-tabs">
+                <button class="nav-tab active" data-view="gallery">
+                    <span class="tab-icon">🖼️</span>
+                    <span class="tab-text">Gallery</span>
+                </button>
+                <button class="nav-tab" data-view="autosep">
+                    <span class="tab-icon">📁</span>
+                    <span class="tab-text">Auto-Separate</span>
+                </button>
+                <button class="nav-tab" data-view="manual">
+                    <span class="tab-icon">🎮</span>
+                    <span class="tab-text">Manual Sort</span>
+                </button>
+                <button class="nav-tab" data-view="censor">
+                    <span class="tab-icon">🔳</span>
+                    <span class="tab-text">Censored Edit</span>
+                </button>
+            </div>
+            <div class="nav-actions">
+                <button id="btn-clear-db" class="btn btn-ghost danger">
+                    <span>🗑️</span> Clear Gallery
+                </button>
+                <button id="btn-scan" class="btn btn-primary">
+                    <span>📂</span> Scan Folder
+                </button>
+                <button id="btn-tag" class="btn btn-secondary">
+                    <span>🏷️</span> Tag Images
+                </button>
+            </div>
+        </nav>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Gallery View -->
+            <section id="view-gallery" class="view active">
+                <aside class="filter-sidebar compact">
+                    <div class="filter-header">
+                        <h3 class="sidebar-title">Filters</h3>
+                        <button id="btn-open-filters" class="btn btn-primary btn-small"><span>🔍</span> Edit
+                            Filters</button>
+                    </div>
+
+                    <!-- Active Filter Summary -->
+                    <div class="filter-summary" id="filter-summary">
+                        <div class="summary-row">
+                            <span class="summary-label">Generators:</span>
+                            <span class="summary-value" id="summary-generators">All</span>
+                        </div>
+                        <div class="summary-row">
+                            <span class="summary-label">Ratings:</span>
+                            <span class="summary-value" id="summary-ratings">All</span>
+                        </div>
+                        <div class="summary-row">
+                            <span class="summary-label">Tags:</span>
+                            <span class="summary-value" id="summary-tags">None</span>
+                        </div>
+                        <div class="summary-row">
+                            <span class="summary-label">Checkpoints:</span>
+                            <span class="summary-value" id="summary-checkpoints">None</span>
+                        </div>
+                        <div class="summary-row">
+                            <span class="summary-label">Loras:</span>
+                            <span class="summary-value" id="summary-loras">None</span>
+                        </div>
+                        <div class="summary-row">
+                            <span class="summary-label">Prompt:</span>
+                            <span class="summary-value" id="summary-prompt">-</span>
+                        </div>
+                    </div>
+
+                    <button id="btn-clear-filters" class="btn btn-ghost full-width">Clear All Filters</button>
+
+                    <div class="divider-h"></div>
+
+                    <button id="btn-toggle-select" class="btn btn-primary btn-large full-width">
+                        <span>✔</span> Select Images
+                    </button>
+                </aside>
+
+                <div class="gallery-container">
+                    <div class="gallery-header">
+                        <div class="gallery-header-left">
+                            <span class="image-count" id="image-count">0 images</span>
+                            <button id="btn-random" class="btn btn-ghost btn-small" title="Random Image">
+                                <span>🎲</span> Random
+                            </button>
+                            <div class="divider-v"></div>
+                            <div class="generator-tabs" id="generator-tabs">
+                                <button class="gen-tab active" data-gen="all">All <span class="gen-count"
+                                        id="count-all">0</span></button>
+                                <button class="gen-tab" data-gen="nai">NovelAI <span class="gen-count"
+                                        id="count-nai">0</span></button>
+                                <button class="gen-tab" data-gen="comfyui">ComfyUI <span class="gen-count"
+                                        id="count-comfyui">0</span></button>
+                                <button class="gen-tab" data-gen="forge">Forge <span class="gen-count"
+                                        id="count-forge">0</span></button>
+                                <button class="gen-tab" data-gen="webui">WebUI <span class="gen-count"
+                                        id="count-webui">0</span></button>
+                                <button class="gen-tab" data-gen="unknown">Unknown <span class="gen-count"
+                                        id="count-unknown">0</span></button>
+                            </div>
+                        </div>
+                        <div class="view-options">
+                            <select id="gallery-sort" class="sort-dropdown" title="Sort images">
+                                <option value="newest">📅 Newest</option>
+                                <option value="oldest">📅 Oldest</option>
+                                <option value="name_asc">🔤 Name (A→Z)</option>
+                                <option value="name_desc">🔤 Name (Z→A)</option>
+                                <option value="generator">🛠️ Generator</option>
+                                <option value="prompt_length">📝 Prompt Length</option>
+                                <option value="tag_count">🏷️ Most Tags</option>
+                                <option value="rating">⚠️ Rating (NSFW↑)</option>
+                                <option value="character_count">👤 Characters</option>
+                                <option value="random">🎲 Random</option>
+                            </select>
+                            <div class="divider-v"></div>
+                            <button class="view-btn active" data-size="medium">
+                                <span>◼◼</span>
+                            </button>
+                            <button class="view-btn" data-size="large">
+                                <span>◼</span>
+                            </button>
+                        </div>
+
+                    </div>
+                    <div class="gallery-grid" id="gallery-grid">
+                        <!-- Images will be inserted here -->
+                    </div>
+                    <div class="gallery-loading" id="gallery-loading">
+                        <div class="spinner"></div>
+                        <span>Loading images...</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Auto-Separate View -->
+            <section id="view-autosep" class="view">
+                <div class="autosep-container">
+                    <div class="autosep-panel">
+                        <h2 class="panel-title">Auto-Separate Images</h2>
+                        <p class="panel-description">Move images matching your filters to a new folder automatically.
+                        </p>
+
+                        <div class="filter-section">
+                            <div class="filter-header-compact">
+                                <h4>Filter Criteria</h4>
+                                <button class="btn btn-primary btn-small" id="btn-autosep-filters"><span>🔍</span> Edit
+                                    Filters</button>
+                            </div>
+                            <div class="filter-summary-compact" id="autosep-filter-summary">
+                                <span class="summary-item"><strong>Generators:</strong> <span
+                                        id="autosep-summary-generators">All</span></span>
+                                <span class="summary-item"><strong>Tags:</strong> <span
+                                        id="autosep-summary-tags">None</span></span>
+                                <span class="summary-item"><strong>Ratings:</strong> <span
+                                        id="autosep-summary-ratings">All</span></span>
+                            </div>
+                        </div>
+
+                        <div class="filter-section">
+                            <h4>Destination Folder</h4>
+                            <div class="folder-input-group">
+                                <input type="text" id="autosep-destination" class="input-field"
+                                    placeholder="D:\sorted\my-folder">
+                                <button class="btn btn-secondary" id="btn-browse-destination">Browse</button>
+                            </div>
+                        </div>
+
+                        <div class="preview-section">
+                            <h4>Preview</h4>
+                            <div class="preview-stats" id="autosep-preview">
+                                <span class="stat-number">0</span>
+                                <span class="stat-label">images will be moved</span>
+                            </div>
+                            <button class="btn btn-secondary" id="btn-preview-autosep">Preview Results</button>
+                        </div>
+
+                        <button class="btn btn-primary btn-large" id="btn-execute-autosep">
+                            <span>📁</span> Move Images
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Manual Sort View -->
+            <section id="view-manual" class="view">
+                <div class="manual-sort-container">
+                    <!-- Setup Panel (shown initially) -->
+                    <div class="sort-setup" id="sort-setup">
+                        <h2 class="setup-title">Manual Sort Mode</h2>
+                        <p class="setup-description">Configure your folder destinations and start sorting!</p>
+
+                        <div class="folder-config">
+                            <div class="folder-slot" data-key="w">
+                                <div class="folder-key">W</div>
+                                <div class="folder-arrow">↑</div>
+                                <input type="text" class="folder-path-input" placeholder="D:\sorted\favorites"
+                                    data-key="w">
+                                <button class="btn btn-small btn-secondary browse-folder">📁</button>
+                            </div>
+
+                            <div class="folder-row-middle">
+                                <div class="folder-slot" data-key="a">
+                                    <div class="folder-key">A</div>
+                                    <div class="folder-arrow">←</div>
+                                    <input type="text" class="folder-path-input" placeholder="D:\sorted\keep"
+                                        data-key="a">
+                                    <button class="btn btn-small btn-secondary browse-folder">📁</button>
+                                </div>
+
+                                <div class="space-indicator">
+                                    <div class="space-key">SPACE</div>
+                                    <span>Skip (keep in place)</span>
+                                </div>
+
+                                <div class="folder-slot" data-key="d">
+                                    <div class="folder-key">D</div>
+                                    <div class="folder-arrow">→</div>
+                                    <input type="text" class="folder-path-input" placeholder="D:\sorted\best"
+                                        data-key="d">
+                                    <button class="btn btn-small btn-secondary browse-folder">📁</button>
+                                </div>
+                            </div>
+
+                            <div class="folder-slot" data-key="s">
+                                <div class="folder-key">S</div>
+                                <div class="folder-arrow">↓</div>
+                                <input type="text" class="folder-path-input" placeholder="D:\sorted\delete"
+                                    data-key="s">
+                                <button class="btn btn-small btn-secondary browse-folder">📁</button>
+                            </div>
+                        </div>
+
+                        <div class="filter-section">
+                            <div class="filter-header-compact">
+                                <h4>Filter Images to Sort</h4>
+                                <button class="btn btn-primary btn-small" id="btn-manual-sort-filters"><span>🔍</span>
+                                    Edit
+                                    Filters</button>
+                            </div>
+                            <div class="filter-summary-compact" id="manual-sort-filter-summary">
+                                <span class="summary-item"><strong>Generators:</strong> <span
+                                        id="manual-sort-summary-generators">All</span></span>
+                                <span class="summary-item"><strong>Tags:</strong> <span
+                                        id="manual-sort-summary-tags">None</span></span>
+                                <span class="summary-item"><strong>Ratings:</strong> <span
+                                        id="manual-sort-summary-ratings">All</span></span>
+                            </div>
+                        </div>
+
+                        <button class="btn btn-primary btn-large btn-glow" id="btn-start-sorting">
+                            🎮 Start Sorting
+                        </button>
+                    </div>
+
+                    <!-- Sorting Interface (shown during sorting) -->
+                    <div class="sort-interface" id="sort-interface" style="display: none;">
+                        <!-- Top Folder -->
+                        <div class="sort-folder sort-folder-top" data-key="w">
+                            <div class="folder-indicator">
+                                <span class="key-hint">W</span>
+                                <span class="folder-name" id="folder-name-w">Favorites</span>
+                            </div>
+                        </div>
+
+                        <!-- Middle Row -->
+                        <div class="sort-middle-row">
+                            <!-- Left Folder -->
+                            <div class="sort-folder sort-folder-left" data-key="a">
+                                <div class="folder-indicator">
+                                    <span class="key-hint">A</span>
+                                    <span class="folder-name" id="folder-name-a">Keep</span>
+                                </div>
+                            </div>
+
+                            <!-- Center Image Stack -->
+                            <div class="sort-image-container">
+                                <div class="image-stack" id="image-stack">
+                                    <div class="current-image-wrapper">
+                                        <img id="current-image" src="" alt="Current image">
+                                        <div class="image-overlay">
+                                            <div class="image-tags" id="current-image-tags"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="combo-display" id="combo-display">
+                                    <span class="combo-number">0</span>
+                                    <span class="combo-text">COMBO</span>
+                                </div>
+                            </div>
+
+                            <!-- Right Folder -->
+                            <div class="sort-folder sort-folder-right" data-key="d">
+                                <div class="folder-indicator">
+                                    <span class="key-hint">D</span>
+                                    <span class="folder-name" id="folder-name-d">Best</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Bottom Folder -->
+                        <div class="sort-folder sort-folder-bottom" data-key="s">
+                            <div class="folder-indicator">
+                                <span class="key-hint">S</span>
+                                <span class="folder-name" id="folder-name-s">Delete</span>
+                            </div>
+                        </div>
+
+                        <!-- Gallery Preview Bar -->
+                        <div class="gallery-preview-bar" id="gallery-preview-bar">
+                            <div class="preview-scroll" id="preview-scroll">
+                                <!-- Thumbnails will be inserted here by JS -->
+                            </div>
+                        </div>
+
+                        <!-- Progress Bar -->
+                        <div class="sort-progress">
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="sort-progress-fill"></div>
+                            </div>
+                            <div class="progress-info">
+                                <span id="sort-progress-text">0 / 0</span>
+                                <span class="progress-hint">SPACE to skip • Z to undo</span>
+                            </div>
+                        </div>
+
+                        <!-- Exit Button -->
+                        <button class="btn btn-ghost sort-exit" id="btn-exit-sorting">
+                            ✕ Exit
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Censored Edit View -->
+            <section id="view-censor" class="view">
+                <div class="censor-workspace-v2">
+                    <!-- Left Sidebar (Queue Only) -->
+                    <aside class="censor-sidebar-v2 left">
+                        <div class="sidebar-header-v2">
+                            <h4 class="sidebar-title-v2">Processing Queue</h4>
+                            <p class="sidebar-subtitle">Drag to reorder • Click to edit</p>
+                        </div>
+
+                        <div class="censor-queue-grid" id="censor-queue-list">
+                            <!-- Queue items injected here as grid -->
+                            <div class="queue-empty-state-v2">
+                                <span class="empty-icon">📷</span>
+                                <p>No images selected</p>
+                                <small>Select from Gallery</small>
+                            </div>
+                        </div>
+                    </aside>
+
+                    <!-- Center Area (Canvas) -->
+                    <div class="censor-main-v2">
+                        <div class="censor-toolbar-v2">
+                            <button class="tool-btn-v2 active" data-tool="brush" title="Brush (B)">
+                                <span class="tool-icon-v2">✏️</span>
+                                <span class="tool-label">Brush</span>
+                            </button>
+                            <button class="tool-btn-v2" data-tool="pen" title="Pen (P)">
+                                <span class="tool-icon-v2">🖊️</span>
+                                <span class="tool-label">Pen</span>
+                            </button>
+                            <button class="tool-btn-v2" data-tool="eraser" title="Eraser (E)">
+                                <span class="tool-icon-v2">🧹</span>
+                                <span class="tool-label">Eraser</span>
+                            </button>
+                            <button class="tool-btn-v2" data-tool="clone" title="Clone Stamp (G)">
+                                <span class="tool-icon-v2">📋</span>
+                                <span class="tool-label">Clone</span>
+                            </button>
+                            <div class="toolbar-divider"></div>
+                            <!-- Censor Style Dropdown in Toolbar -->
+                            <div class="toolbar-dropdown">
+                                <select id="censor-style" class="toolbar-select" title="Censor Style">
+                                    <option value="mosaic">🔳 Mosaic</option>
+                                    <option value="blur">🌀 Blur</option>
+                                    <option value="black_bar">⬛ Black</option>
+                                    <option value="white_bar">⬜ White</option>
+                                </select>
+                            </div>
+                            <div class="toolbar-divider"></div>
+                            <button class="tool-btn-v2" id="btn-undo" title="Undo (Ctrl+Z)">
+                                <span class="tool-icon-v2">↩️</span>
+                                <span class="tool-label">Undo</span>
+                            </button>
+                            <button class="tool-btn-v2" id="btn-clear-edits" title="Reset to Original">
+                                <span class="tool-icon-v2">🔄</span>
+                                <span class="tool-label">Reset</span>
+                            </button>
+                        </div>
+
+                        <div class="censor-canvas-wrapper-v2" id="canvas-wrapper">
+                            <div id="canvas-container"
+                                style="position: relative; width: 100%; height: 100%; display: flex; justify-content: center; align-items: center;">
+                                <canvas id="censor-canvas" style="position: absolute;"></canvas>
+                                <canvas id="censor-canvas-buffer"
+                                    style="position: absolute; opacity: 0; pointer-events: none;"></canvas>
+                            </div>
+                            <!-- Overlays -->
+                            <div id="censor-loading" class="censor-loading-v2" style="display: none;">
+                                <div class="spinner-v2"></div>
+                                <span id="censor-loading-msg">Processing...</span>
+                            </div>
+                            <div id="brush-size-indicator" class="brush-indicator-v2">30px</div>
+                            <div id="cursor-overlay"></div>
+                            <!-- No Image State -->
+                            <div id="censor-no-image" class="no-image-state-v2">
+                                <span class="empty-canvas-icon">🖼️</span>
+                                <p>Select an image from the queue to edit</p>
+                            </div>
+                        </div>
+
+                        <!-- Footer Bars -->
+                        <div class="censor-footer-bars">
+                            <div class="censor-status-bar">
+                                <div class="status-filename" id="censor-filename">No image selected</div>
+                                <div class="status-divider-h"></div>
+                                <div class="status-item">⌨️ Arrows Navigate</div>
+                                <div class="status-item">🖌️ [ ] Brush Size</div>
+                                <div class="status-item">🔍 Ctrl+Scroll Zoom</div>
+                                <div class="status-item">🎯 'D' Detect Current</div>
+                            </div>
+
+                            <div class="zoom-controls-v2">
+                                <button class="zoom-btn-v2" id="btn-zoom-out" title="Zoom Out">−</button>
+                                <span class="zoom-level-v2" id="zoom-level">100%</span>
+                                <button class="zoom-btn-v2" id="btn-zoom-in" title="Zoom In">+</button>
+                                <div class="zoom-divider-v"></div>
+                                <button class="zoom-btn-v2 reset" id="btn-zoom-fit" title="Reset Zoom">Reset</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right Sidebar (Settings & Tools) -->
+                    <aside class="censor-sidebar-v2 right">
+                        <div class="properties-header">
+                            <h4 class="properties-title">Settings & Tools</h4>
+                        </div>
+
+                        <!-- Auto-Detection Section -->
+                        <div class="property-section">
+                            <div class="section-header">
+                                <span class="section-title">🔍 Auto-Detection</span>
+                                <span class="collapse-arrow">▼</span>
+                            </div>
+                            <div class="section-content" id="section-detection" style="padding-top: 8px;">
+                                <div class="sidebar-action-row-v2">
+                                    <button class="btn-side-v2" id="btn-open-detect-modal"
+                                        title="Configure detection settings">
+                                        <span class="btn-icon">⚙️</span> Settings
+                                    </button>
+                                    <button class="btn-side-v2 primary" id="btn-auto-detect-current"
+                                        title="Run AI detection on current image">
+                                        <span class="btn-icon">🎯</span> Detect Current
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Brush & Censor Section -->
+                        <div class="property-section" id="section-pen">
+                            <div class="section-header">
+                                <span class="section-title">🖌️ Brush & Censor</span>
+                                <span class="collapse-arrow">▼</span>
+                            </div>
+                            <div class="section-content" style="padding-top: 8px;">
+                                <div class="prop-group-v2">
+                                    <label>Brush Size: <span id="tool-size-value">30</span>px</label>
+                                    <input type="range" id="tool-size" class="slider-v2" min="5" max="200" step="5"
+                                        value="30">
+                                </div>
+                                <div class="prop-group-v2">
+                                    <label>Block Size: <span id="censor-block-size-value">16</span></label>
+                                    <input type="range" id="censor-block-size" class="slider-v2" min="4" max="64"
+                                        step="2" value="16">
+                                </div>
+                                <div class="prop-group-v2">
+                                    <label>Pen Color</label>
+                                    <input type="color" id="pen-color" class="input-v2" value="#ff0000"
+                                        style="height: 40px; padding: 4px;">
+                                </div>
+                                <div class="prop-group-v2">
+                                    <label>Opacity: <span id="pen-opacity-value">100%</span></label>
+                                    <input type="range" id="pen-opacity" class="slider-v2" min="10" max="100" step="5"
+                                        value="100">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Output & Save Section -->
+                        <div class="property-section">
+                            <div class="section-header">
+                                <span class="section-title">📤 Output & Save</span>
+                                <span class="collapse-arrow">▼</span>
+                            </div>
+                            <div class="section-content" id="section-output" style="padding-top: 8px;">
+                                <div class="prop-group-v2">
+                                    <label>Metadata Handling</label>
+                                    <select id="censor-metadata-option" class="select-v2">
+                                        <option value="keep">Keep Original</option>
+                                        <option value="wash">Strip All</option>
+                                    </select>
+                                </div>
+                                <button class="btn-side-v2 primary" id="btn-save-all-processed"
+                                    style="margin-top: 12px; width: 100%;">
+                                    <span class="btn-icon">💾</span> Save All Processed
+                                </button>
+                                <button class="btn-side-v2" id="btn-batch-rename" style="margin-top: 8px; width: 100%;">
+                                    <span class="btn-icon">📝</span> Batch Rename
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="properties-footer">
+                            <button class="btn-side-v2 danger" id="btn-clear-queue" style="width: 100%;">
+                                <span class="btn-icon">🗑️</span> Clear Queue
+                            </button>
+                        </div>
+                    </aside>
+                </div>
+
+                <!-- Auto-Detect Modal -->
+                <div class="modal" id="detect-modal">
+                    <div class="modal-backdrop"></div>
+                    <div class="modal-content modal-medium">
+                        <button class="modal-close" id="btn-close-detect-modal">✕</button>
+                        <h3>🔍 Auto-Detect Settings</h3>
+                        <p class="modal-description">Configure AI detection and apply censoring automatically.</p>
+
+                        <div class="form-group">
+                            <label>YOLO Model Path</label>
+                            <div class="input-row" style="display: flex; gap: 8px;">
+                                <input type="text" id="censor-model-path" class="input-field"
+                                    placeholder="Path to .pt or .onnx model" style="flex: 1;">
+                                <button class="btn btn-secondary" id="btn-browse-model">📂</button>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Confidence Threshold: <span id="censor-confidence-value">0.50</span></label>
+                            <input type="range" id="censor-confidence" min="0.1" max="0.9" step="0.05" value="0.5">
+                        </div>
+
+                        <div class="form-group">
+                            <label>Target Regions</label>
+                            <div class="checkbox-grid"
+                                style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px;">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" class="target-region-check" value="breasts" checked>
+                                    <span class="checkbox-custom"></span>
+                                    <span class="checkbox-text">Breasts</span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" class="target-region-check" value="pussy" checked>
+                                    <span class="checkbox-custom"></span>
+                                    <span class="checkbox-text">Pussy</span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" class="target-region-check" value="dick" checked>
+                                    <span class="checkbox-custom"></span>
+                                    <span class="checkbox-text">Dick</span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" class="target-region-check" value="anus" checked>
+                                    <span class="checkbox-custom"></span>
+                                    <span class="checkbox-text">Anus</span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" class="target-region-check" value="cum">
+                                    <span class="checkbox-custom"></span>
+                                    <span class="checkbox-text">Cum</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="modal-actions" style="margin-top: 24px; display: flex; gap: 8px;">
+                            <button class="btn btn-secondary" id="btn-auto-detect-current-modal" style="flex: 1;">
+                                🎯 Detect Current
+                            </button>
+                            <button class="btn btn-primary" id="btn-auto-detect-all-modal" style="flex: 1;">
+                                ⚡ Detect All
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Image Preview Modal -->
+        <div class="modal" id="image-modal">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content">
+                <button class="modal-close" id="modal-close">✕</button>
+                <div class="modal-image-container">
+                    <img id="modal-image" src="" alt="Preview">
+                </div>
+                <div class="modal-info">
+                    <h3 id="modal-filename">filename.png</h3>
+                    <div class="modal-meta">
+                        <span class="meta-item"><strong>Generator:</strong> <span id="modal-generator">-</span></span>
+                        <span class="meta-item"><strong>Size:</strong> <span id="modal-size">-</span></span>
+                    </div>
+                    <div class="modal-prompt">
+                        <h4>Prompt</h4>
+                        <p id="modal-prompt-text">-</p>
+                    </div>
+                    <div class="modal-tags">
+                        <h4>Tags</h4>
+                        <div id="modal-tags-list" class="tags-list"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Scan Modal -->
+        <div class="modal" id="scan-modal">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content modal-small">
+                <h3>Scan Folder</h3>
+                <div class="form-group">
+                    <label>Folder Path</label>
+                    <input type="text" id="scan-folder-path" class="input-field" placeholder="D:\images\outputs">
+                </div>
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="scan-recursive" checked>
+                        <span class="checkbox-custom"></span>
+                        <span class="checkbox-text">Include subfolders</span>
+                    </label>
+                </div>
+                <div class="progress-container" id="scan-progress-container" style="display: none;">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="scan-progress-fill"></div>
+                    </div>
+                    <span class="progress-text" id="scan-progress-text">Starting...</span>
+                </div>
+                <div class="modal-actions">
+                    <button class="btn btn-ghost" id="btn-cancel-scan">Cancel</button>
+                    <button class="btn btn-primary" id="btn-start-scan">Start Scan</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tag Modal -->
+        <div class="modal" id="tag-modal">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content modal-medium">
+                <h3>Tag Images with WD14</h3>
+                <p class="modal-description">Uses WD14 tagger to automatically tag your images with anime/illustration
+                    tags.</p>
+
+                <div class="form-group">
+                    <label>Model</label>
+                    <select id="tag-model-select" class="input-field">
+                        <option value="wd-eva02-large-tagger-v3">wd-eva02-large-tagger-v3 (Best Quality)</option>
+                        <option value="wd-swinv2-tagger-v3">wd-swinv2-tagger-v3</option>
+                        <option value="wd-convnext-tagger-v3">wd-convnext-tagger-v3</option>
+                        <option value="wd-vit-tagger-v3">wd-vit-tagger-v3</option>
+                        <option value="wd-vit-large-tagger-v3">wd-vit-large-tagger-v3</option>
+                        <option value="custom">Custom Local Model...</option>
+                    </select>
+                </div>
+
+                <div class="form-group custom-model-group" id="custom-model-group" style="display: none;">
+                    <label>Custom Model Path (.onnx)</label>
+                    <input type="text" id="tag-model-path" class="input-field"
+                        placeholder="I:\ComfyUI\custom_nodes\comfyui-WD14-Tagger\models\wd-eva02-large-tagger-v3.onnx">
+                    <small class="helper-text">Path to your local .onnx model file</small>
+                </div>
+
+                <div class="form-group custom-model-group" id="custom-tags-group" style="display: none;">
+                    <label>Tags CSV Path</label>
+                    <input type="text" id="tag-tags-path" class="input-field"
+                        placeholder="Path to selected_tags.csv (required)">
+                    <small class="helper-text">Required when using custom model</small>
+                </div>
+
+                <div class="form-group">
+                    <label>General Tag Threshold</label>
+                    <div class="range-row">
+                        <input type="range" id="tag-threshold" min="0.1" max="0.9" step="0.05" value="0.35">
+                        <span class="range-value" id="tag-threshold-value">0.35</span>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Character Tag Threshold</label>
+                    <div class="range-row">
+                        <input type="range" id="tag-character-threshold" min="0.1" max="0.99" step="0.05" value="0.85">
+                        <span class="range-value" id="tag-character-threshold-value">0.85</span>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="tag-retag-all">
+                        <span class="checkbox-custom"></span>
+                        <span class="checkbox-text">Re-tag already tagged images?</span>
+                    </label>
+                </div>
+
+                <div class="progress-container" id="tag-progress-container" style="display: none;">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="tag-progress-fill"></div>
+                    </div>
+                    <span class="progress-text" id="tag-progress-text">Loading model...</span>
+                </div>
+                <div class="modal-actions">
+                    <button class="btn btn-ghost" id="btn-cancel-tag">Cancel</button>
+                    <button class="btn btn-primary" id="btn-start-tag">Start Tagging</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Analytics Modal -->
+        <div class="modal" id="analytics-modal">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content modal-large">
+                <button class="modal-close">✕</button>
+                <h3>📊 Image Analytics</h3>
+                <div class="analytics-grid">
+                    <div class="analytics-card">
+                        <h4>Top Checkpoints</h4>
+                        <div id="analytics-checkpoints" class="analytics-list"></div>
+                    </div>
+                    <div class="analytics-card">
+                        <h4>Top Loras</h4>
+                        <div id="analytics-loras" class="analytics-list"></div>
+                    </div>
+                    <div class="analytics-card">
+                        <h4>Top Tags</h4>
+                        <div id="analytics-tags" class="analytics-list"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Export Modal -->
+        <div class="modal" id="export-modal">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content modal-medium">
+                <button class="modal-close" id="btn-close-export">✕</button>
+                <h3 id="export-title">📤 Export Prompts</h3>
+                <p class="modal-description" id="export-count">0 images selected</p>
+                <div class="export-container">
+                    <textarea id="export-text" class="input-field" rows="15" readonly></textarea>
+                </div>
+                <div class="modal-actions">
+                    <button class="btn btn-secondary" id="btn-export-tags">Export Tags Instead</button>
+                    <button class="btn btn-primary" id="btn-copy-export">Copy to Clipboard</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Confirm Modal -->
+        <div class="modal" id="confirm-modal">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content modal-small">
+                <h3 id="confirm-title">Are you sure?</h3>
+                <p id="confirm-message">This action cannot be undone.</p>
+                <div class="modal-actions">
+                    <button class="btn btn-ghost" id="btn-confirm-cancel">Cancel</button>
+                    <button class="btn btn-primary danger" id="btn-confirm-ok">Yes, proceed</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Selection FAB -->
+        <div id="selection-actions" class="selection-fab" style="display: none;">
+            <span id="selection-count">0 items selected</span>
+            <div class="fab-buttons">
+                <button id="btn-select-all" class="btn btn-secondary"><span>✓✓</span> Select All</button>
+                <button id="btn-export-selected" class="btn btn-primary"><span>📤</span> Export Prompts</button>
+                <button id="btn-export-tags-selected" class="btn btn-secondary"><span>🏷️</span> Export Tags</button>
+                <button id="btn-batch-export-tags" class="btn btn-secondary"><span>📝</span> Export Tags to
+                    Files</button>
+                <button id="btn-send-to-censor" class="btn btn-primary"><span>🔳</span> Censor Edit</button>
+                <button id="btn-clear-selection" class="btn btn-ghost">Deselect All</button>
+            </div>
+        </div>
+
+        <!-- Batch Tag Export Modal -->
+        <div class="modal" id="batch-export-modal">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content modal-medium">
+                <button class="modal-close" id="btn-close-batch-export">✕</button>
+                <h3>📝 Export Tags to Files</h3>
+                <p class="modal-description" id="batch-export-count">0 images selected</p>
+
+                <div class="form-group">
+                    <label>Output Folder</label>
+                    <input type="text" id="batch-export-folder" class="input-field" placeholder="D:\\exported_tags">
+                    <small class="helper-text">Each image will create a .txt file with the same name</small>
+                </div>
+
+                <div class="form-group">
+                    <label>Tag Prefix (optional)</label>
+                    <input type="text" id="batch-export-prefix" class="input-field"
+                        placeholder="e.g., masterpiece, best quality, ">
+                    <small class="helper-text">Text to add at the beginning of each tag file</small>
+                </div>
+
+                <div class="form-group">
+                    <label>Tag Blacklist (optional)</label>
+                    <textarea id="batch-export-blacklist" class="input-field" rows="3"
+                        placeholder="e.g., 1girl, solo, simple background"></textarea>
+                    <small class="helper-text">Comma-separated list of tags to exclude from export</small>
+                </div>
+
+                <div class="progress-container" id="batch-export-progress" style="display: none;">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="batch-export-progress-fill"></div>
+                    </div>
+                    <span class="progress-text" id="batch-export-progress-text">Exporting...</span>
+                </div>
+
+                <div class="modal-actions">
+                    <button class="btn btn-ghost" id="btn-cancel-batch-export">Cancel</button>
+                    <button class="btn btn-primary" id="btn-start-batch-export">Export Files</button>
+                </div>
+            </div>
+        </div>
+
+
+        <!-- Unified Filter Modal -->
+        <div class="modal" id="filter-modal">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content modal-large">
+                <button class="modal-close" id="btn-close-filter-modal">✕</button>
+                <h3>🔍 Filter Images</h3>
+
+                <div class="filter-modal-grid">
+                    <!-- Left Column: Quick Filters -->
+                    <div class="filter-column">
+                        <div class="filter-section">
+                            <h4>Generators</h4>
+                            <div class="filter-options" id="modal-generator-filters">
+                                <label class="checkbox-label"><input type="checkbox" value="comfyui" checked><span
+                                        class="checkbox-custom"></span><span
+                                        class="checkbox-text">ComfyUI</span></label>
+                                <label class="checkbox-label"><input type="checkbox" value="nai" checked><span
+                                        class="checkbox-custom"></span><span
+                                        class="checkbox-text">NovelAI</span></label>
+                                <label class="checkbox-label"><input type="checkbox" value="webui" checked><span
+                                        class="checkbox-custom"></span><span class="checkbox-text">WebUI</span></label>
+                                <label class="checkbox-label"><input type="checkbox" value="forge" checked><span
+                                        class="checkbox-custom"></span><span class="checkbox-text">Forge</span></label>
+                                <label class="checkbox-label"><input type="checkbox" value="unknown" checked><span
+                                        class="checkbox-custom"></span><span
+                                        class="checkbox-text">Unknown</span></label>
+                            </div>
+                        </div>
+
+                        <div class="filter-section">
+                            <h4>Ratings</h4>
+                            <div class="filter-options" id="modal-rating-filters">
+                                <label class="checkbox-label"><input type="checkbox" value="general" checked><span
+                                        class="checkbox-custom"></span><span
+                                        class="checkbox-text">General</span></label>
+                                <label class="checkbox-label"><input type="checkbox" value="sensitive" checked><span
+                                        class="checkbox-custom"></span><span
+                                        class="checkbox-text">Sensitive</span></label>
+                                <label class="checkbox-label"><input type="checkbox" value="questionable" checked><span
+                                        class="checkbox-custom"></span><span
+                                        class="checkbox-text">Questionable</span></label>
+                                <label class="checkbox-label"><input type="checkbox" value="explicit" checked><span
+                                        class="checkbox-custom"></span><span
+                                        class="checkbox-text">Explicit</span></label>
+                            </div>
+                        </div>
+
+                        <div class="filter-section">
+                            <h4>Prompt Search</h4>
+                            <input type="text" id="modal-prompt-search" class="input-field"
+                                placeholder="Search in prompts...">
+                        </div>
+                    </div>
+
+                    <!-- Right Column: Searchable Lists -->
+                    <div class="filter-column">
+                        <div class="filter-section">
+                            <h4>Tags</h4>
+                            <input type="text" id="modal-tag-search" class="input-field"
+                                placeholder="Search tags to add...">
+                            <div class="tag-suggestions" id="modal-tag-suggestions"></div>
+                            <div class="active-tags" id="modal-active-tags"></div>
+                        </div>
+
+                        <div class="filter-section">
+                            <h4>Checkpoints</h4>
+                            <input type="text" id="modal-checkpoint-search" class="input-field"
+                                placeholder="Search checkpoints...">
+                            <div class="filter-list" id="modal-checkpoint-list"></div>
+                        </div>
+
+                        <div class="filter-section">
+                            <h4>Loras</h4>
+                            <input type="text" id="modal-lora-search" class="input-field" placeholder="Search loras...">
+                            <div class="filter-list" id="modal-lora-list"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-actions">
+                    <button class="btn btn-ghost" id="btn-reset-filters">Reset All</button>
+                    <button class="btn btn-primary" id="btn-apply-modal-filters">Apply Filters</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Rename Modal (for Censor Edit) -->
+        <div class="modal" id="rename-modal">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content modal-medium">
+                <button class="modal-close" id="btn-close-rename">✕</button>
+                <h3>📝 Batch Rename Images</h3>
+                <p class="modal-description">Set naming pattern for all queued images</p>
+
+                <div class="form-group">
+                    <label>Base Name</label>
+                    <input type="text" id="rename-base" class="input-field" placeholder="Image" value="Image">
+                    <small class="helper-text">Base name for all images</small>
+                </div>
+
+                <div class="form-group">
+                    <label>Starting Number</label>
+                    <input type="number" id="rename-start" class="input-field" min="1" value="1">
+                    <small class="helper-text">Images will be numbered sequentially from this number</small>
+                </div>
+
+                <div class="form-group">
+                    <label>Output Folder (for saving)</label>
+                    <input type="text" id="rename-output-folder" class="input-field" placeholder="D:\censored_output">
+                    <small class="helper-text">Folder where processed images will be saved</small>
+                </div>
+
+                <div class="form-group">
+                    <label>Preview</label>
+                    <div class="rename-preview">
+                        <div class="preview-item">Image_001.png</div>
+                        <div class="preview-item">Image_002.png</div>
+                        <div class="preview-item">Image_003.png</div>
+                        <div class="preview-hint">...and so on</div>
+                    </div>
+                </div>
+
+                <div class="modal-actions">
+                    <button class="btn btn-ghost" id="btn-cancel-rename">Cancel</button>
+                    <button class="btn btn-primary" id="btn-apply-rename">Apply Rename</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Model Selection Modal -->
+        <div class="modal" id="model-select-modal">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content modal-medium">
+                <button class="modal-close" id="btn-close-model-select">✕</button>
+                <h3 id="model-select-title">Select Models</h3>
+                <div class="search-container" style="margin: 15px 0;">
+                    <input type="text" id="model-select-search" class="input-field" placeholder="Search models...">
+                </div>
+                <div class="model-select-list" id="model-select-list"
+                    style="max-height: 400px; overflow-y: auto; display: flex; flex-direction: column; gap: 5px; margin-bottom: 20px;">
+                    <!-- Populated dynamically -->
+                </div>
+                <div class="modal-actions">
+                    <button class="btn btn-ghost" id="btn-cancel-model-select">Cancel</button>
+                    <button class="btn btn-primary" id="btn-confirm-model-select">Apply Selection</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toast Container -->
+        <div class="toast-container" id="toast-container"></div>
+    </div>
+
+    <!-- Audio Elements (will be managed by JS) -->
+    <audio id="sound-move" preload="auto"></audio>
+    <audio id="sound-skip" preload="auto"></audio>
+    <audio id="sound-combo" preload="auto"></audio>
+    <audio id="sound-undo" preload="auto"></audio>
+
+    <script src="/static/js/app.js"></script>
+    <script src="/static/js/gallery.js"></script>
+    <script src="/static/js/autosep.js"></script>
+    <script src="/static/js/manual-sort.js"></script>
+    <script src="/static/js/audio.js"></script>
+    <script src="/static/js/censor-edit.js"></script>
+</body>
+
+</html>
