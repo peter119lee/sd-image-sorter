@@ -20,8 +20,18 @@ models/wd14-tagger/
 testimage/
 backend/test-path/
 backend/favorites/
-backend/outputs/
-backend/censored_output/
+
+# Output directories - ignore anywhere in repo (prevent accidental uploads!)
+**/outputs/
+**/censored_output/
+outputs/
+censored_output/
+
+# Prevent any stray images in backend from being committed
+backend/*.png
+backend/*.jpg
+backend/*.jpeg
+backend/*.webp
 
 # Debug and log files
 *.log
