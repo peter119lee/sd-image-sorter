@@ -28,6 +28,20 @@ A powerful image management tool for Stable Diffusion users. Automatically extra
 
 ---
 
+## 📸 Screenshots
+
+| Gallery View | Manual Sort | Censor Edit |
+|:------------:|:-----------:|:-----------:|
+| ![Gallery](docs/screenshots/gallery_view.png) | ![Manual Sort](docs/screenshots/manual_sort.png) | ![Censor Edit](docs/screenshots/censor_edit.png) |
+
+## 🎬 Demo
+
+| Gallery Navigation | Manual Sort Flow |
+|:------------------:|:----------------:|
+| ![Gallery Demo](docs/screenshots/gallery_demo.gif) | ![Manual Sort Demo](docs/screenshots/manual_sort_demo.gif) |
+
+---
+
 ## ✨ Features
 
 ### 🖼️ Gallery Management
@@ -434,6 +448,20 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 > - 🧹 想批量清除图片的元数据 / 或者打完码后想选择性保留原始元数据
 >
 > **那就来试试这个顶级美味吧！🍜**
+
+---
+
+## 📸 软件截图
+
+| 画廊视图 | 手动排序 | 打码编辑 |
+|:--------:|:--------:|:--------:|
+| ![Gallery](docs/screenshots/gallery_view.png) | ![Manual Sort](docs/screenshots/manual_sort.png) | ![Censor Edit](docs/screenshots/censor_edit.png) |
+
+## 🎬 演示动画
+
+| 画廊导航 | 手动排序流程 |
+|:--------:|:------------:|
+| ![Gallery Demo](docs/screenshots/gallery_demo.gif) | ![Manual Sort Demo](docs/screenshots/manual_sort_demo.gif) |
 
 ---
 
