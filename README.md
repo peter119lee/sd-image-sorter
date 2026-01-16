@@ -14,6 +14,20 @@ A powerful image management tool for Stable Diffusion users. Automatically extra
 ![Python](https://img.shields.io/badge/python-3.9+-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
+---
+
+### 🤔 Sound familiar?
+
+> - 😵 Tons of images — some have metadata, some don't, and you can't tell them apart
+> - 🔍 Want to filter by specific tags / prompts / models, but existing tools just can't do it
+> - 📚 Want to build a local tags/prompts library from your own image collection
+> - 🔳 Auto-censor always misjudges, only draws rigid rectangles, and you can't manually tweak it
+> - 🧹 Want to batch-strip metadata, or selectively keep it after censoring
+>
+> **Give this tasty tool a try! 🍜**
+
+---
+
 ## ✨ Features
 
 ### 🖼️ Gallery Management
@@ -409,6 +423,20 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 专为 Stable Diffusion 用户设计的图像管理工具，具备极简玻璃拟态 UI。支持自动元数据提取、AI 打标、智能过滤和极速排序。
 
+---
+
+### 🤔 如果你正在烦恼...
+
+> - 😵 一大堆图片有些有元数据、有些没有，完全分不清楚
+> - 🔍 想快速过滤特定的 tags / prompts / models，却发现现有工具做不到  
+> - 📚 想基于自己的图库建立本地 tags/prompts 资料库
+> - 🔳 想自动打码却发现 YOLO 总是误判 / 自动打出来的码只有死板的长方形，又不能手动细修
+> - 🧹 想批量清除图片的元数据 / 或者打完码后想选择性保留原始元数据
+>
+> **那就来试试这个顶级美味吧！🍜**
+
+---
+
 ## ✨ 功能特性
 
 ### 🖼️ 画廊管理
@@ -515,3 +543,48 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 📄 开源协议
 
 本项目基于 MIT 协议开源 - 详见 [LICENSE](LICENSE) 文件。
+
+---
+
+## 💡 小贴士 (Tips & Hints)
+
+> [!TIP]
+> **拖拽读图**: 看到喜欢的图片？直接从 Gallery 拖拽到 ComfyUI 就能读取工作流啦！
+
+> [!TIP]  
+> **精细修正**: 在 Censor Edit 打码后，如果自动检测多画了一些区域，用 Eraser 工具 (`E` 键) 擦掉即可恢复原图。
+
+> [!TIP]
+> **批量工作流**: 在 Censor Edit 中可以拖动重新排列图片顺序 → 批量重命名 → 决定要不要保留元数据 → 最后一键导出，超级方便！
+
+> [!TIP]
+> **快捷键加速**: 熟练使用 `WASD` + `Space` + `Z` 组合，手动排序的速度堪比打游戏！
+
+---
+
+## 🙏 Special Thanks
+
+This project wouldn't be possible without these amazing contributors and their inspiring work:
+
+| Contributor | Contribution |
+|:------------|:-------------|
+| **[Antigravity](https://github.com/yourusername)** & **Claude Opus 4.5 (Thinking)** | 💻 Core development & AI-assisted coding |
+| **[Wenaka2004](https://github.com/Wenaka2004/auto-censor)** | 💡 Auto-censor concept inspiration |
+| **Wenaka2004** | 🎯 [YOLO detection model](https://civitai.com/models/1736285?modelVersionId=1965032) |
+| **[Spawner1145](https://github.com/spawner1145/comfyui-lsnet)**, **DraconicDragon**, **heathcliff01** | 🔮 LSNet inspiration *(feature coming soon!)* |
+| **[SmilingWolf](https://huggingface.co/SmilingWolf/wd-eva02-large-tagger-v3)** | 🏷️ WD14 Tagger models |
+| **[Receyuki](https://github.com/receyuki/stable-diffusion-prompt-reader)** | 📖 Prompt reader concept inspiration |
+
+---
+
+## 🐛 Feedback & Contributions
+
+Got ideas? Found a bug? We'd love to hear from you!
+
+- 📝 **Issues**: [Report bugs or request features](../../issues)
+- 🔧 **Pull Requests**: Contributions are always welcome!
+- 💬 **Discussion**: Feel free to start a conversation in Issues
+
+---
+
+*Made with ❤️ for the Stable Diffusion community*

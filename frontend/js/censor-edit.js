@@ -563,11 +563,16 @@ function handleDrop(e) {
 
 // State for double buffering
 CensorState.activeCanvasId = 'censor-canvas';
+CensorState.isLoadingImage = false; // Lock for preventing rapid load race conditions
 
 
 async function loadCanvasImage(id) {
     const item = CensorState.queue.find(i => i.id === id);
     if (!item) return;
+
+    // Prevent race conditions from rapid clicking
+    if (CensorState.isLoadingImage) return;
+    CensorState.isLoadingImage = true;
 
     if (CensorState.activeId && CensorState.activeId !== id) {
         saveCurrentCanvasToState();
@@ -631,11 +636,13 @@ async function loadCanvasImage(id) {
             if (filenameEl) filenameEl.textContent = item.outputFilename;
 
             resetZoom();
+            CensorState.isLoadingImage = false; // Release lock
         });
 
     } catch (error) {
         console.error('Failed to load image:', error);
         showLoading(false);
+        CensorState.isLoadingImage = false; // Release lock on error
         window.App.showToast('Error: ' + error.message, 'error');
     }
 }

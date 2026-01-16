@@ -7,25 +7,33 @@ backend/venv/
 __pycache__/
 *.py[cod]
 *$py.class
+.pytest_cache/
 
 # Database (contains user-specific file paths)
 backend/images.db
+*.db
 
 # Downloaded AI models (large files, auto-downloaded on first use)
 models/wd14-tagger/
 
-# Test images (may contain personal images)
+# Test images and personal folders (may contain personal images)
 testimage/
+backend/test-path/
+backend/favorites/
+backend/outputs/
+backend/censored_output/
+
+# Debug and log files
+*.log
+backend/lora_debug.txt
 
 # IDE files
 .vscode/
 .idea/
 *.swp
 *.swo
+.gemini/
 
 # OS files
 .DS_Store
 Thumbs.db
-
-# Logs
-*.log

@@ -404,6 +404,7 @@ async function performSkip() {
 
     } catch (error) {
         console.error('Failed to skip:', error);
+        showToast('Failed to skip image', 'error');
     }
 }
 

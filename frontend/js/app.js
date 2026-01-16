@@ -127,6 +127,10 @@ const API = {
         return this.get(`/api/tags/library?sort_by=${sortBy}&limit=${limit}`);
     },
 
+    async importTags(images, overwrite = false) {
+        return this.post('/api/tags/import', { images, overwrite });
+    },
+
     async getPromptsLibrary(limit = 5000) {
         return this.get(`/api/prompts/library?limit=${limit}`);
     },
@@ -158,7 +162,8 @@ const API = {
             model_path: options.modelPath || null,
             tags_path: options.tagsPath || null,
             image_ids: options.imageIds || null,
-            retag_all: options.retagAll || false
+            retag_all: options.retagAll || false,
+            use_gpu: options.useGpu ?? true
         });
     },
 
@@ -229,11 +234,6 @@ const API = {
             blacklist: blacklist,
             prefix: prefix
         });
-    },
-
-    // Tags Library
-    async getTagsLibrary(sortBy = 'frequency', limit = 2000) {
-        return this.get(`/api/tags/library?sort_by=${sortBy}&limit=${limit}`);
     },
 
     // Prompts Library
@@ -596,6 +596,41 @@ function initEventListeners() {
     $('#btn-cancel-batch-export').addEventListener('click', () => hideModal('batch-export-modal'));
     $('#btn-start-batch-export').addEventListener('click', executeBatchExport);
 
+    // --- Import Tags (from Tag Modal) ---
+    $('#btn-import-tags')?.addEventListener('click', () => {
+        $('#import-tags-file').click();
+    });
+    $('#import-tags-file')?.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        try {
+            const text = await file.text();
+            const data = JSON.parse(text);
+
+            // Validate the data structure
+            if (!data.images || !Array.isArray(data.images)) {
+                throw new Error('Invalid format: expected { images: [...] }');
+            }
+
+            // Ask user about overwrite preference
+            const overwrite = confirm(
+                `Found ${data.images.length} images in file.\n\n` +
+                'Do you want to OVERWRITE existing tags?\n\n' +
+                'Click OK to overwrite, Cancel to skip already-tagged images.'
+            );
+
+            const result = await API.importTags(data.images, overwrite);
+            showToast(`Imported tags for ${result.imported} images (${result.skipped} skipped)`, 'success');
+
+            // Refresh the gallery to show new tags
+            loadImages();
+        } catch (err) {
+            showToast('Failed to import tags: ' + err.message, 'error');
+        }
+        e.target.value = ''; // Reset file input
+    });
+
     // --- Censored Edit ---
     $('#btn-send-to-censor')?.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -731,6 +766,7 @@ async function startTagging() {
     }
 
     options.retagAll = $('#tag-retag-all').checked;
+    options.useGpu = $('#tag-use-gpu')?.checked ?? true; // Default to GPU if checkbox is checked or missing
 
     try {
         await API.startTagging(options);
@@ -1421,14 +1457,14 @@ async function executeBatchExport() {
 function updateFiltersFromUI() {
     // Get generators
     const generators = [];
-    $$('#generator-filters input[type="checkbox"]:checked').forEach(cb => {
+    $$('#modal-generator-filters input[type="checkbox"]:checked').forEach(cb => {
         generators.push(cb.value);
     });
     AppState.filters.generators = generators;
 
     // Get ratings
     const ratings = [];
-    $$('#rating-filters input[type="checkbox"]:checked').forEach(cb => {
+    $$('#modal-rating-filters input[type="checkbox"]:checked').forEach(cb => {
         ratings.push(cb.value);
     });
     AppState.filters.ratings = ratings;
@@ -1440,10 +1476,10 @@ function applyFilters() {
 }
 
 function clearFilters() {
-    $$('#generator-filters input[type="checkbox"]').forEach(cb => {
+    $$('#modal-generator-filters input[type="checkbox"]').forEach(cb => {
         cb.checked = true;
     });
-    $$('#rating-filters input[type="checkbox"]').forEach(cb => {
+    $$('#modal-rating-filters input[type="checkbox"]').forEach(cb => {
         cb.checked = true;
     });
     AppState.filters.generators = ['comfyui', 'nai', 'webui', 'forge', 'unknown'];
