@@ -44,6 +44,9 @@
                 <button id="btn-clear-db" class="btn btn-ghost danger">
                     <span>🗑️</span> Clear Gallery
                 </button>
+                <button id="btn-tags-library" class="btn btn-ghost" title="Browse all tags and prompts">
+                    <span>📚</span> Library
+                </button>
                 <button id="btn-scan" class="btn btn-primary">
                     <span>📂</span> Scan Folder
                 </button>
@@ -135,6 +138,8 @@
                                 <option value="tag_count">🏷️ Most Tags</option>
                                 <option value="rating">⚠️ Rating (NSFW↑)</option>
                                 <option value="character_count">👤 Characters</option>
+                                <option value="file_size">💾 Largest File</option>
+                                <option value="file_size_asc">💾 Smallest File</option>
                                 <option value="random">🎲 Random</option>
                             </select>
                             <div class="divider-v"></div>
@@ -178,6 +183,14 @@
                                         id="autosep-summary-tags">None</span></span>
                                 <span class="summary-item"><strong>Ratings:</strong> <span
                                         id="autosep-summary-ratings">All</span></span>
+                                <span class="summary-item"><strong>Checkpoints:</strong> <span
+                                        id="autosep-summary-checkpoints">None</span></span>
+                                <span class="summary-item"><strong>Loras:</strong> <span
+                                        id="autosep-summary-loras">None</span></span>
+                                <span class="summary-item"><strong>Prompts:</strong> <span
+                                        id="autosep-summary-prompts">None</span></span>
+                                <span class="summary-item"><strong>Dimensions:</strong> <span
+                                        id="autosep-summary-dimensions">Any</span></span>
                             </div>
                         </div>
 
@@ -269,6 +282,14 @@
                                         id="manual-sort-summary-tags">None</span></span>
                                 <span class="summary-item"><strong>Ratings:</strong> <span
                                         id="manual-sort-summary-ratings">All</span></span>
+                                <span class="summary-item"><strong>Checkpoints:</strong> <span
+                                        id="manual-sort-summary-checkpoints">None</span></span>
+                                <span class="summary-item"><strong>Loras:</strong> <span
+                                        id="manual-sort-summary-loras">None</span></span>
+                                <span class="summary-item"><strong>Prompts:</strong> <span
+                                        id="manual-sort-summary-prompts">None</span></span>
+                                <span class="summary-item"><strong>Dimensions:</strong> <span
+                                        id="manual-sort-summary-dimensions">Any</span></span>
                             </div>
                         </div>
 
@@ -381,19 +402,19 @@
                         <div class="censor-toolbar-v2">
                             <button class="tool-btn-v2 active" data-tool="brush" title="Brush (B)">
                                 <span class="tool-icon-v2">✏️</span>
-                                <span class="tool-label">Brush</span>
+                                <span class="tool-label">Brush <kbd>B</kbd></span>
                             </button>
                             <button class="tool-btn-v2" data-tool="pen" title="Pen (P)">
                                 <span class="tool-icon-v2">🖊️</span>
-                                <span class="tool-label">Pen</span>
+                                <span class="tool-label">Pen <kbd>P</kbd></span>
                             </button>
                             <button class="tool-btn-v2" data-tool="eraser" title="Eraser (E)">
                                 <span class="tool-icon-v2">🧹</span>
-                                <span class="tool-label">Eraser</span>
+                                <span class="tool-label">Eraser <kbd>E</kbd></span>
                             </button>
                             <button class="tool-btn-v2" data-tool="clone" title="Clone Stamp (G)">
                                 <span class="tool-icon-v2">📋</span>
-                                <span class="tool-label">Clone</span>
+                                <span class="tool-label">Clone <kbd>G</kbd></span>
                             </button>
                             <div class="toolbar-divider"></div>
                             <!-- Censor Style Dropdown in Toolbar -->
@@ -408,7 +429,7 @@
                             <div class="toolbar-divider"></div>
                             <button class="tool-btn-v2" id="btn-undo" title="Undo (Ctrl+Z)">
                                 <span class="tool-icon-v2">↩️</span>
-                                <span class="tool-label">Undo</span>
+                                <span class="tool-label">Undo <kbd>Z</kbd></span>
                             </button>
                             <button class="tool-btn-v2" id="btn-clear-edits" title="Reset to Original">
                                 <span class="tool-icon-v2">🔄</span>
@@ -441,6 +462,8 @@
                         <div class="censor-footer-bars">
                             <div class="censor-status-bar">
                                 <div class="status-filename" id="censor-filename">No image selected</div>
+                                <button class="btn-icon-small" id="btn-rename-single"
+                                    title="Rename this image (R)">✏️</button>
                                 <div class="status-divider-h"></div>
                                 <div class="status-item">⌨️ Arrows Navigate</div>
                                 <div class="status-item">🖌️ [ ] Brush Size</div>
@@ -477,8 +500,8 @@
                                         <span class="btn-icon">⚙️</span> Settings
                                     </button>
                                     <button class="btn-side-v2 primary" id="btn-auto-detect-current"
-                                        title="Run AI detection on current image">
-                                        <span class="btn-icon">🎯</span> Detect Current
+                                        title="Run AI detection on current image (D)" style="white-space: nowrap;">
+                                        <span class="btn-icon">🎯</span> Detect <kbd>D</kbd>
                                     </button>
                                 </div>
                             </div>
@@ -521,13 +544,6 @@
                                 <span class="collapse-arrow">▼</span>
                             </div>
                             <div class="section-content" id="section-output" style="padding-top: 8px;">
-                                <div class="prop-group-v2">
-                                    <label>Metadata Handling</label>
-                                    <select id="censor-metadata-option" class="select-v2">
-                                        <option value="keep">Keep Original</option>
-                                        <option value="wash">Strip All</option>
-                                    </select>
-                                </div>
                                 <button class="btn-side-v2 primary" id="btn-save-all-processed"
                                     style="margin-top: 12px; width: 100%;">
                                     <span class="btn-icon">💾</span> Save All Processed
@@ -725,6 +741,15 @@
                     </label>
                 </div>
 
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="tag-use-gpu" checked>
+                        <span class="checkbox-custom"></span>
+                        <span class="checkbox-text">Use GPU acceleration (faster but uses more VRAM)</span>
+                    </label>
+                    <small class="helper-text">Uncheck to use CPU only (slower but won't freeze system)</small>
+                </div>
+
                 <div class="progress-container" id="tag-progress-container" style="display: none;">
                     <div class="progress-bar">
                         <div class="progress-fill" id="tag-progress-fill"></div>
@@ -732,6 +757,12 @@
                     <span class="progress-text" id="tag-progress-text">Loading model...</span>
                 </div>
                 <div class="modal-actions">
+                    <button class="btn btn-ghost" id="btn-export-tags" title="Export all tags to JSON file">📤 Export
+                        Tags</button>
+                    <button class="btn btn-ghost" id="btn-import-tags" title="Import tags from JSON file">📥 Import
+                        Tags</button>
+                    <input type="file" id="import-tags-file" accept=".json" style="display: none;">
+                    <div style="flex: 1;"></div>
                     <button class="btn btn-ghost" id="btn-cancel-tag">Cancel</button>
                     <button class="btn btn-primary" id="btn-start-tag">Start Tagging</button>
                 </div>
@@ -877,28 +908,43 @@
                             </div>
                         </div>
 
+                        <button class="btn btn-ghost" id="btn-open-library-from-filter"
+                            style="margin-top: 10px; width: 100%;">
+                            📚 Browse Library
+                        </button>
+
                         <div class="filter-section">
-                            <h4>Ratings</h4>
-                            <div class="filter-options" id="modal-rating-filters">
-                                <label class="checkbox-label"><input type="checkbox" value="general" checked><span
-                                        class="checkbox-custom"></span><span
-                                        class="checkbox-text">General</span></label>
-                                <label class="checkbox-label"><input type="checkbox" value="sensitive" checked><span
-                                        class="checkbox-custom"></span><span
-                                        class="checkbox-text">Sensitive</span></label>
-                                <label class="checkbox-label"><input type="checkbox" value="questionable" checked><span
-                                        class="checkbox-custom"></span><span
-                                        class="checkbox-text">Questionable</span></label>
-                                <label class="checkbox-label"><input type="checkbox" value="explicit" checked><span
-                                        class="checkbox-custom"></span><span
-                                        class="checkbox-text">Explicit</span></label>
+                            <h4>Dimensions & Aspect</h4>
+                            <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+                                <input type="number" id="filter-min-width" class="input-field input-small"
+                                    placeholder="W min" min="0" step="64" style="width: 65px;">
+                                <span style="color: var(--text-muted);">–</span>
+                                <input type="number" id="filter-max-width" class="input-field input-small"
+                                    placeholder="W max" min="0" step="64" style="width: 65px;">
+                                <span style="margin: 0 4px; color: var(--text-muted);">×</span>
+                                <input type="number" id="filter-min-height" class="input-field input-small"
+                                    placeholder="H min" min="0" step="64" style="width: 65px;">
+                                <span style="color: var(--text-muted);">–</span>
+                                <input type="number" id="filter-max-height" class="input-field input-small"
+                                    placeholder="H max" min="0" step="64" style="width: 65px;">
+                            </div>
+                            <div style="display: flex; gap: 12px; margin-top: 8px; flex-wrap: wrap;">
+                                <label style="display: flex; align-items: center; gap: 4px; cursor: pointer;"><input
+                                        type="radio" name="aspect-ratio" value="" checked> Any</label>
+                                <label style="display: flex; align-items: center; gap: 4px; cursor: pointer;"><input
+                                        type="radio" name="aspect-ratio" value="square"> ■ Square</label>
+                                <label style="display: flex; align-items: center; gap: 4px; cursor: pointer;"><input
+                                        type="radio" name="aspect-ratio" value="landscape"> ▬ Landscape</label>
+                                <label style="display: flex; align-items: center; gap: 4px; cursor: pointer;"><input
+                                        type="radio" name="aspect-ratio" value="portrait"> ▮ Portrait</label>
                             </div>
                         </div>
 
-                        <div class="filter-section">
-                            <h4>Prompt Search</h4>
-                            <input type="text" id="modal-prompt-search" class="input-field"
-                                placeholder="Search in prompts...">
+                        <!-- Action Buttons - positioned in left column for easy access -->
+                        <div class="filter-actions-inline" style="display: flex; gap: 12px; margin-top: 8px;">
+                            <button class="btn btn-ghost" id="btn-reset-filters" style="flex: 1;">Reset All</button>
+                            <button class="btn btn-primary" id="btn-apply-modal-filters" style="flex: 1;">Apply
+                                Filters</button>
                         </div>
                     </div>
 
@@ -906,10 +952,22 @@
                     <div class="filter-column">
                         <div class="filter-section">
                             <h4>Tags</h4>
-                            <input type="text" id="modal-tag-search" class="input-field"
-                                placeholder="Search tags to add...">
-                            <div class="tag-suggestions" id="modal-tag-suggestions"></div>
+                            <div class="tag-search-container">
+                                <input type="text" id="modal-tag-search" class="input-field"
+                                    placeholder="Search tags to add...">
+                                <div class="tag-suggestions" id="modal-tag-suggestions"></div>
+                            </div>
                             <div class="active-tags" id="modal-active-tags"></div>
+                        </div>
+
+                        <div class="filter-section">
+                            <h4>Prompt Search</h4>
+                            <div class="tag-search-container">
+                                <input type="text" id="modal-prompt-search" class="input-field"
+                                    placeholder="Type to search prompts...">
+                                <div class="tag-suggestions" id="modal-prompt-suggestions"></div>
+                            </div>
+                            <div class="active-tags" id="modal-active-prompts"></div>
                         </div>
 
                         <div class="filter-section">
@@ -926,11 +984,6 @@
                         </div>
                     </div>
                 </div>
-
-                <div class="modal-actions">
-                    <button class="btn btn-ghost" id="btn-reset-filters">Reset All</button>
-                    <button class="btn btn-primary" id="btn-apply-modal-filters">Apply Filters</button>
-                </div>
             </div>
         </div>
 
@@ -943,6 +996,15 @@
                 <p class="modal-description">Set naming pattern for all queued images</p>
 
                 <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="rename-use-original">
+                        <span class="checkbox-custom"></span>
+                        <span class="checkbox-text">Use Original Filename</span>
+                    </label>
+                    <small class="helper-text">Keep original names instead of sequential numbering</small>
+                </div>
+
+                <div class="form-group" id="rename-custom-group">
                     <label>Base Name</label>
                     <input type="text" id="rename-base" class="input-field" placeholder="Image" value="Image">
                     <small class="helper-text">Base name for all images</small>
@@ -952,12 +1014,6 @@
                     <label>Starting Number</label>
                     <input type="number" id="rename-start" class="input-field" min="1" value="1">
                     <small class="helper-text">Images will be numbered sequentially from this number</small>
-                </div>
-
-                <div class="form-group">
-                    <label>Output Folder (for saving)</label>
-                    <input type="text" id="rename-output-folder" class="input-field" placeholder="D:\censored_output">
-                    <small class="helper-text">Folder where processed images will be saved</small>
                 </div>
 
                 <div class="form-group">
@@ -973,6 +1029,46 @@
                 <div class="modal-actions">
                     <button class="btn btn-ghost" id="btn-cancel-rename">Cancel</button>
                     <button class="btn btn-primary" id="btn-apply-rename">Apply Rename</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Save Options Modal (for Censor Edit) -->
+        <div class="modal" id="save-options-modal">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content modal-medium">
+                <button class="modal-close" id="btn-close-save-options">✕</button>
+                <h3>💾 Save Options</h3>
+                <p class="modal-description">Configure output settings before saving all images</p>
+
+                <div class="form-group">
+                    <label>Output Folder</label>
+                    <input type="text" id="save-output-folder" class="input-field" placeholder="D:\censored_output">
+                    <small class="helper-text">Folder where processed images will be saved</small>
+                </div>
+
+                <div class="form-group">
+                    <label>Metadata Handling</label>
+                    <select id="save-metadata-option" class="input-field">
+                        <option value="strip">Strip All Metadata (Recommended for sharing)</option>
+                        <option value="keep">Keep Original Metadata</option>
+                        <option value="minimal">Keep Only Basic Info (dimensions, format)</option>
+                    </select>
+                    <small class="helper-text">Choose how to handle image metadata/EXIF data</small>
+                </div>
+
+                <div class="form-group">
+                    <label>Output Format</label>
+                    <select id="save-format-option" class="input-field">
+                        <option value="png">PNG (Lossless, larger file)</option>
+                        <option value="webp">WebP (Smaller file, good quality)</option>
+                    </select>
+                    <small class="helper-text">Choose the output image format</small>
+                </div>
+
+                <div class="modal-actions">
+                    <button class="btn btn-ghost" id="btn-cancel-save-options">Cancel</button>
+                    <button class="btn btn-primary" id="btn-confirm-save-options">💾 Save All Images</button>
                 </div>
             </div>
         </div>
@@ -993,6 +1089,43 @@
                 <div class="modal-actions">
                     <button class="btn btn-ghost" id="btn-cancel-model-select">Cancel</button>
                     <button class="btn btn-primary" id="btn-confirm-model-select">Apply Selection</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tags Library Modal -->
+        <div class="modal" id="tags-library-modal">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content modal-large">
+                <button class="modal-close" id="btn-close-tags-library">✕</button>
+                <h3>📚 Tags & Prompts Library</h3>
+                <p class="modal-description">Browse all discovered tags with their frequencies</p>
+
+                <div class="library-tabs" style="display: flex; gap: 10px; margin: 15px 0;">
+                    <button class="btn btn-secondary active" id="library-tab-tags" data-tab="tags">🏷️ Tags</button>
+                    <button class="btn btn-ghost" id="library-tab-prompts" data-tab="prompts">📝 Prompts</button>
+                    <div style="flex: 1;"></div>
+                    <select id="library-sort" class="sort-dropdown" style="width: auto;">
+                        <option value="frequency">Sort: Frequency</option>
+                        <option value="alphabetical">Sort: A-Z</option>
+                    </select>
+                </div>
+
+                <div class="search-container" style="margin: 10px 0;">
+                    <input type="text" id="library-search" class="input-field" placeholder="Search tags or prompts...">
+                </div>
+
+                <div id="library-content"
+                    style="max-height: 450px; overflow-y: auto; display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 0;">
+                    <!-- Populated dynamically -->
+                </div>
+
+                <div class="library-stats" style="margin-top: 15px; color: var(--text-muted); font-size: 13px;">
+                    <span id="library-stats-text">Loading...</span>
+                </div>
+
+                <div class="modal-actions">
+                    <button class="btn btn-ghost" id="btn-close-tags-library-2">Close</button>
                 </div>
             </div>
         </div>

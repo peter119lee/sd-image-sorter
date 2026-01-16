@@ -7,6 +7,8 @@ const CensorState = {
     // Queue of { id, originalFilename, outputFilename, originalUrl, currentDataUrl, regions, isProcessed, isModified }
     queue: [],
     activeId: null, // ID of currently edited image
+    selectedItems: new Set(), // IDs of selected items for multi-select
+    lastSelectedIndex: -1, // Last clicked index for shift-select range
 
     // Tools
     currentTool: 'brush', // brush, pen, eraser, clone
@@ -43,7 +45,8 @@ const CensorState = {
     style: 'mosaic',
     blockSize: 16,
     targetClasses: ['breasts', 'pussy', 'dick', 'anus'], // Matches Wenaka YOLO model classes
-    metadataOption: 'keep' // 'keep' or 'wash'
+    metadataOption: 'keep', // 'keep' or 'wash'
+    outputFormat: 'png' // 'png' or 'webp'
 };
 
 // Track bound handlers for cleanup to prevent memory leaks
@@ -74,9 +77,11 @@ function initCensorEdit() {
     const { $, $$ } = window.App;
     console.log('Initializing Censor Edit UI...');
 
-    // Load saved settings
-    if (CensorState.modelPath) $('#censor-model-path').value = CensorState.modelPath;
-    if (CensorState.outputFolder) $('#rename-output-folder').value = CensorState.outputFolder;
+    // Load saved settings (use optional chaining for elements that may not exist)
+    const modelPathEl = $('#censor-model-path');
+    const outputFolderEl = $('#save-output-folder'); // Changed from removed rename-output-folder
+    if (CensorState.modelPath && modelPathEl) modelPathEl.value = CensorState.modelPath;
+    if (CensorState.outputFolder && outputFolderEl) outputFolderEl.value = CensorState.outputFolder;
 
     bindEvents();
     initDragAndDrop();
@@ -200,7 +205,11 @@ function bindEvents() {
         if (CensorState.activeId) runDetectionForImage(CensorState.queue.find(i => i.id === CensorState.activeId));
     });
 
-    $('#btn-save-all-processed')?.addEventListener('click', saveAllProcessed);
+    // Save All - opens options popup first
+    $('#btn-save-all-processed')?.addEventListener('click', openSaveOptionsPopup);
+    $('#btn-close-save-options')?.addEventListener('click', () => $('#save-options-modal')?.classList.remove('visible'));
+    $('#btn-cancel-save-options')?.addEventListener('click', () => $('#save-options-modal')?.classList.remove('visible'));
+    $('#btn-confirm-save-options')?.addEventListener('click', confirmAndSaveAll);
 
     // New button handlers
     $('#btn-auto-detect-current')?.addEventListener('click', () => {
@@ -258,6 +267,18 @@ function bindEvents() {
     $('#censor-metadata-option')?.addEventListener('change', (e) => {
         CensorState.metadataOption = e.target.value;
     });
+
+    // Use Original Filename toggle - hide/show custom name fields
+    $('#rename-use-original')?.addEventListener('change', (e) => {
+        const customGroup = $('#rename-custom-group');
+        const startGroup = document.getElementById('rename-start')?.parentElement;
+        if (customGroup) customGroup.style.display = e.target.checked ? 'none' : 'block';
+        if (startGroup) startGroup.style.display = e.target.checked ? 'none' : 'block';
+        updateRenamePreview();
+    });
+
+    // Single rename button
+    $('#btn-rename-single')?.addEventListener('click', promptSingleRename);
 
     // Browse model path button (opens prompt since browser can't access filesystem directly)
     $('#btn-browse-model')?.addEventListener('click', () => {
@@ -377,9 +398,38 @@ function renderQueue() {
             img.draggable = true;
             img.dataset.id = itemIdStr;
 
-            // Click to load
-            img.addEventListener('click', () => {
-                loadCanvasImage(item.id);
+            // Click to load with multi-select support
+            img.addEventListener('click', (e) => {
+                const clickedIndex = parseInt(img.dataset.index);
+                const clickedId = item.id;
+
+                if (e.ctrlKey || e.metaKey) {
+                    // Ctrl+click: toggle selection
+                    if (CensorState.selectedItems.has(clickedId)) {
+                        CensorState.selectedItems.delete(clickedId);
+                    } else {
+                        CensorState.selectedItems.add(clickedId);
+                    }
+                    CensorState.lastSelectedIndex = clickedIndex;
+                } else if (e.shiftKey && CensorState.lastSelectedIndex >= 0) {
+                    // Shift+click: range selection
+                    const start = Math.min(CensorState.lastSelectedIndex, clickedIndex);
+                    const end = Math.max(CensorState.lastSelectedIndex, clickedIndex);
+                    CensorState.selectedItems.clear();
+                    for (let i = start; i <= end; i++) {
+                        if (CensorState.queue[i]) {
+                            CensorState.selectedItems.add(CensorState.queue[i].id);
+                        }
+                    }
+                } else {
+                    // Normal click: select single and load
+                    CensorState.selectedItems.clear();
+                    CensorState.selectedItems.add(clickedId);
+                    CensorState.lastSelectedIndex = clickedIndex;
+                    loadCanvasImage(item.id);
+                }
+
+                updateQueueSelection();
             });
 
             // DnD Events
@@ -418,6 +468,23 @@ function initDragAndDrop() {
     // Basic setup handled in renderQueue listeners
 }
 
+function updateQueueSelection() {
+    // Update visual selection state on all queue thumbnails
+    document.querySelectorAll('.queue-thumb-v2').forEach(img => {
+        const itemId = parseInt(img.dataset.id);
+        const isSelected = CensorState.selectedItems.has(itemId);
+        img.classList.toggle('selected', isSelected);
+    });
+
+    // Update selection count indicator if it exists
+    const countEl = document.getElementById('queue-selection-count');
+    if (countEl) {
+        const count = CensorState.selectedItems.size;
+        countEl.textContent = count > 1 ? `${count} selected` : '';
+        countEl.style.display = count > 1 ? 'block' : 'none';
+    }
+}
+
 let draggedItemIndex = null;
 
 function handleDragStart(e) {
@@ -454,19 +521,36 @@ function handleDrop(e) {
     const targetIndex = parseInt(targetItem.dataset.index);
     const draggedId = e.dataTransfer.getData('text/plain');
 
-    // Find current index of the dragged item
-    const currentIndex = CensorState.queue.findIndex(item => item.id.toString() === draggedId);
+    // Check if we're moving multiple selected items
+    if (CensorState.selectedItems.size > 1 && CensorState.selectedItems.has(parseInt(draggedId))) {
+        // Move all selected items as a group
+        const selectedIds = [...CensorState.selectedItems];
+        const selectedItems = CensorState.queue.filter(item => selectedIds.includes(item.id));
 
-    if (currentIndex !== -1 && currentIndex !== targetIndex) {
-        // Move item in array
-        const item = CensorState.queue[currentIndex];
-        CensorState.queue.splice(currentIndex, 1);
-        CensorState.queue.splice(targetIndex, 0, item);
+        // Remove selected items from queue
+        CensorState.queue = CensorState.queue.filter(item => !selectedIds.includes(item.id));
 
-        // Re-render the whole queue to update indices and visuals
+        // Find adjusted target index
+        let adjustedTarget = targetIndex;
+        if (adjustedTarget > CensorState.queue.length) {
+            adjustedTarget = CensorState.queue.length;
+        }
+
+        // Insert selected items at target position
+        CensorState.queue.splice(adjustedTarget, 0, ...selectedItems);
+
         renderQueue();
+        updateQueueSelection();
+    } else {
+        // Single item move (original logic)
+        const currentIndex = CensorState.queue.findIndex(item => item.id.toString() === draggedId);
 
-        // Save state if needed (optional, depends if queue should persist)
+        if (currentIndex !== -1 && currentIndex !== targetIndex) {
+            const item = CensorState.queue[currentIndex];
+            CensorState.queue.splice(currentIndex, 1);
+            CensorState.queue.splice(targetIndex, 0, item);
+            renderQueue();
+        }
     }
 
     document.querySelectorAll('.queue-thumb-v2').forEach(el => {
@@ -933,19 +1017,59 @@ async function runDetectionForImage(item, silent = false) {
 
 // ============== Batch Actions ==============
 
-async function applyBatchRename() {
-    const base = document.getElementById('rename-base').value || 'Image';
-    const start = parseInt(document.getElementById('rename-start').value) || 1;
-    const outputFolder = document.getElementById('rename-output-folder').value;
+function updateRenamePreview() {
+    const useOriginal = document.getElementById('rename-use-original')?.checked || false;
+    const base = document.getElementById('rename-base')?.value || 'Image';
+    const start = parseInt(document.getElementById('rename-start')?.value) || 1;
+    const previewContainer = document.querySelector('.rename-preview');
 
-    if (outputFolder) {
-        CensorState.outputFolder = outputFolder;
-        localStorage.setItem('censor_output_folder', outputFolder);
+    if (!previewContainer) return;
+
+    // Generate preview items
+    let previewHtml = '';
+    const sampleCount = Math.min(3, CensorState.queue.length || 3);
+
+    for (let i = 0; i < sampleCount; i++) {
+        let filename;
+        if (useOriginal) {
+            const item = CensorState.queue[i];
+            if (item) {
+                const originalName = item.originalFilename || item.filename || `image_${i + 1}`;
+                const baseName = originalName.replace(/\.[^/.]+$/, '');
+                filename = `${baseName}.png`;
+            } else {
+                filename = `original_name_${i + 1}.png`;
+            }
+        } else {
+            const num = String(start + i).padStart(3, '0');
+            filename = `${base}_${num}.png`;
+        }
+        previewHtml += `<div class="preview-item">${filename}</div>`;
     }
 
+    if (CensorState.queue.length > 3 || sampleCount === 3) {
+        previewHtml += '<div class="preview-hint">...and so on</div>';
+    }
+
+    previewContainer.innerHTML = previewHtml;
+}
+
+async function applyBatchRename() {
+    const useOriginal = document.getElementById('rename-use-original')?.checked || false;
+    const base = document.getElementById('rename-base').value || 'Image';
+    const start = parseInt(document.getElementById('rename-start').value) || 1;
+    // Note: Output folder is configured in Save Options modal, not here
+
     CensorState.queue.forEach((item, i) => {
-        const num = String(start + i).padStart(3, '0');
-        item.outputFilename = `${base}_${num}.png`;
+        if (useOriginal) {
+            // Use original filename (keeping extension as .png)
+            const originalName = item.originalFilename || item.filename || `image_${i + 1}`;
+            const baseName = originalName.replace(/\.[^/.]+$/, ''); // Remove extension
+            item.outputFilename = `${baseName}.png`;
+        } else {
+            const num = String(start + i).padStart(3, '0');
+            item.outputFilename = `${base}_${num}.png`;
+        }
     });
 
     renderQueue();
@@ -956,9 +1080,59 @@ async function applyBatchRename() {
         const item = CensorState.queue.find(i => i.id === CensorState.activeId);
         if (item) document.getElementById('censor-filename').textContent = item.outputFilename;
     }
+
+    window.App.showToast(`Renamed ${CensorState.queue.length} images`, 'success');
 }
 
-async function saveAllProcessed() {
+function openSaveOptionsPopup() {
+    if (CensorState.queue.length === 0) {
+        window.App.showToast('No images in queue to save', 'error');
+        return;
+    }
+
+    // Pre-fill with saved values
+    const outputFolder = document.getElementById('save-output-folder');
+    if (outputFolder) {
+        outputFolder.value = CensorState.outputFolder || localStorage.getItem('censor_output_folder') || '';
+    }
+
+    const metadataOption = document.getElementById('save-metadata-option');
+    if (metadataOption) {
+        metadataOption.value = CensorState.metadataOption || 'strip';
+    }
+
+    const formatOption = document.getElementById('save-format-option');
+    if (formatOption) {
+        formatOption.value = CensorState.outputFormat || 'png';
+    }
+
+    document.getElementById('save-options-modal')?.classList.add('visible');
+}
+
+async function confirmAndSaveAll() {
+    // Read options from popup
+    const folder = document.getElementById('save-output-folder')?.value;
+    const metadataOption = document.getElementById('save-metadata-option')?.value || 'strip';
+    const formatOption = document.getElementById('save-format-option')?.value || 'png';
+
+    if (!folder) {
+        window.App.showToast('Please specify an output folder', 'error');
+        return;
+    }
+
+    // Save settings
+    CensorState.outputFolder = folder;
+    CensorState.metadataOption = metadataOption;
+    CensorState.outputFormat = formatOption;
+    localStorage.setItem('censor_output_folder', folder);
+
+    // Close popup and start saving
+    document.getElementById('save-options-modal')?.classList.remove('visible');
+
+    await saveAllProcessed(formatOption, metadataOption);
+}
+
+async function saveAllProcessed(formatOption = 'png', metadataOption = 'strip') {
     const folder = CensorState.outputFolder;
     if (!folder) {
         window.App.showToast('Set output folder in Rename or Setup first', 'error');
@@ -969,19 +1143,33 @@ async function saveAllProcessed() {
 
     let count = 0;
     for (const item of CensorState.queue) {
-        // Only save if processed or modified? Or all? Usually all in queue.
-        // Use currentDataUrl if exists, else original
-        const dataUrl = item.currentDataUrl || await urlToDataUrl(item.originalUrl);
-
         try {
+            let dataUrl;
+
+            if (item.currentDataUrl) {
+                // Already edited - canvas data has no metadata
+                dataUrl = item.currentDataUrl;
+            } else if (metadataOption === 'strip') {
+                // No edits but stripping metadata - draw through canvas to remove all metadata
+                dataUrl = await stripMetadataViaCanvas(item.originalUrl);
+            } else {
+                // Keep metadata - use original blob (metadata preserved in blob)
+                dataUrl = await urlToDataUrl(item.originalUrl);
+            }
+
+            // Update filename extension to match selected format
+            const baseName = item.outputFilename.replace(/\.[^/.]+$/, '');
+            const finalFilename = `${baseName}.${formatOption}`;
+
             await fetch('/api/censor/save-data', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     image_data: dataUrl,
-                    filename: item.outputFilename,
+                    filename: finalFilename,
                     output_folder: folder,
-                    metadata_option: CensorState.metadataOption,
+                    metadata_option: metadataOption,
+                    output_format: formatOption,
                     original_image_id: item.id  // Pass original image ID for metadata copying
                 })
             });
@@ -993,6 +1181,47 @@ async function saveAllProcessed() {
 
     showLoading(false);
     window.App.showToast(`Saved ${count} images to ${folder}`, 'success');
+}
+
+/**
+ * Strips all metadata from an image by drawing it through a canvas.
+ * Canvas toDataURL() produces a clean image with no embedded metadata.
+ */
+async function stripMetadataViaCanvas(url) {
+    const img = await loadImage(url);
+    const canvas = document.createElement('canvas');
+    canvas.width = img.width;
+    canvas.height = img.height;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0);
+    // toDataURL creates a clean PNG with no metadata
+    return canvas.toDataURL('image/png');
+}
+
+function promptSingleRename() {
+    if (!CensorState.activeId) {
+        window.App.showToast('No image selected', 'error');
+        return;
+    }
+
+    const item = CensorState.queue.find(i => i.id === CensorState.activeId);
+    if (!item) return;
+
+    const currentName = item.outputFilename || item.filename || 'image.png';
+    const newName = prompt('Enter new filename:', currentName);
+
+    if (newName && newName !== currentName) {
+        // Ensure it has an extension
+        let finalName = newName;
+        if (!/\.\w+$/.test(finalName)) {
+            finalName += '.png';
+        }
+
+        item.outputFilename = finalName;
+        document.getElementById('censor-filename').textContent = finalName;
+        renderQueue();
+        window.App.showToast(`Renamed to "${finalName}"`, 'success');
+    }
 }
 
 // ============== Helpers ==============
@@ -1166,21 +1395,6 @@ function navigateQueue(direction) {
     const newIndex = currentIndex + direction;
     if (newIndex >= 0 && newIndex < CensorState.queue.length) {
         loadCanvasImage(CensorState.queue[newIndex].id);
-    }
-}
-
-function updateRenamePreview() {
-    const base = document.getElementById('rename-base')?.value || 'Image';
-    const start = parseInt(document.getElementById('rename-start')?.value) || 1;
-
-    const preview = document.querySelector('.rename-preview');
-    if (preview) {
-        preview.innerHTML = `
-            <div class="preview-item">${base}_${String(start).padStart(3, '0')}.png</div>
-            <div class="preview-item">${base}_${String(start + 1).padStart(3, '0')}.png</div>
-            <div class="preview-item">${base}_${String(start + 2).padStart(3, '0')}.png</div>
-            <div class="preview-hint">...and so on</div>
-        `;
     }
 }
 

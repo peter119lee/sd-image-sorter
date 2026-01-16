@@ -70,13 +70,36 @@ const Gallery = {
                 }
             });
 
-            // Drag navigation support
+            // Drag navigation support - enables dragging to WebUI/Forge/ComfyUI
             item.addEventListener('dragstart', (e) => {
+                // Get the full image URL (not thumbnail) for metadata access
                 const imgUrl = API.getImageUrl(image.id);
-                e.dataTransfer.setData('text/plain', image.prompt || '');
-                e.dataTransfer.setData('text/uri-list', imgUrl);
-                e.dataTransfer.downloadPlaceholder = `${image.filename}:${imgUrl}`;
+                const absoluteUrl = new URL(imgUrl, window.location.origin).href;
+
+                // Set multiple data formats for maximum compatibility
+                // - text/uri-list: Standard URL format for browsers
+                // - text/plain: Fallback with prompt text
+                // - DownloadURL: Chrome-specific for file download triggers
+                e.dataTransfer.setData('text/uri-list', absoluteUrl);
+                e.dataTransfer.setData('text/plain', absoluteUrl);
+
+                // DownloadURL format: MIME:filename:URL (Chrome specific, triggers download on drop)
+                const mimeType = image.filename.toLowerCase().endsWith('.png') ? 'image/png' :
+                    image.filename.toLowerCase().endsWith('.webp') ? 'image/webp' :
+                        'image/jpeg';
+                e.dataTransfer.setData('DownloadURL', `${mimeType}:${image.filename}:${absoluteUrl}`);
+
+                // Set drag image to the actual thumbnail
+                const img = item.querySelector('img');
+                if (img && img.src) {
+                    e.dataTransfer.setDragImage(img, 50, 50);
+                }
+
+                // Mark as dragging
                 item.classList.add('dragging');
+
+                // Store image data for potential same-app drops
+                e.dataTransfer.effectAllowed = 'copyMove';
             });
 
             item.addEventListener('dragend', () => {

@@ -440,22 +440,44 @@
         margin-top: 4px;
         max-height: 200px;
         overflow-y: auto;
-        z-index: 100;
+        z-index: 10000;
         display: none;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
     }
 
     .tag-suggestions.visible {
         display: block;
     }
 
-    .tag-suggestion {
+    .tag-suggestion,
+    .suggestion-item {
         padding: 10px 16px;
         cursor: pointer;
         transition: background var(--transition-fast);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
     }
 
-    .tag-suggestion:hover {
+    .tag-suggestion:hover,
+    .suggestion-item:hover {
         background: var(--bg-hover);
+    }
+
+    .suggestion-name {
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .suggestion-count {
+        margin-left: 8px;
+        font-size: 12px;
+        color: var(--text-muted);
+        background: var(--bg-card);
+        padding: 2px 8px;
+        border-radius: 10px;
     }
 
     .active-tags {
@@ -740,6 +762,7 @@
 
     .filter-section {
         margin-bottom: 28px;
+        position: relative;
     }
 
     .filter-section h4 {
@@ -3166,4 +3189,202 @@
 
 .full-width {
     width: 100%;
+}
+
+/* ===== Collapsible Filter Sections ===== */
+.filter-section.collapsible .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 10px;
+}
+
+.filter-section.collapsible .section-header:hover {
+    color: var(--accent-primary);
+}
+
+.filter-section.collapsible .collapse-icon {
+    transition: transform var(--transition-fast);
+}
+
+.filter-section.collapsible.collapsed .collapse-icon {
+    transform: rotate(-90deg);
+}
+
+.filter-section.collapsible.collapsed .section-content {
+    display: none;
+}
+
+/* ===== Hotkey Badges (kbd) ===== */
+kbd {
+    display: inline-block;
+    padding: 2px 6px;
+    font-size: 10px;
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-weight: 600;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    color: var(--text-secondary);
+    margin-left: 4px;
+    vertical-align: middle;
+}
+
+.tool-btn-v2 kbd,
+.btn-side-v2 kbd {
+    background: rgba(0, 0, 0, 0.3);
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+/* ===== Small Input Fields ===== */
+.input-small {
+    width: 80px;
+    padding: 8px 10px;
+    font-size: 13px;
+}
+
+/* ===== Range Row for Dimension Filters ===== */
+.range-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.range-row label {
+    font-size: 12px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+/* ===== Compact Filter Modal ===== */
+.filter-section .filter-list {
+    max-height: 120px;
+}
+
+.modal-large .modal-content {
+    max-height: 85vh;
+    overflow-y: auto;
+}
+
+/* Reduce gaps for compact layout */
+.filter-modal-grid {
+    gap: 20px;
+}
+
+.filter-column {
+    gap: 16px;
+}
+
+/* ===== Tags Library ===== */
+.library-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: rgba(168, 85, 247, 0.1);
+    border: 1px solid var(--border-color);
+    border-radius: 20px;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.library-tag:hover {
+    background: rgba(168, 85, 247, 0.25);
+    border-color: var(--accent-primary);
+    transform: translateY(-1px);
+}
+
+.library-tag .tag-name {
+    font-size: 13px;
+    color: var(--text-primary);
+}
+
+.library-tag .tag-count {
+    font-size: 11px;
+    color: var(--text-muted);
+    padding: 2px 6px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 10px;
+}
+
+.library-prompt {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 14px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    width: 100%;
+}
+
+.library-prompt:hover {
+    background: rgba(168, 85, 247, 0.1);
+    border-color: var(--accent-primary);
+}
+
+.library-prompt .prompt-text {
+    font-size: 13px;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+    margin-right: 10px;
+}
+
+.library-prompt .prompt-count {
+    font-size: 11px;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+/* ===== Small Icon Button ===== */
+.btn-icon-small {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    color: var(--text-secondary);
+    font-size: 14px;
+    padding: 2px 6px;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    margin-left: 6px;
+}
+
+.btn-icon-small:hover {
+    background: rgba(168, 85, 247, 0.2);
+    border-color: var(--accent-primary);
+    color: var(--text-primary);
+}
+
+/* ===== Queue Multi-select ===== */
+.queue-thumb-v2.selected {
+    outline: 3px solid var(--accent-secondary, #0ea5e9);
+    outline-offset: 2px;
+    box-shadow: 0 0 10px rgba(14, 165, 233, 0.4);
+}
+
+.queue-thumb-v2.selected.active {
+    outline-color: var(--accent-primary);
+    box-shadow: 0 0 12px rgba(168, 85, 247, 0.5);
+}
+
+#queue-selection-count {
+    position: absolute;
+    bottom: 5px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(14, 165, 233, 0.9);
+    color: white;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
 }

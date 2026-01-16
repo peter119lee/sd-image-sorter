@@ -36,7 +36,9 @@ const DIRECTION_MAP = {
 // ============== Initialization ==============
 
 function initManualSort() {
-    const { $, $$ } = window.App;
+    // Use direct selectors to avoid timing issues with window.App
+    const $ = (sel) => document.querySelector(sel);
+    const $$ = (sel) => document.querySelectorAll(sel);
 
     // Folder path inputs
     $$('.folder-path-input').forEach(input => {
@@ -45,26 +47,54 @@ function initManualSort() {
         });
     });
 
+    // Browse folder buttons
+    $$('.browse-folder').forEach(btn => {
+        btn.addEventListener('click', () => {
+            // Find the input in the same folder-slot as this button
+            const folderSlot = btn.closest('.folder-slot');
+            const input = folderSlot?.querySelector('.folder-path-input');
+            if (input) {
+                const key = input.dataset.key?.toUpperCase() || '';
+                const currentValue = input.value || '';
+                const path = prompt(`Enter folder path for ${key}:\n\nExample: D:\\sorted\\folder-name`, currentValue);
+                if (path !== null) {
+                    input.value = path;
+                    ManualSortState.folders[input.dataset.key] = path;
+                }
+            }
+        });
+    });
+
     // Edit Filters button - open unified filter modal
     const filterBtn = $('#btn-manual-sort-filters');
     if (filterBtn) {
         filterBtn.addEventListener('click', () => {
-            if (window.App.openFilterModal) {
+            if (window.App && window.App.openFilterModal) {
                 window.App.openFilterModal();
             }
         });
     }
 
     // Start sorting button
-    $('#btn-start-sorting').addEventListener('click', startSorting);
+    const startBtn = $('#btn-start-sorting');
+    if (startBtn) {
+        startBtn.addEventListener('click', startSorting);
+    }
 
     // Exit sorting button
-    $('#btn-exit-sorting').addEventListener('click', exitSorting);
+    const exitBtn = $('#btn-exit-sorting');
+    if (exitBtn) {
+        exitBtn.addEventListener('click', exitSorting);
+    }
 
     // Keyboard listener (added when sorting starts)
 
     // Update filter summary display initially
-    updateManualSortFilterSummary();
+    setTimeout(() => {
+        if (window.App && window.App.AppState) {
+            updateManualSortFilterSummary();
+        }
+    }, 100);
 }
 
 // ============== Start Sorting ==============
@@ -89,21 +119,35 @@ async function startSorting() {
     ManualSortState.folders = folders;
 
     // Get filters from unified AppState
-    const filters = AppState.filters;
-    const generators = filters.generators && filters.generators.length > 0 ? filters.generators : null;
-    const ratings = filters.ratings && filters.ratings.length > 0 ? filters.ratings : null;
-    const tags = filters.tags && filters.tags.length > 0 ? filters.tags : null;
+    const f = AppState.filters;
+    const generators = f.generators?.length > 0 ? f.generators : null;
+    const ratings = f.ratings?.length > 0 ? f.ratings : null;
+    const tags = f.tags?.length > 0 ? f.tags : null;
+    const checkpoints = f.checkpoints?.length > 0 ? f.checkpoints : null;
+    const loras = f.loras?.length > 0 ? f.loras : null;
+    const prompts = f.prompts?.length > 0 ? f.prompts : null;
+    const dimensions = {
+        minWidth: f.minWidth,
+        maxWidth: f.maxWidth,
+        minHeight: f.minHeight,
+        maxHeight: f.maxHeight,
+        aspectRatio: f.aspectRatio
+    };
 
     try {
         // Set folders on server
         await API.setSortFolders(folders);
 
-        // Start session with unified filters
+        // Start session with unified filters including prompts and dimensions
         const result = await API.startSortSession(
             generators,
+            tags,
             ratings,
             folders,
-            tags
+            checkpoints,
+            loras,
+            prompts,
+            dimensions
         );
 
         if (result.total_images === 0) {
@@ -111,9 +155,19 @@ async function startSorting() {
             return;
         }
 
-        // Fetch images for gallery preview
+        // Fetch images for gallery preview with all filter types
         const imagesResult = await API.getImages({
-            generators: generators.length > 0 ? generators : null,
+            generators: generators,
+            tags: tags,
+            ratings: ratings,
+            checkpoints: checkpoints,
+            loras: loras,
+            prompts: prompts,
+            minWidth: f.minWidth,
+            maxWidth: f.maxWidth,
+            minHeight: f.minHeight,
+            maxHeight: f.maxHeight,
+            aspectRatio: f.aspectRatio,
             limit: 10000
         });
 
@@ -243,7 +297,7 @@ function updateGalleryPreview() {
 
         thumbsHTML.push(`
             <div class="${className}" data-index="${i}" title="Image ${i + 1}">
-                <img src="${API.getImageUrl(img.id)}" alt="" loading="lazy">
+                <img src="${API.getThumbnailUrl(img.id)}" alt="" loading="lazy">
             </div>
         `);
     }
@@ -365,10 +419,59 @@ async function undoLastAction() {
 
     try {
         const result = await API.sortAction('undo');
-        await loadCurrentImage();
-        showToast('Undid last action', 'info');
+
+        // Check if there was nothing to undo
+        if (result.status === 'no_history') {
+            showToast('Nothing to undo', 'info');
+            return;
+        }
+
+        // Use the returned image data directly instead of making another API call
+        if (result.image && result.image.id) {
+            ManualSortState.currentImage = result.image;
+            ManualSortState.currentTags = result.tags || [];
+            ManualSortState.index = result.index;
+            ManualSortState.total = result.total;
+
+            // Update the images array at the current index with the restored image data
+            // This ensures the gallery preview stays in sync after undo operations
+            if (ManualSortState.images && ManualSortState.index < ManualSortState.images.length) {
+                ManualSortState.images[ManualSortState.index] = result.image;
+            }
+
+            // Update image display
+            const imgWrapper = $('.current-image-wrapper');
+            imgWrapper.classList.remove('fly-up', 'fly-down', 'fly-left', 'fly-right', 'skip');
+            imgWrapper.classList.add('slide-in');
+
+            const img = $('#current-image');
+            // Add cache-bust to force reload of the image
+            const cacheBust = Date.now();
+            img.src = API.getImageUrl(result.image.id) + '?t=' + cacheBust;
+
+            // Update tags
+            const tagsEl = $('#current-image-tags');
+            const topTags = ManualSortState.currentTags.slice(0, 5);
+            tagsEl.innerHTML = topTags.map(t => `<span class="image-tag">${t.tag}</span>`).join('');
+
+            // Update progress
+            updateProgress();
+
+            // Remove slide-in class after animation
+            setTimeout(() => {
+                imgWrapper.classList.remove('slide-in');
+            }, 300);
+
+            showToast('Undid last action', 'info');
+        } else {
+            // Fallback to loadCurrentImage if no image data returned
+            console.log('[undo] No image data in response, falling back to loadCurrentImage');
+            await loadCurrentImage();
+            showToast('Undid last action', 'info');
+        }
     } catch (error) {
         console.error('Failed to undo:', error);
+        showToast('Failed to undo', 'error');
     }
 }
 
@@ -446,6 +549,11 @@ function exitSorting() {
     $('#sort-setup').style.display = 'block';
 
     showToast('Exited sorting mode', 'info');
+
+    // Refresh gallery to show updated image locations
+    if (window.App && window.App.loadImages) {
+        window.App.loadImages();
+    }
 }
 
 // ============== Filter Summary ==============
@@ -483,6 +591,45 @@ function updateManualSortFilterSummary() {
                 f.ratings.length === 0 ? 'None' :
                     f.ratings.length > 2 ? `${f.ratings.length} selected` : f.ratings.join(', ');
     }
+
+    // Checkpoints
+    const cpEl = $('#manual-sort-summary-checkpoints');
+    if (cpEl) {
+        cpEl.textContent =
+            !f.checkpoints?.length ? 'None' :
+                f.checkpoints.length > 2 ? `${f.checkpoints.length} selected` : f.checkpoints.join(', ');
+    }
+
+    // Loras
+    const loraEl = $('#manual-sort-summary-loras');
+    if (loraEl) {
+        loraEl.textContent =
+            !f.loras?.length ? 'None' :
+                f.loras.length > 2 ? `${f.loras.length} selected` : f.loras.join(', ');
+    }
+
+    // Prompts
+    const promptEl = $('#manual-sort-summary-prompts');
+    if (promptEl) {
+        promptEl.textContent =
+            !f.prompts?.length ? 'None' :
+                f.prompts.length > 2 ? `${f.prompts.length} prompts` : f.prompts.join(', ');
+    }
+
+    // Dimensions
+    const dimEl = $('#manual-sort-summary-dimensions');
+    if (dimEl) {
+        const hasDimFilter = f.minWidth || f.maxWidth || f.minHeight || f.maxHeight || f.aspectRatio;
+        if (!hasDimFilter) {
+            dimEl.textContent = 'Any';
+        } else {
+            const parts = [];
+            if (f.minWidth || f.maxWidth) parts.push(`W: ${f.minWidth || 0}-${f.maxWidth || '∞'}`);
+            if (f.minHeight || f.maxHeight) parts.push(`H: ${f.minHeight || 0}-${f.maxHeight || '∞'}`);
+            if (f.aspectRatio) parts.push(f.aspectRatio);
+            dimEl.textContent = parts.join(', ') || 'Custom';
+        }
+    }
 }
 
 // ============== Utilities ==============
@@ -497,5 +644,6 @@ document.addEventListener('DOMContentLoaded', () => {
     initManualSort();
 });
 
-// Export
+// Export for use by app.js and filter modal
 window.ManualSortState = ManualSortState;
+window.updateManualSortFilterSummary = updateManualSortFilterSummary;

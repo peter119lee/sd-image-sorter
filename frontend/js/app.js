@@ -15,6 +15,7 @@ const AppState = {
         tags: [],
         checkpoints: [],
         loras: [],
+        prompts: [],  // Multi-prompt filter
         search: '',
         sortBy: 'newest'
     },
@@ -81,11 +82,19 @@ const API = {
         if (filters.tags?.length) params.set('tags', filters.tags.join(','));
         if (filters.checkpoints?.length) params.set('checkpoints', filters.checkpoints.join(','));
         if (filters.loras?.length) params.set('loras', filters.loras.join(','));
-
+        if (filters.prompts?.length) params.set('prompts', filters.prompts.join(','));
         if (filters.search) params.set('search', filters.search);
         if (filters.sortBy) params.set('sort_by', filters.sortBy);
         params.set('limit', filters.limit || 0);  // 0 = no limit
         if (filters.offset) params.set('offset', filters.offset);
+
+        // Dimension filters
+        if (filters.minWidth) params.set('min_width', filters.minWidth);
+        if (filters.maxWidth) params.set('max_width', filters.maxWidth);
+        if (filters.minHeight) params.set('min_height', filters.minHeight);
+        if (filters.maxHeight) params.set('max_height', filters.maxHeight);
+        if (filters.aspectRatio) params.set('aspect_ratio', filters.aspectRatio);
+
         return this.get(`/api/images?${params}`);
     },
 
@@ -112,6 +121,14 @@ const API = {
     // Tags & Generators
     async getTags() {
         return this.get('/api/tags');
+    },
+
+    async getTagsLibrary(sortBy = 'frequency', limit = 2000) {
+        return this.get(`/api/tags/library?sort_by=${sortBy}&limit=${limit}`);
+    },
+
+    async getPromptsLibrary(limit = 5000) {
+        return this.get(`/api/prompts/library?limit=${limit}`);
     },
 
     async getGenerators() {
@@ -154,21 +171,37 @@ const API = {
         return this.post('/api/move', { image_ids: imageIds, destination_folder: destinationFolder });
     },
 
-    async batchMove(generators, tags, ratings, destinationFolder) {
+    async batchMove(generators, tags, ratings, destinationFolder, checkpoints = null, loras = null, prompts = null, dimensions = null) {
         return this.post('/api/batch-move', {
             generators,
             tags,
             ratings,
+            checkpoints,
+            loras,
+            prompts,
+            min_width: dimensions?.minWidth || null,
+            max_width: dimensions?.maxWidth || null,
+            min_height: dimensions?.minHeight || null,
+            max_height: dimensions?.maxHeight || null,
+            aspect_ratio: dimensions?.aspectRatio || null,
             destination_folder: destinationFolder
         });
     },
 
     // Manual Sort
-    async startSortSession(generators, tags, ratings, folders) {
+    async startSortSession(generators, tags, ratings, folders, checkpoints = null, loras = null, prompts = null, dimensions = null) {
         const params = new URLSearchParams();
         if (generators?.length) params.set('generators', generators.join(','));
         if (tags?.length) params.set('tags', tags.join(','));
         if (ratings?.length) params.set('ratings', ratings.join(','));
+        if (checkpoints?.length) params.set('checkpoints', checkpoints.join(','));
+        if (loras?.length) params.set('loras', loras.join(','));
+        if (prompts?.length) params.set('prompts', prompts.join(','));
+        if (dimensions?.minWidth) params.set('min_width', dimensions.minWidth);
+        if (dimensions?.maxWidth) params.set('max_width', dimensions.maxWidth);
+        if (dimensions?.minHeight) params.set('min_height', dimensions.minHeight);
+        if (dimensions?.maxHeight) params.set('max_height', dimensions.maxHeight);
+        if (dimensions?.aspectRatio) params.set('aspect_ratio', dimensions.aspectRatio);
         if (folders) params.set('folders', JSON.stringify(folders));
         return this.post(`/api/sort/start?${params}`);
     },
@@ -196,6 +229,16 @@ const API = {
             blacklist: blacklist,
             prefix: prefix
         });
+    },
+
+    // Tags Library
+    async getTagsLibrary(sortBy = 'frequency', limit = 2000) {
+        return this.get(`/api/tags/library?sort_by=${sortBy}&limit=${limit}`);
+    },
+
+    // Prompts Library
+    async getPromptsLibrary(limit = 2000) {
+        return this.get(`/api/prompts/library?limit=${limit}`);
     }
 };
 
@@ -473,6 +516,80 @@ function initEventListeners() {
     // Modal tag search
     $('#modal-tag-search').addEventListener('input', (e) => searchModalTags(e.target.value));
 
+    // Tag input Enter key - add comma-separated tags
+    $('#modal-tag-search').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const input = e.target.value.trim();
+            if (input) {
+                const tags = input.split(',').map(t => t.trim()).filter(t => t.length > 0);
+                tags.forEach(tag => {
+                    if (!AppState.filters.tags.includes(tag)) {
+                        AppState.filters.tags.push(tag);
+                    }
+                });
+                renderModalActiveTags();
+                e.target.value = '';
+                $('#modal-tag-suggestions').innerHTML = '';
+            }
+        }
+    });
+
+    // Prompt input Enter key - add comma-separated prompts
+    const promptSearchEl = $('#modal-prompt-search');
+    console.log('Prompt search element:', promptSearchEl);
+    if (promptSearchEl) {
+        // Autocomplete suggestions on input
+        promptSearchEl.addEventListener('input', (e) => {
+            searchModalPrompts(e.target.value);
+        });
+
+        promptSearchEl.addEventListener('keydown', (e) => {
+            console.log('Prompt keydown:', e.key);
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const input = e.target.value.trim();
+                console.log('Prompt Enter pressed, input:', input);
+                if (input) {
+                    const prompts = input.split(',').map(p => p.trim()).filter(p => p.length > 0);
+                    prompts.forEach(prompt => {
+                        if (!AppState.filters.prompts.includes(prompt)) {
+                            AppState.filters.prompts.push(prompt);
+                        }
+                    });
+                    console.log('Prompts after adding:', AppState.filters.prompts);
+                    renderModalActivePrompts();
+                    e.target.value = '';
+                    $('#modal-prompt-suggestions').innerHTML = '';
+                }
+            }
+        });
+    }
+
+    // Library buttons
+    $('#btn-tags-library')?.addEventListener('click', openTagsLibrary);
+    $('#btn-open-library-from-filter')?.addEventListener('click', () => {
+        hideModal('filter-modal');
+        openTagsLibrary();
+    });
+    $('#btn-close-tags-library')?.addEventListener('click', () => hideModal('tags-library-modal'));
+    $('#btn-close-tags-library-2')?.addEventListener('click', () => hideModal('tags-library-modal'));
+    $('#library-search')?.addEventListener('input', filterLibraryContent);
+    $('#library-sort')?.addEventListener('change', loadLibraryContent);
+    // Library tab switching
+    $('#library-tab-tags')?.addEventListener('click', () => switchLibraryTab('tags'));
+    $('#library-tab-prompts')?.addEventListener('click', () => switchLibraryTab('prompts'));
+
+    // Checkpoint search in filter modal
+    $('#modal-checkpoint-search')?.addEventListener('input', (e) => {
+        filterModalList('modal-checkpoint-list', e.target.value);
+    });
+
+    // Lora search in filter modal
+    $('#modal-lora-search')?.addEventListener('input', (e) => {
+        filterModalList('modal-lora-list', e.target.value);
+    });
+
     // --- Batch Tag Export Modal ---
     $('#btn-batch-export-tags').addEventListener('click', showBatchExportModal);
     $('#btn-close-batch-export').addEventListener('click', () => hideModal('batch-export-modal'));
@@ -499,6 +616,22 @@ function filterCollapsibleList(type, query) {
     items.forEach(item => {
         const text = item.querySelector('.checkbox-text').textContent.toLowerCase();
         item.style.display = text.includes(query) ? 'flex' : 'none';
+    });
+}
+
+function filterModalList(listId, query) {
+    const list = document.getElementById(listId);
+    if (!list) return;
+
+    const items = list.querySelectorAll('.checkbox-label');
+    query = query.toLowerCase();
+
+    items.forEach(item => {
+        const textEl = item.querySelector('.checkbox-text');
+        if (textEl) {
+            const text = textEl.textContent.toLowerCase();
+            item.style.display = text.includes(query) ? '' : 'none';
+        }
     });
 }
 
@@ -796,6 +929,268 @@ function updateModelSelectionSummaries() {
 function updateCollapsibleFilterUI(type, items) {
     // Legacy support, now using summaries
     updateModelSelectionSummaries();
+}
+
+// ============== Tags & Prompts Library ==============
+
+const libraryData = {
+    currentTab: 'tags',
+    tags: [],
+    prompts: []
+};
+
+function openTagsLibrary() {
+    showModal('tags-library-modal');
+    loadLibraryContent();
+}
+
+function switchLibraryTab(tab) {
+    libraryData.currentTab = tab;
+    // Update tab button active states
+    const tagsTab = $('#library-tab-tags');
+    const promptsTab = $('#library-tab-prompts');
+    if (tagsTab) {
+        tagsTab.classList.toggle('active', tab === 'tags');
+        tagsTab.classList.toggle('btn-secondary', tab === 'tags');
+        tagsTab.classList.toggle('btn-ghost', tab !== 'tags');
+    }
+    if (promptsTab) {
+        promptsTab.classList.toggle('active', tab === 'prompts');
+        promptsTab.classList.toggle('btn-secondary', tab === 'prompts');
+        promptsTab.classList.toggle('btn-ghost', tab !== 'prompts');
+    }
+    loadLibraryContent();
+}
+
+async function loadLibraryContent() {
+    const content = $('#library-content');
+    const statsText = $('#library-stats-text');
+    const sortBy = $('#library-sort')?.value || 'frequency';
+
+    content.innerHTML = '<div class="spinner"></div>';
+
+    try {
+        if (libraryData.currentTab === 'tags') {
+            const result = await API.getTagsLibrary(sortBy, 2000);
+            libraryData.tags = result.tags;
+            renderLibraryTags(result.tags);
+            statsText.textContent = `${result.total} unique tags found`;
+        } else {
+            const result = await API.getPromptsLibrary(99999);
+            libraryData.prompts = result.prompts;
+            renderLibraryPrompts(result.prompts);
+            statsText.textContent = `${result.total} unique prompts found`;
+        }
+    } catch (error) {
+        content.innerHTML = '<p style="color: var(--accent-danger);">Failed to load library</p>';
+        console.error('Library load error:', error);
+    }
+}
+
+function renderLibraryTags(tags) {
+    const content = $('#library-content');
+    content.style.flexDirection = 'row';
+    content.innerHTML = tags.map(t => `
+        <div class="library-tag" data-tag="${t.tag}" title="Click to add as filter">
+            <span class="tag-name">${t.tag}</span>
+            <span class="tag-count">${t.count}</span>
+        </div>
+    `).join('');
+
+    content.querySelectorAll('.library-tag').forEach(el => {
+        el.addEventListener('click', () => {
+            const tag = el.dataset.tag;
+            if (!AppState.filters.tags.includes(tag)) {
+                AppState.filters.tags.push(tag);
+                updateFilterSummary();
+                hideModal('tags-library-modal');
+                loadImages();
+                showToast(`Added "${tag}" to filters`, 'success');
+            }
+        });
+    });
+}
+
+function renderLibraryPrompts(prompts) {
+    const content = $('#library-content');
+    content.style.flexDirection = 'row';
+    content.innerHTML = prompts.map(p => `
+        <div class="library-tag" data-prompt="${p.prompt}" title="Click to add as filter">
+            <span class="tag-name">${p.prompt}</span>
+            <span class="tag-count">${p.count}</span>
+        </div>
+    `).join('');
+
+    content.querySelectorAll('.library-tag').forEach(el => {
+        el.addEventListener('click', () => {
+            const prompt = el.dataset.prompt;
+            if (!AppState.filters.prompts.includes(prompt)) {
+                AppState.filters.prompts.push(prompt);
+                console.log('Added prompt to filters:', prompt, 'Current prompts:', AppState.filters.prompts);
+                updateFilterSummary();
+                hideModal('tags-library-modal');
+                loadImages();
+                showToast(`Added "${prompt}" to filters`, 'success');
+            }
+        });
+    });
+}
+
+function filterLibraryContent() {
+    const query = $('#library-search')?.value.toLowerCase() || '';
+
+    if (libraryData.currentTab === 'tags') {
+        const filtered = libraryData.tags.filter(t => t.tag.toLowerCase().includes(query));
+        renderLibraryTags(filtered);
+    } else {
+        const filtered = libraryData.prompts.filter(p => p.prompt.toLowerCase().includes(query));
+        renderLibraryPrompts(filtered);
+    }
+}
+
+// ============== Modal Tag/Prompt Autocomplete ==============
+
+// Debounced tag/prompt search for autocomplete
+const debouncedTagSearch = debounce(async (query) => {
+    const suggestionsDiv = $('#modal-tag-suggestions');
+    if (!query || query.length < 2) {
+        suggestionsDiv.innerHTML = '';
+        suggestionsDiv.classList.remove('visible');
+        return;
+    }
+
+    try {
+        const tags = await API.getTagsLibrary('frequency', 1000);
+        const filtered = tags.filter(t =>
+            t.tag.toLowerCase().includes(query.toLowerCase())
+        ).slice(0, 15);
+
+        if (filtered.length === 0) {
+            suggestionsDiv.innerHTML = '';
+            suggestionsDiv.classList.remove('visible');
+            return;
+        }
+
+        suggestionsDiv.innerHTML = filtered.map(t => `
+            <div class="suggestion-item" data-tag="${t.tag}">
+                <span class="suggestion-name">${t.tag}</span>
+                <span class="suggestion-count">${t.count}</span>
+            </div>
+        `).join('');
+
+        suggestionsDiv.classList.add('visible');
+
+        // Add click handlers
+        suggestionsDiv.querySelectorAll('.suggestion-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const tag = item.dataset.tag;
+                if (!AppState.filters.tags.includes(tag)) {
+                    AppState.filters.tags.push(tag);
+                    renderModalActiveTags();
+                }
+                $('#modal-tag-search').value = '';
+                suggestionsDiv.innerHTML = '';
+                suggestionsDiv.classList.remove('visible');
+            });
+        });
+    } catch (e) {
+        console.error('Error fetching tag suggestions:', e);
+    }
+}, 250);
+
+function searchModalTags(query) {
+    debouncedTagSearch(query);
+}
+
+const debouncedPromptSearch = debounce(async (query) => {
+    const suggestionsDiv = $('#modal-prompt-suggestions');
+    if (!query || query.length < 2) {
+        suggestionsDiv.innerHTML = '';
+        suggestionsDiv.classList.remove('visible');
+        return;
+    }
+
+    try {
+        const prompts = await API.getPromptsLibrary(1000);
+        const filtered = prompts.filter(p =>
+            p.prompt.toLowerCase().includes(query.toLowerCase())
+        ).slice(0, 15);
+
+        if (filtered.length === 0) {
+            suggestionsDiv.innerHTML = '';
+            suggestionsDiv.classList.remove('visible');
+            return;
+        }
+
+        suggestionsDiv.innerHTML = filtered.map(p => `
+            <div class="suggestion-item" data-prompt="${p.prompt}">
+                <span class="suggestion-name">${p.prompt}</span>
+                <span class="suggestion-count">${p.count}</span>
+            </div>
+        `).join('');
+
+        suggestionsDiv.classList.add('visible');
+
+        // Add click handlers
+        suggestionsDiv.querySelectorAll('.suggestion-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const prompt = item.dataset.prompt;
+                if (!AppState.filters.prompts.includes(prompt)) {
+                    AppState.filters.prompts.push(prompt);
+                    renderModalActivePrompts();
+                }
+                $('#modal-prompt-search').value = '';
+                suggestionsDiv.innerHTML = '';
+                suggestionsDiv.classList.remove('visible');
+            });
+        });
+    } catch (e) {
+        console.error('Error fetching prompt suggestions:', e);
+    }
+}, 250);
+
+function searchModalPrompts(query) {
+    debouncedPromptSearch(query);
+}
+
+function renderModalActiveTags() {
+    const container = $('#modal-active-tags');
+    if (!container) return;
+
+    container.innerHTML = AppState.filters.tags.map(tag => `
+        <span class="active-tag" data-tag="${tag}">
+            ${tag}
+            <span class="remove-tag">×</span>
+        </span>
+    `).join('');
+
+    container.querySelectorAll('.active-tag').forEach(el => {
+        el.querySelector('.remove-tag').addEventListener('click', () => {
+            const tag = el.dataset.tag;
+            AppState.filters.tags = AppState.filters.tags.filter(t => t !== tag);
+            renderModalActiveTags();
+        });
+    });
+}
+
+function renderModalActivePrompts() {
+    const container = $('#modal-active-prompts');
+    if (!container) return;
+
+    container.innerHTML = AppState.filters.prompts.map(prompt => `
+        <span class="active-tag" data-prompt="${prompt}">
+            ${prompt}
+            <span class="remove-tag">×</span>
+        </span>
+    `).join('');
+
+    container.querySelectorAll('.active-tag').forEach(el => {
+        el.querySelector('.remove-tag').addEventListener('click', () => {
+            const prompt = el.dataset.prompt;
+            AppState.filters.prompts = AppState.filters.prompts.filter(p => p !== prompt);
+            renderModalActivePrompts();
+        });
+    });
 }
 
 function updateSelectionUI() {
@@ -1134,8 +1529,9 @@ async function openFilterModal() {
     });
     $('#modal-prompt-search').value = AppState.filters.search || '';
 
-    // Show active tags
+    // Show active tags and prompts
     renderModalActiveTags();
+    renderModalActivePrompts();
 
     // Load checkpoints and loras into modal lists
     await loadModalFilterLists();
@@ -1154,6 +1550,36 @@ function renderModalActiveTags() {
             const tag = el.dataset.tag;
             AppState.filters.tags = AppState.filters.tags.filter(t => t !== tag);
             renderModalActiveTags();
+        });
+    });
+}
+
+function renderModalActivePrompts() {
+    // Try to find or create a prompts display area in the modal
+    let container = document.getElementById('modal-active-prompts');
+    if (!container) {
+        // Create container after prompt search input if it doesn't exist
+        const promptSearch = document.getElementById('modal-prompt-search');
+        if (promptSearch) {
+            container = document.createElement('div');
+            container.id = 'modal-active-prompts';
+            container.className = 'active-tags';
+            container.style.marginTop = '8px';
+            promptSearch.parentNode.insertBefore(container, promptSearch.nextSibling);
+        } else {
+            return;
+        }
+    }
+
+    container.innerHTML = AppState.filters.prompts.map(prompt => `
+        <span class="active-tag">${prompt} <span class="remove-modal-prompt" data-prompt="${prompt}">×</span></span>
+    `).join('');
+
+    container.querySelectorAll('.remove-modal-prompt').forEach(el => {
+        el.addEventListener('click', () => {
+            const prompt = el.dataset.prompt;
+            AppState.filters.prompts = AppState.filters.prompts.filter(p => p !== prompt);
+            renderModalActivePrompts();
         });
     });
 }
@@ -1189,8 +1615,10 @@ async function loadModalFilterLists() {
 }
 
 async function searchModalTags(query) {
+    const suggestionsEl = $('#modal-tag-suggestions');
     if (query.length < 2) {
-        $('#modal-tag-suggestions').innerHTML = '';
+        suggestionsEl.innerHTML = '';
+        suggestionsEl.classList.remove('visible');
         return;
     }
 
@@ -1200,12 +1628,18 @@ async function searchModalTags(query) {
             .filter(t => t.tag.toLowerCase().includes(query.toLowerCase()))
             .slice(0, 8);
 
-        const suggestionsEl = $('#modal-tag-suggestions');
         suggestionsEl.innerHTML = filtered.map(t => `
             <div class="tag-suggestion" data-tag="${t.tag}">
                 ${t.tag} <span style="color: var(--text-muted)">(${t.count})</span>
             </div>
         `).join('');
+
+        // Show/hide based on results
+        if (filtered.length > 0) {
+            suggestionsEl.classList.add('visible');
+        } else {
+            suggestionsEl.classList.remove('visible');
+        }
 
         suggestionsEl.querySelectorAll('.tag-suggestion').forEach(el => {
             el.addEventListener('click', () => {
@@ -1215,10 +1649,65 @@ async function searchModalTags(query) {
                 }
                 $('#modal-tag-search').value = '';
                 suggestionsEl.innerHTML = '';
+                suggestionsEl.classList.remove('visible');
             });
         });
     } catch (e) {
         console.error('Failed to search tags:', e);
+    }
+}
+
+// Cache for prompts library to avoid repeated API calls
+let promptsLibraryCache = null;
+
+async function searchModalPrompts(query) {
+    const suggestionsEl = $('#modal-prompt-suggestions');
+    if (!suggestionsEl) return;
+
+    if (query.length < 2) {
+        suggestionsEl.innerHTML = '';
+        suggestionsEl.classList.remove('visible');
+        return;
+    }
+
+    try {
+        // Cache the prompts library for better performance
+        if (!promptsLibraryCache) {
+            const result = await API.getPromptsLibrary(5000);
+            promptsLibraryCache = result.prompts || [];
+        }
+
+        const filtered = promptsLibraryCache
+            .filter(p => p.prompt.toLowerCase().includes(query.toLowerCase()))
+            .slice(0, 10);
+
+        suggestionsEl.innerHTML = filtered.map(p => `
+            <div class="tag-suggestion" data-prompt="${p.prompt}">
+                ${p.prompt} <span style="color: var(--text-muted)">(${p.count})</span>
+            </div>
+        `).join('');
+
+        // Show/hide based on results
+        if (filtered.length > 0) {
+            suggestionsEl.classList.add('visible');
+        } else {
+            suggestionsEl.classList.remove('visible');
+        }
+
+        suggestionsEl.querySelectorAll('.tag-suggestion').forEach(el => {
+            el.addEventListener('click', () => {
+                const prompt = el.dataset.prompt;
+                if (!AppState.filters.prompts.includes(prompt)) {
+                    AppState.filters.prompts.push(prompt);
+                    renderModalActivePrompts();
+                }
+                $('#modal-prompt-search').value = '';
+                suggestionsEl.innerHTML = '';
+                suggestionsEl.classList.remove('visible');
+            });
+        });
+    } catch (e) {
+        console.error('Failed to search prompts:', e);
     }
 }
 
@@ -1243,14 +1732,30 @@ function applyModalFilters() {
     $$('#modal-lora-list input:checked').forEach(cb => loras.push(cb.value));
     AppState.filters.loras = loras;
 
-    // Get prompt search
-    AppState.filters.search = $('#modal-prompt-search').value.trim();
+    // Prompts: don't use search bar - prompts array is built via Enter key
+    // Clear search bar since prompts are in the array now
+    AppState.filters.search = '';
+    $('#modal-prompt-search').value = '';
+
+    // Get dimension filters
+    const minWidth = parseInt($('#filter-min-width').value) || null;
+    const maxWidth = parseInt($('#filter-max-width').value) || null;
+    const minHeight = parseInt($('#filter-min-height').value) || null;
+    const maxHeight = parseInt($('#filter-max-height').value) || null;
+    AppState.filters.minWidth = minWidth;
+    AppState.filters.maxWidth = maxWidth;
+    AppState.filters.minHeight = minHeight;
+    AppState.filters.maxHeight = maxHeight;
+
+    // Get aspect ratio
+    const aspectRadio = $('input[name="aspect-ratio"]:checked');
+    AppState.filters.aspectRatio = aspectRadio ? aspectRadio.value : '';
 
     // Update all filter summaries (gallery sidebar + view-specific)
     updateFilterSummary();
     // Also update Auto-Separate and Manual Sort summaries if their functions exist
-    if (typeof updateAutoSepSummary === 'function') updateAutoSepSummary();
-    if (typeof updateManualSortFilterSummary === 'function') updateManualSortFilterSummary();
+    if (typeof window.updateAutoSepSummary === 'function') window.updateAutoSepSummary();
+    if (typeof window.updateManualSortFilterSummary === 'function') window.updateManualSortFilterSummary();
 
     hideModal('filter-modal');
     loadImages();
@@ -1264,8 +1769,15 @@ function resetAllFilters() {
         tags: [],
         checkpoints: [],
         loras: [],
+        prompts: [],
         search: '',
-        limit: 0
+        sortBy: 'newest',
+        limit: 0,
+        minWidth: null,
+        maxWidth: null,
+        minHeight: null,
+        maxHeight: null,
+        aspectRatio: ''
     };
 
     // Reset modal checkboxes
@@ -1275,11 +1787,19 @@ function resetAllFilters() {
     $$('#modal-lora-list input').forEach(cb => cb.checked = false);
     $('#modal-prompt-search').value = '';
     renderModalActiveTags();
+    renderModalActivePrompts();
+
+    // Reset dimension filters
+    $('#filter-min-width').value = '';
+    $('#filter-max-width').value = '';
+    $('#filter-min-height').value = '';
+    $('#filter-max-height').value = '';
+    $$('input[name="aspect-ratio"]').forEach(r => r.checked = r.value === '');
 
     // Update all filter summaries
     updateFilterSummary();
-    if (typeof updateAutoSepSummary === 'function') updateAutoSepSummary();
-    if (typeof updateManualSortFilterSummary === 'function') updateManualSortFilterSummary();
+    if (typeof window.updateAutoSepSummary === 'function') window.updateAutoSepSummary();
+    if (typeof window.updateManualSortFilterSummary === 'function') window.updateManualSortFilterSummary();
 
     hideModal('filter-modal');
     loadImages();
@@ -1318,8 +1838,13 @@ function updateFilterSummary() {
         (!f.loras || f.loras.length === 0) ? 'None' :
             `${f.loras.length} selected`;
 
-    // Prompt
-    $('#summary-prompt').textContent = f.search || '-';
+    // Prompt (now uses prompts array)
+    const promptSummary = $('#summary-prompt');
+    if (promptSummary) {
+        promptSummary.textContent =
+            (!f.prompts || f.prompts.length === 0) ? 'None' :
+                f.prompts.length > 2 ? `${f.prompts.length} prompts` : f.prompts.join(', ');
+    }
 }
 
 // ============== Initialization ==============
@@ -1362,6 +1887,9 @@ window.App = {
     applyModalFilters,
     resetAllFilters,
     updateFilterSummary,
+    openTagsLibrary,
+    switchLibraryTab,
+    filterLibraryContent,
     $,
     $$
 };

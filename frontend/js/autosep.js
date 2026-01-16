@@ -10,24 +10,46 @@ const AutoSepState = {
 // ============== Initialization ==============
 
 function initAutoSeparate() {
-    const { $, API, showToast } = window.App;
+    // Use direct selectors to avoid timing issues with window.App
+    const $ = (sel) => document.querySelector(sel);
 
     // Edit Filters button - opens unified filter modal
-    // Note: Call window.App.openFilterModal directly (not destructured) to ensure 
-    // it's available at click time, not init time
-    $('#btn-autosep-filters')?.addEventListener('click', () => {
-        if (window.App.openFilterModal) {
-            window.App.openFilterModal();
-        } else {
-            console.error('openFilterModal not available');
-        }
-    });
+    const filterBtn = $('#btn-autosep-filters');
+    if (filterBtn) {
+        filterBtn.addEventListener('click', () => {
+            if (window.App && window.App.openFilterModal) {
+                window.App.openFilterModal();
+            } else {
+                console.error('openFilterModal not available');
+            }
+        });
+    }
 
     // Preview button
-    $('#btn-preview-autosep')?.addEventListener('click', updateAutoSepPreview);
+    const previewBtn = $('#btn-preview-autosep');
+    if (previewBtn) {
+        previewBtn.addEventListener('click', updateAutoSepPreview);
+    }
 
     // Execute button
-    $('#btn-execute-autosep')?.addEventListener('click', executeAutoSeparate);
+    const executeBtn = $('#btn-execute-autosep');
+    if (executeBtn) {
+        executeBtn.addEventListener('click', executeAutoSeparate);
+    }
+
+    // Browse button for destination folder
+    const browseBtn = $('#btn-browse-destination');
+    if (browseBtn) {
+        browseBtn.addEventListener('click', () => {
+            const input = $('#autosep-destination');
+            // Browser can't access filesystem directly, prompt user for path
+            const currentPath = input ? input.value : '';
+            const path = prompt('Enter destination folder path:\n\nExample: D:\\sorted\\my-folder', currentPath);
+            if (path !== null && input) {
+                input.value = path;
+            }
+        });
+    }
 }
 
 // ============== Update Summary Display ==============
@@ -39,19 +61,70 @@ function updateAutoSepSummary() {
     const allGens = ['comfyui', 'nai', 'webui', 'forge', 'unknown'];
     const allRatings = ['general', 'sensitive', 'questionable', 'explicit'];
 
-    $('#autosep-summary-generators').textContent =
-        f.generators.length === allGens.length ? 'All' :
-            f.generators.length === 0 ? 'None' :
-                f.generators.length > 2 ? `${f.generators.length} selected` : f.generators.join(', ');
+    // Generators
+    const genEl = $('#autosep-summary-generators');
+    if (genEl) {
+        genEl.textContent =
+            f.generators?.length === allGens.length ? 'All' :
+                !f.generators?.length ? 'None' :
+                    f.generators.length > 2 ? `${f.generators.length} selected` : f.generators.join(', ');
+    }
 
-    $('#autosep-summary-tags').textContent =
-        f.tags.length === 0 ? 'None' :
-            f.tags.length > 3 ? `${f.tags.length} tags` : f.tags.join(', ');
+    // Tags
+    const tagEl = $('#autosep-summary-tags');
+    if (tagEl) {
+        tagEl.textContent =
+            !f.tags?.length ? 'None' :
+                f.tags.length > 3 ? `${f.tags.length} tags` : f.tags.join(', ');
+    }
 
-    $('#autosep-summary-ratings').textContent =
-        f.ratings.length === allRatings.length ? 'All' :
-            f.ratings.length === 0 ? 'None' :
-                f.ratings.join(', ');
+    // Ratings
+    const ratingEl = $('#autosep-summary-ratings');
+    if (ratingEl) {
+        ratingEl.textContent =
+            f.ratings?.length === allRatings.length ? 'All' :
+                !f.ratings?.length ? 'None' :
+                    f.ratings.join(', ');
+    }
+
+    // Checkpoints
+    const cpEl = $('#autosep-summary-checkpoints');
+    if (cpEl) {
+        cpEl.textContent =
+            !f.checkpoints?.length ? 'None' :
+                f.checkpoints.length > 2 ? `${f.checkpoints.length} selected` : f.checkpoints.join(', ');
+    }
+
+    // Loras
+    const loraEl = $('#autosep-summary-loras');
+    if (loraEl) {
+        loraEl.textContent =
+            !f.loras?.length ? 'None' :
+                f.loras.length > 2 ? `${f.loras.length} selected` : f.loras.join(', ');
+    }
+
+    // Prompts
+    const promptEl = $('#autosep-summary-prompts');
+    if (promptEl) {
+        promptEl.textContent =
+            !f.prompts?.length ? 'None' :
+                f.prompts.length > 2 ? `${f.prompts.length} prompts` : f.prompts.join(', ');
+    }
+
+    // Dimensions
+    const dimEl = $('#autosep-summary-dimensions');
+    if (dimEl) {
+        const hasDimFilter = f.minWidth || f.maxWidth || f.minHeight || f.maxHeight || f.aspectRatio;
+        if (!hasDimFilter) {
+            dimEl.textContent = 'Any';
+        } else {
+            const parts = [];
+            if (f.minWidth || f.maxWidth) parts.push(`W: ${f.minWidth || 0}-${f.maxWidth || '∞'}`);
+            if (f.minHeight || f.maxHeight) parts.push(`H: ${f.minHeight || 0}-${f.maxHeight || '∞'}`);
+            if (f.aspectRatio) parts.push(f.aspectRatio);
+            dimEl.textContent = parts.join(', ') || 'Custom';
+        }
+    }
 }
 
 // ============== Preview ==============
@@ -64,17 +137,36 @@ async function updateAutoSepPreview() {
 
     const f = AppState.filters;
 
-    if (f.generators.length === 0 && f.tags.length === 0 && f.ratings.length === 4) {
+    // Check if any meaningful filters are set
+    const hasFilters =
+        (f.generators?.length > 0 && f.generators.length < 5) ||
+        (f.tags?.length > 0) ||
+        (f.ratings?.length > 0 && f.ratings.length < 4) ||
+        (f.checkpoints?.length > 0) ||
+        (f.loras?.length > 0) ||
+        (f.prompts?.length > 0) ||
+        f.minWidth || f.maxWidth || f.minHeight || f.maxHeight || f.aspectRatio;
+
+    if (!hasFilters) {
         $('#autosep-preview .stat-number').textContent = '0';
         AutoSepState.matchCount = 0;
         return;
     }
 
     try {
+        // Pass all filter types
         const result = await API.getImages({
-            generators: f.generators.length > 0 ? f.generators : null,
-            tags: f.tags.length > 0 ? f.tags : null,
-            ratings: f.ratings.length < 4 ? f.ratings : null,
+            generators: f.generators?.length > 0 ? f.generators : null,
+            tags: f.tags?.length > 0 ? f.tags : null,
+            ratings: f.ratings?.length < 4 ? f.ratings : null,
+            checkpoints: f.checkpoints?.length > 0 ? f.checkpoints : null,
+            loras: f.loras?.length > 0 ? f.loras : null,
+            prompts: f.prompts?.length > 0 ? f.prompts : null,
+            minWidth: f.minWidth,
+            maxWidth: f.maxWidth,
+            minHeight: f.minHeight,
+            maxHeight: f.maxHeight,
+            aspectRatio: f.aspectRatio,
             limit: 10000
         });
 
@@ -106,11 +198,25 @@ async function executeAutoSeparate() {
     const f = AppState.filters;
 
     try {
+        // Build dimensions object
+        const dimensions = {
+            minWidth: f.minWidth,
+            maxWidth: f.maxWidth,
+            minHeight: f.minHeight,
+            maxHeight: f.maxHeight,
+            aspectRatio: f.aspectRatio
+        };
+
+        // Pass all filter types including prompts and dimensions
         const result = await API.batchMove(
             f.generators.length > 0 ? f.generators : null,
             f.tags.length > 0 ? f.tags : null,
+            f.ratings.length < 4 ? f.ratings : null,
             destination,
-            f.ratings.length < 4 ? f.ratings : null
+            f.checkpoints?.length > 0 ? f.checkpoints : null,
+            f.loras?.length > 0 ? f.loras : null,
+            f.prompts?.length > 0 ? f.prompts : null,
+            dimensions
         );
 
         showToast(`Moved ${result.count} images to ${destination}`, 'success');
@@ -134,3 +240,6 @@ async function executeAutoSeparate() {
 document.addEventListener('DOMContentLoaded', () => {
     initAutoSeparate();
 });
+
+// Export for use by app.js filter modal
+window.updateAutoSepSummary = updateAutoSepSummary;

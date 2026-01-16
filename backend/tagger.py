@@ -71,7 +71,8 @@ class WD14Tagger:
         tags_path: Optional[str] = None,
         model_dir: Optional[str] = None,
         threshold: float = 0.35,
-        character_threshold: float = 0.85
+        character_threshold: float = 0.85,
+        use_gpu: bool = True
     ):
         """
         Initialize the tagger.
@@ -83,6 +84,7 @@ class WD14Tagger:
             model_dir: Directory to store/load models. If None, uses cache dir.
             threshold: Confidence threshold for general tags
             character_threshold: Confidence threshold for character tags
+            use_gpu: Whether to use GPU acceleration (CUDA) if available
         """
         _ensure_imports()
         
@@ -92,6 +94,7 @@ class WD14Tagger:
         self.model_dir = model_dir or self._get_default_model_dir()
         self.threshold = threshold
         self.character_threshold = character_threshold
+        self.use_gpu = use_gpu
         
         self.session = None
         self.tags = []
@@ -271,12 +274,40 @@ class WD14Tagger:
         
         # Load ONNX model with error handling
         print(f"Loading model from {model_path}...")
-        providers = ['CUDAExecutionProvider', 'CPUExecutionProvider']
+        
+        # Choose providers based on use_gpu setting
+        if self.use_gpu:
+            providers = ['CUDAExecutionProvider', 'CPUExecutionProvider']
+        else:
+            providers = ['CPUExecutionProvider']
+        
         available_providers = ort.get_available_providers()
         providers = [p for p in providers if p in available_providers]
+        print(f"Using providers: {providers} (GPU {'enabled' if self.use_gpu else 'disabled'})")
+        
+        # Create session options to prevent CPU overload / BSOD
+        # This fixes CLOCK_WATCHDOG_TIMEOUT crashes
+        sess_options = ort.SessionOptions()
+        
+        # Limit threads to prevent CPU overload (use half of available cores, min 1)
+        import multiprocessing
+        num_threads = max(1, multiprocessing.cpu_count() // 2)
+        sess_options.intra_op_num_threads = num_threads
+        sess_options.inter_op_num_threads = 1  # Sequential graph execution
+        
+        # Disable thread spinning to reduce CPU usage (prevents BSOD)
+        sess_options.add_session_config_entry("session.intra_op.allow_spinning", "0")
+        
+        # Use sequential execution mode (safer for CPU)
+        sess_options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
+        
+        # Optimize for inference
+        sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+        
+        print(f"ONNX session using {num_threads} threads (spinning disabled)")
         
         try:
-            self.session = ort.InferenceSession(model_path, providers=providers)
+            self.session = ort.InferenceSession(model_path, sess_options=sess_options, providers=providers)
         except Exception as e:
             error_msg = str(e)
             if "INVALID_PROTOBUF" in error_msg or "Protobuf parsing failed" in error_msg:
@@ -297,7 +328,7 @@ class WD14Tagger:
                 
                 # Try loading again
                 try:
-                    self.session = ort.InferenceSession(model_path, providers=providers)
+                    self.session = ort.InferenceSession(model_path, sess_options=sess_options, providers=providers)
                     print("Successfully loaded model after re-download!")
                 except Exception as e2:
                     raise RuntimeError(f"Failed to load model even after re-download. Error: {e2}")
@@ -403,9 +434,10 @@ class WD14Tagger:
                 result["rating_confidences"][tag_name] = conf
         
         if rating_probs:
-            result["rating"] = max(rating_probs, key=lambda x: x[1])[0]
-            for tag_name, conf in rating_probs:
-                result["all_tags"].append({"tag": tag_name, "confidence": conf})
+            # Only add the HIGHEST confidence rating tag to all_tags
+            best_rating = max(rating_probs, key=lambda x: x[1])
+            result["rating"] = best_rating[0]
+            result["all_tags"].append({"tag": best_rating[0], "confidence": best_rating[1]})
         
         # Sort by confidence
         result["general_tags"].sort(key=lambda x: x["confidence"], reverse=True)
@@ -447,6 +479,7 @@ def get_tagger(
     tags_path: Optional[str] = None,
     threshold: float = 0.35,
     character_threshold: float = 0.85,
+    use_gpu: bool = True,
     force_reload: bool = False
 ) -> WD14Tagger:
     """Get or create the tagger instance."""
@@ -455,7 +488,8 @@ def get_tagger(
     new_settings = {
         "model_name": model_name,
         "model_path": model_path,
-        "tags_path": tags_path
+        "tags_path": tags_path,
+        "use_gpu": use_gpu
     }
     
     # Reload if settings changed or forced
@@ -465,7 +499,8 @@ def get_tagger(
             model_path=model_path,
             tags_path=tags_path,
             threshold=threshold,
-            character_threshold=character_threshold
+            character_threshold=character_threshold,
+            use_gpu=use_gpu
         )
         _current_settings = new_settings
     else:
