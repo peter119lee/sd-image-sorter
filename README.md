@@ -64,7 +64,7 @@ A powerful image management tool for Stable Diffusion users. Automatically extra
 
 1. **Clone/Download** the repository:
    ```bash
-   git clone https://github.com/yourusername/sd-image-sorter.git
+   git clone https://github.com/peter119lee/sd-image-sorter.git
    cd sd-image-sorter
    ```
 
@@ -473,7 +473,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 1. **获取代码**:
    ```bash
-   git clone https://github.com/yourusername/sd-image-sorter.git
+   git clone https://github.com/peter119lee/sd-image-sorter.git
    cd sd-image-sorter
    ```
 
@@ -568,7 +568,7 @@ This project wouldn't be possible without these amazing contributors and their i
 
 | Contributor | Contribution |
 |:------------|:-------------|
-| **[Antigravity](https://github.com/yourusername)** & **Claude Opus 4.5 (Thinking)** | 💻 Core development & AI-assisted coding |
+| **[Antigravity](https://github.com/peter119lee)** & **Claude Opus 4.5 (Thinking)** | 💻 Core development & AI-assisted coding |
 | **[Wenaka2004](https://github.com/Wenaka2004/auto-censor)** | 💡 Auto-censor concept inspiration |
 | **Wenaka2004** | 🎯 [YOLO detection model](https://civitai.com/models/1736285?modelVersionId=1965032) |
 | **[Spawner1145](https://github.com/spawner1145/comfyui-lsnet)**, **DraconicDragon**, **heathcliff01** | 🔮 LSNet inspiration *(feature coming soon!)* |
