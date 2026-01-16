@@ -38,7 +38,7 @@ A powerful image management tool for Stable Diffusion users. Automatically extra
 
 | Gallery Navigation | Manual Sort Flow |
 |:------------------:|:----------------:|
-| ![Gallery Demo](docs/screenshots/gallery_demo.webp) | ![Manual Sort Demo](docs/screenshots/manual_sort_demo.gif) |
+| ![Gallery Demo](docs/screenshots/gallery_demo.gif) | ![Manual Sort Demo](docs/screenshots/manual_sort_demo.gif) |
 
 ---
 
