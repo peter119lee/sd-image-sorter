@@ -477,11 +477,20 @@ class PromptService:
 
             scored = cursor.execute("SELECT COUNT(*) FROM images WHERE aesthetic_score IS NOT NULL").fetchone()[0]
 
+            # Each example card renders a thumbnail and offers Build / Reader /
+            # Preview on its id, so rows whose file is gone are left out and
+            # counted separately — the headline "scored images" stat above still
+            # reports every scored row on record.
+            scored_available = cursor.execute(
+                "SELECT COUNT(*) FROM images "
+                "WHERE aesthetic_score IS NOT NULL AND COALESCE(is_readable, 1) = 1"
+            ).fetchone()[0]
+
             top_scored_images = []
             for row in cursor.execute(
                 "SELECT id, filename, checkpoint, prompt, aesthetic_score "
                 "FROM images "
-                "WHERE aesthetic_score IS NOT NULL "
+                "WHERE aesthetic_score IS NOT NULL AND COALESCE(is_readable, 1) = 1 "
                 "ORDER BY aesthetic_score DESC, id DESC "
                 "LIMIT ?",
                 (scored_limit,),
@@ -515,8 +524,8 @@ class PromptService:
             "high_aesthetic_tags_has_more": high_score_tags_total > len(high_score_tags),
             "low_aesthetic_tags": low_score_tags,
             "top_scored_images": top_scored_images,
-            "top_scored_images_total": scored,
-            "top_scored_images_has_more": scored > len(top_scored_images),
+            "top_scored_images_total": scored_available,
+            "top_scored_images_has_more": scored_available > len(top_scored_images),
         }
 
     def compare_prompts(self, *, id_a: int, id_b: int) -> Dict[str, Any]:

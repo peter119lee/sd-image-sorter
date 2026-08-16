@@ -273,6 +273,31 @@ class TestPromptsRouter:
         assert any(item["name"] == "RealisticVisionV51" and item["count"] == 3 for item in data["checkpoint_score_leaders"])
         assert any(recipe["name"] == "RealisticVisionV51" and "studio_lighting" in recipe["tags"] for recipe in data["checkpoint_recipes"])
 
+    def test_top_scored_examples_skip_images_whose_file_is_gone(self, test_client, test_db):
+        """Every example card renders a thumbnail and three actions keyed on the
+        id, so an unreadable row hands the user a broken image and three
+        buttons that cannot work."""
+        gone = test_db.add_image(path="/tmp/pl-gone.png", filename="pl-gone.png", metadata_json="{}")
+        kept = test_db.add_image(path="/tmp/pl-kept.png", filename="pl-kept.png", metadata_json="{}")
+        with test_db.get_db() as conn:
+            conn.execute("UPDATE images SET aesthetic_score = 9.5 WHERE id = ?", (gone,))
+            conn.execute("UPDATE images SET aesthetic_score = 8.0 WHERE id = ?", (kept,))
+            conn.execute(
+                "UPDATE images SET is_readable = 0, read_error = 'missing' WHERE id = ?",
+                (gone,),
+            )
+
+        response = test_client.get("/api/prompts/stats")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert [entry["id"] for entry in data["top_scored_images"]] == [kept]
+        # The show-more affordance must not promise rows that can never render.
+        assert data["top_scored_images_total"] == 1
+        assert data["top_scored_images_has_more"] is False
+        # The headline library stat still counts every scored row on record.
+        assert data["scored_images"] == 2
+
 
 class TestCensorRouterValidation:
     @pytest.mark.parametrize(
