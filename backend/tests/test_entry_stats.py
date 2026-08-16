@@ -34,6 +34,16 @@ def _add_image(db, path: str, filename: str):
     )
 
 
+def _mark_unreadable(db, image_id: int) -> None:
+    """Flag a row the way the gallery does when the file no longer opens."""
+    conn = db.get_connection()
+    conn.execute(
+        "UPDATE images SET is_readable = 0, read_error = 'missing' WHERE id = ?",
+        (image_id,),
+    )
+    conn.commit()
+
+
 class TestMigration020:
     def test_activity_log_table_exists(self, test_db):
         conn = test_db.get_connection()
@@ -158,6 +168,24 @@ class TestHeroPick:
         }
         assert picks == set(ids)
 
+    def test_unreadable_five_star_is_never_picked(self, test_db):
+        gone = _add_image(test_db, "/lib/gone.png", "gone.png")
+        test_db.set_user_rating(gone, 5)
+        _mark_unreadable(test_db, gone)
+        kept = _add_image(test_db, "/lib/kept.png", "kept.png")
+        test_db.set_user_rating(kept, 5)
+
+        for seed in range(4):
+            hero = entry_stats_service.get_entry_summary(hero_seed=seed)["hero"]
+            assert hero["id"] == kept
+            assert hero["pool"] == 1
+
+    def test_all_five_stars_unreadable_means_no_hero(self, test_db):
+        gone = _add_image(test_db, "/lib/gone.png", "gone.png")
+        test_db.set_user_rating(gone, 5)
+        _mark_unreadable(test_db, gone)
+        assert entry_stats_service.get_entry_summary()["hero"] is None
+
 
 class TestEntrySummaryEndpoint:
     def test_endpoint_shape(self, test_client):
@@ -195,6 +223,33 @@ class TestHeroPool:
     def test_empty_library(self, test_db):
         pool = entry_stats_service.get_hero_pool()
         assert pool == {"ids": [], "starred": 0, "total": 0}
+
+    def test_unreadable_rows_are_excluded(self, test_db):
+        """A library whose newest rows are all missing files must still
+        surface the older readable ones, otherwise the entry-page cover
+        renders as a black void."""
+        readable = [
+            _add_image(test_db, f"/lib/ok{n}.png", f"ok{n}.png") for n in range(3)
+        ]
+        for n in range(5):
+            dead = _add_image(test_db, f"/lib/dead{n}.png", f"dead{n}.png")
+            _mark_unreadable(test_db, dead)
+
+        pool = entry_stats_service.get_hero_pool(limit=10)
+
+        assert pool["ids"] == sorted(readable, reverse=True)
+        assert pool["total"] == 3
+
+    def test_unreadable_starred_row_is_not_counted(self, test_db):
+        gone = _add_image(test_db, "/lib/gone.png", "gone.png")
+        test_db.set_user_rating(gone, 5)
+        _mark_unreadable(test_db, gone)
+        alive = _add_image(test_db, "/lib/alive.png", "alive.png")
+
+        pool = entry_stats_service.get_hero_pool(limit=10)
+
+        assert pool["ids"] == [alive]
+        assert pool["starred"] == 0
 
     def test_endpoint_shape_and_limit_validation(self, test_client):
         response = test_client.get("/api/entry/hero-pool?limit=5")

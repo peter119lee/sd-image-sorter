@@ -80,7 +80,9 @@ def _utc_sqlite_text(moment: datetime) -> str:
 
 def _pick_hero(conn, hero_seed: int) -> Optional[Dict[str, Any]]:
     rows = conn.execute(
-        "SELECT id, filename FROM images WHERE user_rating = 5 ORDER BY id"
+        "SELECT id, filename FROM images "
+        "WHERE user_rating = 5 AND COALESCE(is_readable, 1) = 1 "
+        "ORDER BY id"
     ).fetchall()
     if not rows:
         return None
@@ -96,6 +98,9 @@ def get_hero_pool(limit: int = 60) -> Dict[str, Any]:
     ★5-rated images lead (the same pool the daily hero draws from); the rest
     fills with the newest library images so a fresh install with zero ratings
     still gets a living wall. Ids only — the client renders thumbnails.
+
+    Rows whose file no longer opens are excluded: the client turns each id
+    straight into a background image, so a dead id renders as a black void.
     """
     conn = db.get_connection()
     capped = max(1, min(int(limit or 60), 200))
@@ -103,6 +108,7 @@ def get_hero_pool(limit: int = 60) -> Dict[str, Any]:
         """
         SELECT id, (user_rating = 5) AS starred
         FROM images
+        WHERE COALESCE(is_readable, 1) = 1
         ORDER BY (user_rating = 5) DESC, indexed_at DESC, id DESC
         LIMIT ?
         """,

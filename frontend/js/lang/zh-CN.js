@@ -4687,6 +4687,7 @@ window.I18nLang_zhCN = {
     'entry.heroFilm': '胶卷墙 · {total} 张',
     'entry.heroLatestFallback': '最新作品 · 给喜欢的图点 ★5 就能钉在这里',
     'entry.heroPoolEmpty': '图库还是空的——先扫描一个文件夹，这里就会亮起来',
+    'entry.heroUnavailable': '封面图的原始文件已经不在硬盘上——重新扫描一次就能刷新图库',
     'entry.showModeLabel': '门面展示模式',
     'entry.showModeOff': '无',
     'entry.showModeOffTip': '不显示门面图',

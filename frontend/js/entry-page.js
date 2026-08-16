@@ -29,6 +29,7 @@
     const SLIDESHOW_INTERVAL_MS = 8000;
     const FILM_ROWS = 4;
     const PROMPT_TEXTURE_MAX_CHARS = 90;
+    const HERO_LOAD_ATTEMPTS = 8;
     const CLOCK_TICK_MS = 30 * 1000;
 
     const state = {
@@ -39,6 +40,9 @@
         slideshowTimer: null,
         slideshowIndex: 0,
         activeSlideLayer: 0,
+        // Bumped on every renderHero so a probe still in flight from the
+        // previous mode cannot paint over the one the user just chose.
+        heroToken: 0,
     };
 
     function t(key, params, fallback) {
@@ -156,15 +160,46 @@
         return layers;
     }
 
-    function showSlide(imageId) {
+    function decodes(imageId) {
+        return new Promise((resolve) => {
+            const probe = new Image();
+            probe.onload = () => resolve(true);
+            probe.onerror = () => resolve(false);
+            probe.src = `/api/image-file/${imageId}`;
+        });
+    }
+
+    // A row can be indexed while readable and then deleted from disk. Painting
+    // its url straight into the layer leaves the cover black with nothing to
+    // explain it, so a candidate is only swapped in after the bytes decode.
+    async function showSlide(imageId, token) {
+        if (!(await decodes(imageId))) return false;
+        if (token !== undefined && token !== state.heroToken) return false;
         const bg = el('entry-hero');
-        if (!bg) return;
+        if (!bg) return false;
         const layers = ensureSlideLayers(bg);
         const nextIndex = state.activeSlideLayer ^ 1;
         layers[nextIndex].style.setProperty('--hero-url', `url("/api/image-file/${imageId}")`);
         layers[state.activeSlideLayer].classList.remove('active');
         layers[nextIndex].classList.add('active');
         state.activeSlideLayer = nextIndex;
+        return true;
+    }
+
+    // Walks the pool from startIndex until one candidate loads, so a handful of
+    // stale rows cannot strand the cover on black. Returns the id shown, or null.
+    async function showFirstLoadable(ids, startIndex, token) {
+        const attempts = Math.min(ids.length, HERO_LOAD_ATTEMPTS);
+        for (let n = 0; n < attempts; n += 1) {
+            if (token !== undefined && token !== state.heroToken) return null;
+            const id = ids[(startIndex + n) % ids.length];
+            if (await showSlide(id, token)) return id;
+        }
+        return null;
+    }
+
+    function heroUnavailableCredit(credit) {
+        if (credit) credit.textContent = t('entry.heroUnavailable', {}, 'Cover images are missing from disk — rescan to refresh the library');
     }
 
     async function ensureHeroPool() {
@@ -194,18 +229,22 @@
         if (credit) credit.textContent = t('entry.heroPoolEmpty', {}, 'The library is empty — scan a folder and art shows up here');
     }
 
-    function renderSlideshow() {
+    function renderSlideshow(token) {
         ensureHeroPool().then((pool) => {
-            if (heroMode() !== 'slideshow' || !state.visible) return;
+            if (token !== state.heroToken || !state.visible) return;
             const credit = el('entry-hero-credit');
             if (!pool.ids.length) {
                 poolEmptyCredit(credit);
                 return;
             }
             const advance = () => {
-                const id = pool.ids[state.slideshowIndex % pool.ids.length];
+                const start = state.slideshowIndex % pool.ids.length;
                 state.slideshowIndex += 1;
-                showSlide(id);
+                showFirstLoadable(pool.ids, start, token).then((shown) => {
+                    if (shown === null && token === state.heroToken && state.visible) {
+                        heroUnavailableCredit(credit);
+                    }
+                });
             };
             advance();
             stopSlideshow();
@@ -246,6 +285,9 @@
                     img.loading = 'lazy';
                     img.decoding = 'async';
                     img.alt = '';
+                    // Both copies of an id fail together, so dropping them
+                    // keeps the doubled track symmetric and the loop seamless.
+                    img.addEventListener('error', () => img.remove());
                     img.src = `/api/image-thumbnail/${id}`;
                     track.appendChild(img);
                 });
@@ -275,6 +317,7 @@
         if (!bg || !credit) return;
 
         const mode = heroMode();
+        const token = (state.heroToken += 1);
         refreshModeSwitch();
         stopSlideshow();
         state.slideshowIndex = 0;
@@ -289,7 +332,7 @@
 
         if (mode === 'slideshow') {
             ensureSlideLayers(bg);
-            renderSlideshow();
+            renderSlideshow(token);
             return;
         }
 
@@ -300,31 +343,46 @@
 
         // single (default)
         if (!hero) {
-            renderSingleFallback(credit, swap);
+            renderSingleFallback(credit, swap, token);
             return;
         }
-        showSlide(hero.id);
-        credit.textContent = t('entry.heroCredit', { filename: hero.filename }, "Today's cover: {filename} · ★5");
-        swap.hidden = hero.pool <= 1;
-        renderPromptTexture(hero.id);
+        showSlide(hero.id, token).then((shown) => {
+            if (token !== state.heroToken || !state.visible) return;
+            if (!shown) {
+                // Indexed as readable but gone from disk since; the pool walk
+                // below still has readable candidates to offer.
+                renderSingleFallback(credit, swap, token);
+                return;
+            }
+            credit.textContent = t('entry.heroCredit', { filename: hero.filename }, "Today's cover: {filename} · ★5");
+            swap.hidden = hero.pool <= 1;
+            renderPromptTexture(hero.id);
+        });
     }
 
     // No ★5 image yet (fresh install / unrated library): fall back to the
     // hero pool (newest works) instead of a blank half-canvas, and keep 换一张
     // usable by walking the pool. slideshowIndex doubles as the cursor.
-    function renderSingleFallback(credit, swap) {
+    function renderSingleFallback(credit, swap, token) {
         ensureHeroPool().then((pool) => {
-            if (heroMode() !== 'single' || !state.visible) return;
+            if (token !== state.heroToken || !state.visible) return;
             if (!pool.ids.length) {
                 clearHeroLayers();
                 poolEmptyCredit(credit);
                 return;
             }
-            const id = pool.ids[state.slideshowIndex % pool.ids.length];
-            showSlide(id);
-            credit.textContent = t('entry.heroLatestFallback', {}, 'Latest works — rate one ★5 to make it the cover');
-            swap.hidden = pool.ids.length <= 1;
-            renderPromptTexture(id);
+            const start = state.slideshowIndex % pool.ids.length;
+            return showFirstLoadable(pool.ids, start, token).then((shown) => {
+                if (token !== state.heroToken || !state.visible) return;
+                if (shown === null) {
+                    clearHeroLayers();
+                    heroUnavailableCredit(credit);
+                    return;
+                }
+                credit.textContent = t('entry.heroLatestFallback', {}, 'Latest works — rate one ★5 to make it the cover');
+                swap.hidden = pool.ids.length <= 1;
+                renderPromptTexture(shown);
+            });
         });
     }
 
@@ -853,7 +911,8 @@
                     // Fallback single (no ★5 yet): walk the pool directly —
                     // re-fetching the summary would just return null again.
                     state.slideshowIndex += 1;
-                    renderSingleFallback(el('entry-hero-credit'), swap);
+                    // Same render generation — this only advances the cursor.
+                    renderSingleFallback(el('entry-hero-credit'), swap, state.heroToken);
                     return;
                 }
                 try { localStorage.setItem(HERO_SEED_KEY, String((heroSeed() + 1) % 1000000)); } catch (e) { /* ignore */ }

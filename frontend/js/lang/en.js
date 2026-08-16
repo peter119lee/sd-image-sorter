@@ -4690,6 +4690,7 @@ window.I18nLang_en = {
     'entry.heroFilm': 'Film strips · {total} images',
     'entry.heroLatestFallback': 'Latest works — rate one ★5 to make it the cover',
     'entry.heroPoolEmpty': 'The library is empty — scan a folder and art shows up here',
+    'entry.heroUnavailable': 'Cover images are missing from disk — rescan to refresh the library',
     'entry.showModeLabel': 'Cover display mode',
     'entry.showModeOff': 'Off',
     'entry.showModeOffTip': 'No cover',
