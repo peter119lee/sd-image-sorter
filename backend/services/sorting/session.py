@@ -630,7 +630,7 @@ class SortSessionMixin:
                 except Exception as e:
                     logger.error("Sort %s failed for image %d: %s", operation_mode, current["id"], e)
                     return {
-                        "error": f"Failed to {operation_mode} image",
+                        "error": self._describe_operation_failure(operation_mode, e),
                         "operation_mode": operation_mode,
                         **self._get_sort_session_flags(),
                     }

@@ -164,6 +164,20 @@ class MoveMixin:
         }
 
     @staticmethod
+    def _describe_operation_failure(operation: str, exc: Exception) -> str:
+        """Build the user-facing text for a failed move/copy, keeping the cause.
+
+        Every failure used to collapse to "Failed to move image", so a
+        permission denial, a disconnected drive, a full disk and a file locked
+        by another program were indistinguishable to the user even though the
+        precise reason was already in the exception.
+        """
+        cause = _describe_file_operation_cause(exc)
+        if not cause:
+            return f"Failed to {operation} image"
+        return f"Failed to {operation} image: {cause}"
+
+    @staticmethod
     def _restore_file_to_original_path(
         image_id: int,
         source_path: str,
@@ -349,7 +363,7 @@ class MoveMixin:
             logger.error("Failed to %s image %d: %s", operation, image_id, e)
             return {
                 "id": image_id,
-                "error": f"Failed to {operation} image",
+                "error": self._describe_operation_failure(operation, e),
                 "operation": operation,
                 "success": False,
             }
