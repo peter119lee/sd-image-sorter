@@ -244,3 +244,11 @@ claude-*.md
 HANDOFF-*.md
 qa-sweep-*.md
 *-REPORT.md
+
+# The rules above key off a prefix; root-level scratch audits have also landed
+# with an "-audit" SUFFIX and no claude- prefix (the 2026-08 cleanup removed
+# claude-code-sd-image-sorter-tagger-audit.md, and v3_audit_prompt.md above
+# needed its own line for the same reason). Root-anchored so real docs under
+# docs/ are unaffected.
+/*-audit.md
+/*-AUDIT.md
