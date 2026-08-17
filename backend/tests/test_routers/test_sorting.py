@@ -3498,6 +3498,95 @@ def test_unreadable_session_file_is_preserved_and_reported(tmp_path: Path, monke
     )
 
 
+class TestSortSessionRestoreFailureNotice:
+    """A failed restore has to reach the user, not just the log file.
+
+    651c0cf stopped a corrupt session file being discarded in silence and logged
+    it at ERROR, but the user never opens the log: they open Manual Sort, find
+    the undo history for their half-finished sort gone, and have nothing to act
+    on. The notice therefore has to travel on the payload the Manual Sort view
+    already polls (``GET /api/sort/current``), naming the quarantined file so
+    the history is recoverable by hand.
+    """
+
+    @staticmethod
+    def _service_with_corrupt_session(tmp_path: Path, monkeypatch):
+        from services import sorting_service as sorting_module
+        from services.sorting_service import SortingService
+
+        session_path = tmp_path / "sort-session.json"
+        session_path.write_text(
+            '{"session_schema_version": 1, "active": true, "history": [{"image_id',
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(sorting_module, "SESSION_FILE", str(session_path))
+        monkeypatch.setattr(sorting_module, "LEGACY_SESSION_FILE", str(session_path))
+        service = SortingService()
+        service.load_session_from_disk()
+        return service, session_path
+
+    def test_sort_current_payload_reports_the_failed_restore(self, tmp_path, monkeypatch):
+        service, session_path = self._service_with_corrupt_session(tmp_path, monkeypatch)
+
+        payload = service.get_current_sort_image()
+
+        failure = payload["restore_failure"]
+        assert failure["reason"] == "unreadable_session_file"
+        assert failure["session_path"] == str(session_path)
+        # The actionable part: where the undo history actually went.
+        quarantined = list(tmp_path.glob("sort-session.json.corrupt-*"))
+        assert failure["quarantine_path"] == str(quarantined[0])
+        assert failure["detail"]
+        assert failure["occurred_at"] > 0
+
+    def test_a_clean_start_reports_no_failure(self, tmp_path, monkeypatch):
+        from services import sorting_service as sorting_module
+        from services.sorting_service import SortingService
+
+        monkeypatch.setattr(
+            sorting_module, "SESSION_FILE", str(tmp_path / "sort-session.json")
+        )
+        monkeypatch.setattr(
+            sorting_module, "LEGACY_SESSION_FILE", str(tmp_path / "legacy.json")
+        )
+        service = SortingService()
+        service.load_session_from_disk()
+
+        assert service.get_current_sort_image()["restore_failure"] is None
+
+    def test_starting_a_new_session_clears_the_notice(
+        self, test_db, tmp_path, monkeypatch
+    ):
+        service, _ = self._service_with_corrupt_session(tmp_path, monkeypatch)
+        assert service.get_current_sort_image()["restore_failure"] is not None
+
+        service.start_sort_session(folders={"w": str(tmp_path / "keep")})
+
+        assert service.get_sort_session()["restore_failure"] is None
+
+    def test_clearing_the_session_clears_the_notice(self, tmp_path, monkeypatch):
+        service, _ = self._service_with_corrupt_session(tmp_path, monkeypatch)
+        assert service.get_sort_session()["restore_failure"] is not None
+
+        service.clear_sort_session()
+
+        assert service.get_current_sort_image()["restore_failure"] is None
+
+    def test_the_notice_is_never_written_to_the_session_file(
+        self, test_db, tmp_path, monkeypatch
+    ):
+        """It describes one startup, so persisting it would resurrect it forever."""
+        from services.sorting_session_store import (
+            build_persisted_sort_session_payload,
+        )
+
+        service, _ = self._service_with_corrupt_session(tmp_path, monkeypatch)
+
+        persisted = build_persisted_sort_session_payload(service.get_sort_session())
+
+        assert "restore_failure" not in persisted
+
+
 # ---------------------------------------------------------------------------
 # v3.3.2 Sort & Cull Workbench — WB-S2: A/B "King-of-Hill" bracket mode.
 # A champion stays; each remaining candidate challenges it; N-1 comparisons →

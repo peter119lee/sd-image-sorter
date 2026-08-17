@@ -138,7 +138,54 @@ class SortingStateMixin:
             "operation_mode": "move",
             "history": [],
             "redo_stack": [],
+            # Why the session the user left behind is not here. 651c0cf keeps a
+            # corrupt session file as a .corrupt sibling and logs at ERROR, but
+            # the user reads the UI, not the log, so the reason travels on every
+            # sort payload (see _build_sort_restore_failure). None = nothing
+            # failed. Deliberately absent from build_persisted_sort_session_payload:
+            # it describes one startup, and persisting it would replay forever.
+            "restore_failure": None,
         }
+
+    @staticmethod
+    def _build_sort_restore_failure(
+        reason: str,
+        session_path: Any,
+        quarantine_path: Any,
+        detail: str,
+    ) -> Dict[str, Any]:
+        """Describe a persisted sort session that could not be restored.
+
+        ``quarantine_path`` is None when the file could not even be moved aside,
+        which is the one case where the history is genuinely unrecoverable.
+        """
+        return {
+            "reason": reason,
+            "session_path": str(session_path),
+            "quarantine_path": str(quarantine_path) if quarantine_path else None,
+            "detail": str(detail),
+            "occurred_at": time.time(),
+        }
+
+    @classmethod
+    def _coerce_sort_restore_failure(cls, failure: Optional[Any]) -> Optional[Dict[str, Any]]:
+        """Normalize an injected restore-failure notice, or drop it entirely."""
+        if not isinstance(failure, dict):
+            return None
+        reason = str(failure.get("reason") or "").strip()
+        if not reason:
+            return None
+        coerced = cls._build_sort_restore_failure(
+            reason,
+            failure.get("session_path") or "",
+            failure.get("quarantine_path"),
+            failure.get("detail") or "",
+        )
+        try:
+            coerced["occurred_at"] = float(failure["occurred_at"])
+        except (KeyError, TypeError, ValueError):
+            pass
+        return coerced
 
     def _with_scan_attention_fields(self, progress: Dict[str, Any]) -> Dict[str, Any]:
         """Add UI-facing stalled-scan diagnostics without mutating worker progress."""

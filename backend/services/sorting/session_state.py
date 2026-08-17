@@ -9,6 +9,7 @@ module reaches them via ``self``.
 
 import json
 import logging
+from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence, TypedDict
 
 from fastapi import HTTPException
@@ -173,13 +174,20 @@ class SessionStateMixin:
         history: Optional[List[Dict[str, Any]]] = None,
         redo_stack: Optional[List[Dict[str, Any]]] = None,
     ) -> Dict[str, Any]:
-        """Expose undo/redo availability alongside move/skip counters."""
+        """Expose undo/redo availability alongside move/skip counters.
+
+        Also the single seam through which ``restore_failure`` reaches the
+        client: every ``/api/sort/current`` and ``/api/sort/action`` payload
+        already spreads this, including the three inactive-session branches —
+        which is precisely where a session that failed to restore lands.
+        """
         active_history = history if history is not None else self._sort_session.get("history", [])
         active_redo = redo_stack if redo_stack is not None else self._sort_session.get("redo_stack", [])
         return {
             **self._get_sort_history_counts(active_history),
             "undo_available": bool(active_history),
             "redo_available": bool(active_redo),
+            "restore_failure": self._sort_session.get("restore_failure"),
         }
 
     def _filter_sort_actions(
@@ -289,6 +297,9 @@ class SessionStateMixin:
         coerced["history"] = list(session.get("history", []))
         coerced["redo_stack"] = list(session.get("redo_stack", []))
         coerced["operation_mode"] = self._validate_file_operation(session.get("operation_mode", "move"))
+        # Carried, not rebuilt: starting or clearing a session omits the key and
+        # so retires the notice, which is exactly when it stops being true.
+        coerced["restore_failure"] = self._coerce_sort_restore_failure(session.get("restore_failure"))
 
         try:
             current_index = int(session.get("current_index", 0) or 0)
@@ -303,6 +314,19 @@ class SessionStateMixin:
             champion_index = 0
         coerced["champion_index"] = max(0, min(champion_index, max(0, len(coerced["image_ids"]) - 1)))
         return coerced
+
+    def _record_sort_restore_failure(
+        self,
+        reason: str,
+        session_path: Path,
+        quarantine_path: Optional[Path],
+        detail: str,
+    ) -> None:
+        """Publish why the persisted session the user left behind is not here."""
+        with self._sort_session_lock:
+            self._sort_session["restore_failure"] = self._build_sort_restore_failure(
+                reason, session_path, quarantine_path, detail
+            )
 
     def load_session_from_disk(self) -> None:
         """Load persisted session from disk on startup."""
@@ -319,7 +343,13 @@ class SessionStateMixin:
                         # Unparseable content (the truncated-file case): keep the
                         # bytes, take them out of the load path, and say so at
                         # ERROR instead of dropping the undo history in silence.
-                        quarantine_unreadable_session_file(session_file, str(exc))
+                        quarantine_path = quarantine_unreadable_session_file(session_file, str(exc))
+                        self._record_sort_restore_failure(
+                            "unreadable_session_file",
+                            session_file,
+                            quarantine_path,
+                            str(exc),
+                        )
                         continue
 
                     try:
@@ -490,6 +520,10 @@ class SessionStateMixin:
 
                     with self._sort_session_lock:
                         self._sort_session = self._coerce_sort_session_state({
+                            # A corrupt preferred file with a readable legacy
+                            # fallback still lost the newer undo history, so the
+                            # notice outlives the successful restore.
+                            'restore_failure': self._sort_session.get("restore_failure"),
                             'active': True,
                             'mode': restored_mode,
                             'image_ids': valid_ids,
