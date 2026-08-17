@@ -31,7 +31,10 @@
             this._eventsBound = true;
             this._bindDropZone(dropZone, fileInput);
             this._bindPasteShortcut();
-            document.getElementById('obfuscate-compat-mode')?.addEventListener('change', () => this._syncCompatModeUI());
+            document.getElementById('obfuscate-compat-mode')?.addEventListener('change', () => {
+                this._syncCompatModeUI();
+                this._revealAdvancedSettingsForCaveat();
+            });
 
             document.getElementById('obfuscate-btn-encode')?.addEventListener('click', () => this._processAll('encode'));
             document.getElementById('obfuscate-btn-decode')?.addEventListener('click', () => this._processAll('decode'));
@@ -170,10 +173,20 @@
             const compatHelp = document.getElementById('obfuscate-compat-help');
 
             if (compatHelp) {
+                // The markup carries data-i18n="tools.compatBigTomatoHelp", and
+                // ui-refresh's MutationObserver re-applies it on any DOM change
+                // inside #app, so the Simple-mode help was silently reverting to
+                // the Standard-mode description moments after being set. Claim
+                // the dynamic-text lock both i18n.applyToDOM and ui-refresh
+                // honour, so the line always describes the selected mode.
+                compatHelp.dataset.i18nLocked = '1';
                 compatHelp.textContent = isSmallTomato
                     ? this._t(
+                        // The old fallback claimed no PNG Info was kept, which stopped
+                        // being true once the mode gate came off; the locale pack owns
+                        // the shipped wording, this is only the no-i18n fallback.
                         'tools.compatSmallTomatoHelp',
-                        'Best when you just want a quick share-safe version. No password, and no PNG Info is kept.'
+                        'Best when you just want a quick share-safe version. No password.'
                     )
                     : this._t(
                         'tools.compatBigTomatoHelp',
@@ -195,16 +208,45 @@
                     : this._t('tools.bigTomatoPasswordHint', 'Leave empty for a fixed scramble. For decoding on the site too, use a 4-digit numeric password (e.g. 0512) — other formats break on the site side.');
             }
 
-            if (legacyInput) {
-                legacyInput.disabled = isSmallTomato;
-                if (isSmallTomato) legacyInput.checked = false;
+            // Protect and restore both emit a PNG, and a PNG can always carry
+            // tEXt, so metadata now survives in Simple mode too (backend commit
+            // 8982d08 removed the same gate server-side). Nothing here is
+            // disabled by compat mode any more; the one path that genuinely
+            // cannot carry it is the Simple-mode .jpg download, and
+            // _renderMetadataDownloadNote says so next to the checkbox.
+            if (legacyInput) legacyInput.disabled = false;
+            if (metadataInput) metadataInput.disabled = false;
+            legacyRow?.classList.remove('is-disabled');
+            metadataRow?.classList.remove('is-disabled');
+            this._renderMetadataDownloadNote(isSmallTomato);
+        },
+
+        _renderMetadataDownloadNote(isSmallTomato) {
+            const metadataRow = document.getElementById('obfuscate-metadata-row');
+            if (!metadataRow) return;
+
+            let note = document.getElementById('obfuscate-metadata-download-note');
+            if (!note) {
+                note = document.createElement('p');
+                note.id = 'obfuscate-metadata-download-note';
+                note.className = 'reader-editor-warning';
+                metadataRow.insertAdjacentElement('afterend', note);
             }
-            if (metadataInput) {
-                metadataInput.disabled = isSmallTomato;
-                if (isSmallTomato) metadataInput.checked = false;
-            }
-            legacyRow?.classList.toggle('is-disabled', isSmallTomato);
-            metadataRow?.classList.toggle('is-disabled', isSmallTomato);
+
+            note.textContent = this._t(
+                'tools.smallTomatoMetadataDownloadNote',
+                'Simple mode keeps image info in the protected and restored PNG, but its download is re-encoded to .jpg for site compatibility and JPEG cannot hold PNG Info. Copy or drag the result, or use Standard mode, when the receiver needs the info.'
+            );
+            note.hidden = !isSmallTomato;
+        },
+
+        _revealAdvancedSettingsForCaveat() {
+            // The note above lives in Advanced settings, collapsed by default, so
+            // picking Simple mode would otherwise hide the download limitation
+            // until after the user had already downloaded and shared a copy.
+            if (this._getCompatMode() !== 'small_tomato') return;
+            const panel = document.getElementById('obfuscate-advanced-settings');
+            if (panel && panel.style.display === 'none') panel.style.display = 'flex';
         },
 
         _addFiles(files) {
@@ -482,12 +524,8 @@
 
             const compatMode = this._getCompatMode();
             const password = document.getElementById('obfuscate-password')?.value || '';
-            const preserveMetadata = compatMode === 'big_tomato'
-                ? (document.getElementById('obfuscate-preserve-metadata')?.checked ?? true)
-                : false;
-            const legacyPngInfo = compatMode === 'big_tomato'
-                ? (document.getElementById('obfuscate-use-legacy-pnginfo')?.checked ?? false)
-                : false;
+            const preserveMetadata = document.getElementById('obfuscate-preserve-metadata')?.checked ?? true;
+            const legacyPngInfo = document.getElementById('obfuscate-use-legacy-pnginfo')?.checked ?? false;
             const progressEl = document.getElementById('obfuscate-progress');
 
             // Always use client-side engine for pixel scrambling (instant).
