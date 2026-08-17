@@ -131,8 +131,10 @@ function syncSortMuteButton() {
     const muteBtn = document.getElementById('btn-sort-mute');
     const muteIcon = document.getElementById('sort-mute-icon');
     if (!muteBtn) return;
-    const on = window.AudioManager ? window.AudioManager.enabled !== false : true;
-    if (muteIcon) muteIcon.textContent = on ? '🔊' : '🔇';
+    // Read the real boolean: the sort blip defaults OFF, and if audio.js never
+    // loaded nothing can play, so "muted" is the honest paint in both cases.
+    const on = window.AudioManager?.enabled === true;
+    if (muteIcon) muteIcon.innerHTML = on ? "<svg class=\"icon\" aria-hidden=\"true\"><use href=\"#i-volume\"/></svg>" : "<svg class=\"icon\" aria-hidden=\"true\"><use href=\"#i-volume-off\"/></svg>";
     muteBtn.setAttribute('aria-pressed', on ? 'false' : 'true');
     muteBtn.title = on
         ? manualSortText('manual.muteSounds', 'Mute sort sounds', '静音排序音效')

@@ -4741,4 +4741,30 @@ window.I18nLang_en = {
     'settings.entryHeroOn': 'Shown',
     'settings.entryHeroOff': 'Hidden',
 
+    // Accessible names for icon-only buttons. These carry no visible text, so
+    // the sprite icon (aria-hidden) leaves a screen reader nothing to announce
+    // but "button". Applied via data-i18n-aria; the markup also holds a literal
+    // aria-label so the name survives a missing key or an i18n failure.
+    'a11y.closeObfuscatePreview': 'Close image preview',
+    'a11y.closeAutosepSettings': 'Close Auto-Separate settings',
+    'a11y.closeDetectSettings': 'Close auto-detect settings',
+    'a11y.closeProfiles': 'Close profile manager',
+    'a11y.closeImagePicker': 'Close image picker',
+    'a11y.closeCategoryBoard': 'Close tag category suggestions',
+    'a11y.closeAnalytics': 'Close image analytics',
+    'a11y.closeExport': 'Close combined export',
+    'a11y.closeBatchExport': 'Close caption export',
+    'a11y.closeRename': 'Close batch rename',
+    'a11y.closeSaveOptions': 'Close save options',
+    'a11y.closeQueueManager': 'Close queue manager',
+    'a11y.closeModelSelect': 'Close model selector',
+    'a11y.closeTagsLibrary': 'Close tags and prompts library',
+    'a11y.closeVlmSettings': 'Close VLM captioning settings',
+    'a11y.closeVlmDebugChat': 'Close VLM API chat',
+    'a11y.browseSlotW': 'Browse for the W slot folder',
+    'a11y.browseSlotA': 'Browse for the A slot folder',
+    'a11y.browseSlotS': 'Browse for the S slot folder',
+    'a11y.browseSlotD': 'Browse for the D slot folder',
+    'a11y.browseModelFile': 'Browse for a YOLO model file',
+
 };

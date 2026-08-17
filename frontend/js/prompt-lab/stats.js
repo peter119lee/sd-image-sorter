@@ -52,7 +52,7 @@ Object.assign(window.PromptLab, {
                     ? visible.map(t =>
                         `<div class="promptlab-tag-item">
                             <span class="tag-name">${escapeHtml(t.tag)}</span>
-                            <div class="tag-bar"><div class="tag-bar-fill" style="width:${(t.count / maxH * 100).toFixed(0)}%;background:#22c55e;"></div></div>
+                            <div class="tag-bar"><div class="tag-bar-fill" style="width:${(t.count / maxH * 100).toFixed(0)}%;background:#4A9D69;"></div></div>
                             <span class="tag-count">${t.count}</span>
                             <div class="promptlab-inline-actions">
                                 <button class="btn btn-ghost btn-small" data-action="gallery-tag" data-tag="${escapeHtml(t.tag)}">${this._t('promptlab.filterGallery', 'Filter Gallery')}</button>
@@ -70,7 +70,7 @@ Object.assign(window.PromptLab, {
                 cpEl.innerHTML = visible.length
                     ? visible.map(c => {
                         const name = c.name.replace(/\\/g, '/').split('/').pop()?.replace(/\.(safetensors|ckpt)$/i, '') || c.name;
-                        return `<div class="promptlab-tag-item"><span class="tag-name">🧠 ${escapeHtml(name)}</span><span class="tag-count">${c.count}</span></div>`;
+                        return `<div class="promptlab-tag-item"><span class="tag-name"><svg class="icon" aria-hidden="true"><use href="#i-cpu"/></svg> ${escapeHtml(name)}</span><span class="tag-count">${c.count}</span></div>`;
                     }).join('')
                     : this._renderStatsEmpty(this._t('promptlab.noCheckpointsYet', 'Checkpoint patterns will appear here after you import more prompt metadata.'));
             }
@@ -88,7 +88,7 @@ Object.assign(window.PromptLab, {
                         const recipeTags = Array.isArray(matchingRecipe?.tags) ? matchingRecipe.tags : [];
                         const recipePreview = recipeTags.slice(0, 8);
                         return `<div class="promptlab-action-card">
-                            <div class="promptlab-action-title">🧠 ${escapeHtml(cleanName)}</div>
+                            <div class="promptlab-action-title"><svg class="icon" aria-hidden="true"><use href="#i-cpu"/></svg> ${escapeHtml(cleanName)}</div>
                             <div class="promptlab-action-meta">${metaText}${recipePreview.length ? `<br>${escapeHtml(recipePreview.join(', '))}` : ''}</div>
                             <div class="promptlab-action-buttons">
                                 <button class="btn btn-ghost btn-small" data-action="gallery" data-checkpoint="${escapeHtml(entry.name)}">${this._t('promptlab.filterGallery', 'Filter Gallery')}</button>
@@ -114,7 +114,7 @@ Object.assign(window.PromptLab, {
                                 <img src="${escapeHtml(this._getImageThumbUrl(entry.id, 320))}" alt="${escapeHtml(entry.filename || '')}" loading="lazy">
                             </div>
                             <div class="promptlab-action-main">
-                                <div class="promptlab-action-title">${escapeHtml(entry.filename)} · ★ ${Number(entry.aesthetic_score || 0).toFixed(2)}</div>
+                                <div class="promptlab-action-title">${escapeHtml(entry.filename)} · <svg class="icon" aria-hidden="true"><use href="#i-star"/></svg> ${Number(entry.aesthetic_score || 0).toFixed(2)}</div>
                                 <div class="promptlab-action-meta">${cleanCheckpoint ? `🧠 ${escapeHtml(cleanCheckpoint)}<br>` : ''}${promptPreview}</div>
                                 <div class="promptlab-action-buttons">
                                     <button class="btn btn-primary btn-small" data-action="build" data-image-id="${entry.id}">${this._t('promptlab.openInBuild', 'Open in Build')}</button>
@@ -139,7 +139,7 @@ Object.assign(window.PromptLab, {
                             ? `★ ${Number(entry.avg_score || 0).toFixed(2)} · ${entry.count} images`
                             : `${entry.count} images`;
                         return `<div class="promptlab-action-card">
-                            <div class="promptlab-action-title">🧪 ${escapeHtml(cleanName)}</div>
+                            <div class="promptlab-action-title"><svg class="icon" aria-hidden="true"><use href="#i-flask"/></svg> ${escapeHtml(cleanName)}</div>
                             <div class="promptlab-action-meta">${metaText}<br>${escapeHtml(tagPreview.join(', '))}</div>
                             <div class="promptlab-action-buttons">
                                 <button class="btn btn-secondary btn-small" data-action="gallery" data-checkpoint="${escapeHtml(entry.name)}" data-tags="${escapeHtml(tags.join('|'))}">${this._t('promptlab.tryRecipe', 'Try in Gallery')}</button>

@@ -283,9 +283,9 @@
                             <span class="obfuscate-item-status">${this._escapeHtml(statusParts.join(' · '))}</span>
                         </div>
                         <div class="obfuscate-item-actions">
-                            <button class="btn-icon obfuscate-copy" data-index="${index}" ${copyDisabled} title="${this._escapeHtml(copyTitle)}" aria-label="${this._escapeHtml(copyTitle)}">📋</button>
+                            <button class="btn-icon obfuscate-copy" data-index="${index}" ${copyDisabled} title="${this._escapeHtml(copyTitle)}" aria-label="${this._escapeHtml(copyTitle)}"><svg class="icon" aria-hidden="true"><use href="#i-clipboard"/></svg></button>
                             <button class="btn-icon obfuscate-download" data-index="${index}" ${downloadDisabled} title="${this._escapeHtml(downloadTitle)}" aria-label="${this._escapeHtml(downloadTitle)}">⬇️</button>
-                            <button class="btn-icon obfuscate-remove" data-index="${index}" title="${this._escapeHtml(this._t('tools.removeItem', 'Remove'))}" aria-label="${this._escapeHtml(this._t('tools.removeItem', 'Remove'))}">✕</button>
+                            <button class="btn-icon obfuscate-remove" data-index="${index}" title="${this._escapeHtml(this._t('tools.removeItem', 'Remove'))}" aria-label="${this._escapeHtml(this._t('tools.removeItem', 'Remove'))}"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button>
                         </div>
                     </div>
                 `;

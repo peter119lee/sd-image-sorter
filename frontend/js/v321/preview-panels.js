@@ -429,7 +429,7 @@ Object.assign(window.V321Integration, {
         editBtn.type = 'button';
         editBtn.className = 'btn btn-small btn-ghost';
         editBtn.title = this._i18n('batchExport.editBlacklist', 'Edit blacklist...');
-        editBtn.textContent = '✏️';
+        editBtn.innerHTML = "<svg class=\"icon\" aria-hidden=\"true\"><use href=\"#i-edit\"/></svg>";
         editBtn.addEventListener('click', () => {
             let existing = grid.querySelector('.inline-blacklist-editor');
             if (existing) { existing.remove(); return; }

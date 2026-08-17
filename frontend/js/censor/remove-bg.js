@@ -21,7 +21,7 @@ async function showRemoveBackgroundPreview() {
             <div class="modal-backdrop"></div>
             <div class="modal-content">
                 <button class="modal-close" id="remove-bg-close" aria-label="Close">
-                    <span aria-hidden="true">✕</span>
+                    <span aria-hidden="true"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></span>
                 </button>
                 <div class="modal-header">
                     <h2>${censorT('censor.removeBgTitle', null, 'Remove Background')}</h2>
@@ -107,8 +107,8 @@ async function showRemoveBackgroundPreview() {
             if (result.status === 'no_match') {
                 statusDiv.textContent = result.message || censorT('censor.noForegroundDetected', null, 'No foreground object detected');
                 statusDiv.style.display = 'block';
-                statusDiv.style.backgroundColor = 'var(--warning-bg, #fff3cd)';
-                statusDiv.style.color = 'var(--warning-text, #856404)';
+                statusDiv.style.backgroundColor = 'var(--warning-bg, #F7EED5)';
+                statusDiv.style.color = 'var(--warning-text, #745915)';
                 currentPreviewData = null;
             } else {
                 currentPreviewData = result.preview;
@@ -117,15 +117,15 @@ async function showRemoveBackgroundPreview() {
                 applyBtn.style.display = 'inline-block';
                 statusDiv.textContent = censorT('censor.previewReady', null, 'Preview ready. Click Apply to add to canvas.');
                 statusDiv.style.display = 'block';
-                statusDiv.style.backgroundColor = 'var(--success-bg, #d4edda)';
-                statusDiv.style.color = 'var(--success-text, #155724)';
+                statusDiv.style.backgroundColor = 'var(--success-bg, #D6EBDE)';
+                statusDiv.style.color = 'var(--success-text, #234931)';
             }
         } catch (error) {
             console.error('Background removal error:', error);
             statusDiv.textContent = error.message || censorT('censor.removeBgFailed', null, 'Background removal failed');
             statusDiv.style.display = 'block';
-            statusDiv.style.backgroundColor = 'var(--error-bg, #f8d7da)';
-            statusDiv.style.color = 'var(--error-text, #721c24)';
+            statusDiv.style.backgroundColor = 'var(--error-bg, #F7DAD8)';
+            statusDiv.style.color = 'var(--error-text, #751D19)';
             currentPreviewData = null;
         } finally {
             previewBtn.disabled = false;

@@ -247,7 +247,7 @@
             if (part.kind === 'warn') {
                 chip.className = 'gsq-chip gsq-chip-warn';
                 const reason = t(part.reasonKey, 'unrecognized value');
-                chip.textContent = `⚠ ${part.value} — ${reason}${part.hint ? ` (${part.hint})` : ''}`;
+                chip.textContent = `${part.value} — ${reason}${part.hint ? ` (${part.hint})` : ''}`;
             } else {
                 chip.className = 'gsq-chip';
                 chip.textContent = part.op

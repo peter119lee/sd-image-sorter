@@ -4738,4 +4738,29 @@ window.I18nLang_zhCN = {
     'settings.entryHeroOn': '展示',
     'settings.entryHeroOff': '隐藏',
 
+    // 纯图标按钮的无障碍名称。这些按钮没有可见文字，SVG 图标带 aria-hidden，
+    // 读屏软件只会念「按钮」。通过 data-i18n-aria 套用；HTML 里同时写死
+    // aria-label，这样即使缺少键值或 i18n 失败也仍有名称。
+    'a11y.closeObfuscatePreview': '关闭图片预览',
+    'a11y.closeAutosepSettings': '关闭自动分类设置',
+    'a11y.closeDetectSettings': '关闭自动识别设置',
+    'a11y.closeProfiles': '关闭配置管理',
+    'a11y.closeImagePicker': '关闭图片选择器',
+    'a11y.closeCategoryBoard': '关闭标签分类建议',
+    'a11y.closeAnalytics': '关闭图片分析',
+    'a11y.closeExport': '关闭合并导出',
+    'a11y.closeBatchExport': '关闭 caption 导出',
+    'a11y.closeRename': '关闭批量重命名',
+    'a11y.closeSaveOptions': '关闭保存选项',
+    'a11y.closeQueueManager': '关闭队列管理',
+    'a11y.closeModelSelect': '关闭模型选择',
+    'a11y.closeTagsLibrary': '关闭标签与提示词库',
+    'a11y.closeVlmSettings': '关闭 VLM 描述设置',
+    'a11y.closeVlmDebugChat': '关闭 VLM API 对话',
+    'a11y.browseSlotW': '为 W 槽位选择文件夹',
+    'a11y.browseSlotA': '为 A 槽位选择文件夹',
+    'a11y.browseSlotS': '为 S 槽位选择文件夹',
+    'a11y.browseSlotD': '为 D 槽位选择文件夹',
+    'a11y.browseModelFile': '选择 YOLO 模型文件',
+
 };

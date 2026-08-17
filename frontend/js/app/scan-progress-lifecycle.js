@@ -319,7 +319,7 @@ async function handleManualScanProgress(progress, retryCount, scheduleNext, iden
                 });
             }
             showPipelineNextStep({
-                icon: '✅',
+                icon: 'i-check',
                 title: _scanNewCount > 0
                     ? appT('flow.scanDoneTitle', 'Imported {count} images — what next?').replace('{count}', String(_scanNewCount))
                     : appT('flow.scanDoneTitleZero', 'Import complete — what next?'),

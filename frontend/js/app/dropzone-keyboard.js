@@ -22,7 +22,7 @@ function initGalleryDropZone() {
         overlay.className = 'gallery-drop-overlay';
         overlay.innerHTML = `
             <div class="gallery-drop-overlay-content">
-                <span class="gallery-drop-overlay-icon" aria-hidden="true">📂</span>
+                <span class="gallery-drop-overlay-icon" aria-hidden="true"><svg class="icon" aria-hidden="true"><use href="#i-folder"/></svg></span>
                 <span class="gallery-drop-overlay-text">${escapeHtml(appT('gallery.dropToImport', 'Drop folder or images to import'))}</span>
                 <span class="gallery-drop-overlay-hint">${escapeHtml(appT('gallery.dropHint', 'Images will be imported from the dropped folder'))}</span>
             </div>`;

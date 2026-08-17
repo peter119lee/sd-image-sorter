@@ -748,7 +748,7 @@ function renderFilterPresets() {
         const pinButton = smartFolders ? `
                 <button class="btn-small preset-pin${isPinned ? ' is-pinned' : ''}" data-preset-action="pin" data-preset-name="${safeName}"
                     aria-pressed="${isPinned ? 'true' : 'false'}"
-                    title="${escapeHtml(isPinned ? appT('filter.unpinPreset', 'Unpin from sidebar') : appT('filter.pinPreset', 'Pin to sidebar as a smart folder'))}">📌</button>` : '';
+                    title="${escapeHtml(isPinned ? appT('filter.unpinPreset', 'Unpin from sidebar') : appT('filter.pinPreset', 'Pin to sidebar as a smart folder'))}"><svg class="icon" aria-hidden="true"><use href="#i-pin"/></svg></button>` : '';
         return `
         <div class="preset-item">
             <span class="preset-name">${safeName}</span>

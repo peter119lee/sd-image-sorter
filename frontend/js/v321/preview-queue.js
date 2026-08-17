@@ -193,7 +193,7 @@ Object.assign(window.V321Integration, {
         if (tokens.some((t) => this._normalizeCaptionToken(t) === triggerKey)) return;
         const badge = document.createElement('span');
         badge.className = 'export-preview-queue-trigger-warn';
-        badge.textContent = '⚑';
+        badge.innerHTML = "<svg class=\"icon\" aria-hidden=\"true\"><use href=\"#i-flag\"/></svg>";
         badge.title = this._i18n('batchExport.previewMissingTriggerHint', 'Missing trigger word');
         badge.setAttribute('aria-label', badge.title);
         btn.appendChild(badge);

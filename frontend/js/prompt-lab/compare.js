@@ -10,7 +10,7 @@ Object.assign(window.PromptLab, {
     populateImageSelectors() {
         const images = this._getPromptLabImages();
         const options = images.map(img =>
-            `<option value="${img.id}">${escapeHtml(img.filename)}${img.aesthetic_score != null ? ' ★' + img.aesthetic_score.toFixed(1) : ''}</option>`
+            `<option value="${img.id}">${escapeHtml(img.filename)}${img.aesthetic_score != null ? ' <svg class="icon" aria-hidden="true"><use href="#i-star"/></svg>' + img.aesthetic_score.toFixed(1) : ''}</option>`
         ).join('');
         const defaultOpt = `<option value="">${this._t('promptlab.selectImage', 'Select image...')}</option>`;
         ['pl-compare-a', 'pl-compare-b'].forEach(id => {
@@ -39,21 +39,21 @@ Object.assign(window.PromptLab, {
             const commonTokens = Array.isArray(result.prompt_common) ? result.prompt_common : [];
             container.innerHTML = `
                 <div class="promptlab-diff-card" style="grid-column:1/-1;">
-                    <h5 style="color:#86efac;">${this._t('promptlab.commonTokens', 'Common')} (${result.prompt_common.length})</h5>
+                    <h5 style="color:#A2D3B4;">${this._t('promptlab.commonTokens', 'Common')} (${result.prompt_common.length})</h5>
                     <div class="promptlab-diff-tags">${renderTags(result.prompt_common, 'common') || `<span style="color:var(--text-muted)">${this._t('promptlab.none', 'None')}</span>`}</div>
                     <div class="promptlab-action-buttons" style="margin-top:10px;">
                         <button class="btn btn-primary btn-small" data-action="build-common" data-tokens="${escapeHtml(commonTokens.join('|'))}">${this._t('promptlab.buildFromCommon', 'Build from Common')}</button>
                     </div>
                 </div>
                 <div class="promptlab-diff-card">
-                    <h5 style="color:#93c5fd;">${this._t('promptlab.onlyInImage', 'Only in {name}', { name: result.image_a.filename }).replace('{name}', escapeHtml(result.image_a.filename))} (${result.prompt_only_a.length})</h5>
+                    <h5 style="color:#E7CAA9;">${this._t('promptlab.onlyInImage', 'Only in {name}', { name: result.image_a.filename }).replace('{name}', escapeHtml(result.image_a.filename))} (${result.prompt_only_a.length})</h5>
                     <div class="promptlab-diff-tags">${renderTags(result.prompt_only_a, 'only-a') || `<span style="color:var(--text-muted)">${this._t('promptlab.none', 'None')}</span>`}</div>
                     <div class="promptlab-action-buttons" style="margin-top:10px;">
                         <button class="btn btn-secondary btn-small" data-action="build-image" data-image-id="${result.image_a.id}">${this._t('promptlab.openImageABuild', 'Open Image A in Build')}</button>
                     </div>
                 </div>
                 <div class="promptlab-diff-card">
-                    <h5 style="color:#fcd34d;">${this._t('promptlab.onlyInImage', 'Only in {name}', { name: result.image_b.filename }).replace('{name}', escapeHtml(result.image_b.filename))} (${result.prompt_only_b.length})</h5>
+                    <h5 style="color:var(--warning);">${this._t('promptlab.onlyInImage', 'Only in {name}', { name: result.image_b.filename }).replace('{name}', escapeHtml(result.image_b.filename))} (${result.prompt_only_b.length})</h5>
                     <div class="promptlab-diff-tags">${renderTags(result.prompt_only_b, 'only-b') || `<span style="color:var(--text-muted)">${this._t('promptlab.none', 'None')}</span>`}</div>
                     <div class="promptlab-action-buttons" style="margin-top:10px;">
                         <button class="btn btn-secondary btn-small" data-action="build-image" data-image-id="${result.image_b.id}">${this._t('promptlab.openImageBBuild', 'Open Image B in Build')}</button>

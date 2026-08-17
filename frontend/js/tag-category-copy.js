@@ -405,7 +405,7 @@
         allButton.type = 'button';
         allButton.className = 'tag-category-copy-item';
         allButton.innerHTML = `
-            <span class="tag-category-copy-icon" aria-hidden="true">🏷</span>
+            <span class="tag-category-copy-icon" aria-hidden="true"><svg class="icon" aria-hidden="true"><use href="#i-tag"/></svg></span>
             <span class="tag-category-copy-label">${escapeHtml(t('tagCategory.allTags', 'All Tags'))}</span>
             <span class="tag-category-copy-count">${allCount}</span>
         `;

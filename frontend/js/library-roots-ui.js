@@ -127,7 +127,7 @@
                 : t('libraryRoots.neverScanned', 'Never scanned');
             const metaParts = [];
             if (isMissing) {
-                metaParts.push(`<span class="library-root-missing">⚠ ${escapeHtml(t('libraryRoots.missing', 'Folder missing'))}</span>`);
+                metaParts.push(`<span class="library-root-missing"><svg class="icon" aria-hidden="true"><use href="#i-alert"/></svg> ${escapeHtml(t('libraryRoots.missing', 'Folder missing'))}</span>`);
             }
             metaParts.push(`${count} ${escapeHtml(t('libraryRoots.images', 'images'))}`);
             metaParts.push(escapeHtml(scanned));

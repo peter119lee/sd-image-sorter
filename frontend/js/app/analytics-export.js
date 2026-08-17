@@ -158,10 +158,11 @@ function getExportFormatDescription(format) {
 }
 
 function updateExportModalTitle(format) {
-    const title = $('#export-title');
+    // Target the label span, not the <h3>: the heading also holds the sprite icon.
+    const title = $('#export-title-text');
     if (!title) return;
     title.dataset.i18nLocked = '1';
-    title.textContent = `${format === 'tags' ? '🏷️' : '📤'} ${getExportFormatLabel(format)}`;
+    title.textContent = getExportFormatLabel(format);
 }
 
 function getBatchExportContentDescription(mode) {

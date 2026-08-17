@@ -13,7 +13,7 @@ Object.assign(window.PromptLab, {
     populateBuildSelector() {
         const images = this._getPromptLabImages();
         const options = images.map(img =>
-            `<option value="${img.id}">${escapeHtml(img.filename)}${img.aesthetic_score != null ? ' ★' + img.aesthetic_score.toFixed(1) : ''}</option>`
+            `<option value="${img.id}">${escapeHtml(img.filename)}${img.aesthetic_score != null ? ' <svg class="icon" aria-hidden="true"><use href="#i-star"/></svg>' + img.aesthetic_score.toFixed(1) : ''}</option>`
         ).join('');
         const el = document.getElementById('pl-build-source');
         if (el) {

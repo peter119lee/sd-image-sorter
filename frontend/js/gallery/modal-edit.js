@@ -197,7 +197,7 @@ Object.assign(window.Gallery, {
             textEl.textContent = caption;
             textEl.classList.remove('modal-caption-empty');
         } else {
-            textEl.textContent = this._t('modal.noCaption', null, 'No caption yet — use ✎ Edit to add one');
+            textEl.textContent = this._t('modal.noCaption', null,'No caption yet — use Edit to add one');
             textEl.classList.add('modal-caption-empty');
         }
 

@@ -334,7 +334,7 @@
         meta.appendChild(makeEl('div', 'pub-item-facts', dims + fmtBytes(item.fileSize)));
         const pairLine = makeEl('div', 'pub-item-pair ' + (item.pair ? 'is-paired' : 'is-unpaired'));
         if (item.pair) {
-            pairLine.textContent = '✓ ' + item.pair.filename;
+            pairLine.textContent = item.pair.filename;
             pairLine.title = item.pair.path;
         } else {
             pairLine.textContent = t('pub.noPair', '— no censored version found');

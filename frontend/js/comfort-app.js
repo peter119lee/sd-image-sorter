@@ -134,7 +134,7 @@
                 : _t('comfort.zenOffLabel', 'Off');
         }
         const icon = document.getElementById('settings-comfort-zen-icon');
-        if (icon) icon.textContent = on ? '🧘' : '🖥️';
+        if (icon) icon.innerHTML = on ? "<svg class=\"icon\" aria-hidden=\"true\"><use href=\"#i-moon\"/></svg>" : "<svg class=\"icon\" aria-hidden=\"true\"><use href=\"#i-monitor\"/></svg>";
     }
 
     function refreshWarmthControl() {
@@ -179,7 +179,7 @@
             chip.className = 'comfort-zen-chip';
             chip.hidden = true;
             chip.setAttribute('aria-label', 'Exit zen mode');
-            chip.innerHTML = '<span aria-hidden="true">🧘</span> <span data-i18n="comfort.zenExit">Exit zen</span>';
+            chip.innerHTML = '<span aria-hidden="true"><svg class="icon" aria-hidden="true"><use href="#i-moon"/></svg></span> <span data-i18n="comfort.zenExit">Exit zen</span>';
             document.body.appendChild(chip);
             chip.addEventListener('click', () => setZen(false));
         }

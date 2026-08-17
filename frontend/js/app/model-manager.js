@@ -471,16 +471,18 @@ async function runBulkDownload(items) {
     // Update banner with final result
     if (banner) {
         if (needsRestart) {
-            banner.style.borderColor = 'var(--color-warning, #f59e0b)';
+            banner.style.borderColor = 'var(--color-warning, var(--accent))';
             banner.style.background = 'rgba(245, 158, 11, 0.1)';
-            banner.innerHTML = `<strong>${escapeHtml(appT('models.bulkNeedsRestart', '⚠️ Restart required'))}</strong><br>${escapeHtml(appT('models.bulkRestartExplain', 'A feature installed Python packages. Close and restart the app, then reopen the model selector to continue the remaining downloads.'))}`;
+            // Plain-text fallback only: this string goes through escapeHtml, so
+            // any markup here would be shown to the user as literal source.
+            banner.innerHTML = `<strong>${escapeHtml(appT('models.bulkNeedsRestart', 'Restart required'))}</strong><br>${escapeHtml(appT('models.bulkRestartExplain', 'A feature installed Python packages. Close and restart the app, then reopen the model selector to continue the remaining downloads.'))}`;
         } else if (failures.length === 0) {
-            banner.style.borderColor = 'var(--color-success, #22c55e)';
+            banner.style.borderColor = 'var(--color-success, #4A9D69)';
             banner.style.background = 'rgba(34, 197, 94, 0.1)';
             banner.textContent = appT('models.bulkDoneAll', 'All {count} model(s) downloaded successfully.', { count: total });
             setTimeout(() => { if (banner.parentNode) banner.remove(); }, 10000);
         } else {
-            banner.style.borderColor = 'var(--color-danger, #ef4444)';
+            banner.style.borderColor = 'var(--color-danger, var(--danger))';
             banner.textContent = appT('models.bulkDoneMixed', 'Downloaded {ok}/{total}. Failed: {failed}.', { ok: total - failures.length, total, failed: failureSummary });
         }
     }

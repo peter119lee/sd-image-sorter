@@ -327,7 +327,7 @@ async function pollAutosepMoveProgress(expectedTotal, destination) {
                         // so sorting no longer dead-ends (the toast above still confirms
                         // the destination). Reuses window.App.showPipelineNextStep.
                         window.App?.showPipelineNextStep?.({
-                            icon: '🗂️',
+                            icon: 'i-folders',
                             title: _formatAutoSepI18n('flow.sortDoneTitle', 'Sorting done — what next?'),
                             actions: [
                                 { icon: '🔳', label: _formatAutoSepI18n('nav.censor', 'Censor Edit'), action: 'view:censor' },

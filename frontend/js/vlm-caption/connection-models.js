@@ -183,7 +183,7 @@ Object.assign(window.VLMCaption, {
                     <div class="vlm-model-card-header">
                         <strong>${escapeHtml(m.name)}</strong>
                         ${m.nsfw_ok ? '<span class="vlm-badge-nsfw">NSFW OK</span>' : ''}
-                        ${m.installed ? '<span class="vlm-badge-installed">✓ Installed</span>' : ''}
+                        ${m.installed ? '<span class="vlm-badge-installed"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg> Installed</span>' : ''}
                     </div>
                     <p class="helper-text">${escapeHtml(m.description)}</p>
                     <div class="vlm-model-card-meta">

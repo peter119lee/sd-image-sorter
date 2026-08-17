@@ -233,11 +233,11 @@ Object.assign(window.V321Integration, {
             return `
                 <span class="tagger-model-choice-actions">
                     <button type="button" class="btn btn-secondary btn-small" id="btn-vlm-banner-settings">
-                        <span aria-hidden="true">⚙️</span>
+                        <span aria-hidden="true"><svg class="icon" aria-hidden="true"><use href="#i-settings"/></svg></span>
                         <span>${this._escapeHtml(i18n('vlm.openSettings', 'VLM Settings'))}</span>
                     </button>
                     <button type="button" class="btn btn-ghost btn-small" data-vlm-debug-chat>
-                        <span aria-hidden="true">💬</span>
+                        <span aria-hidden="true"><svg class="icon" aria-hidden="true"><use href="#i-message"/></svg></span>
                         <span>${this._escapeHtml(i18n('vlm.debugChat', 'API Chat'))}</span>
                     </button>
                 </span>
@@ -247,7 +247,7 @@ Object.assign(window.V321Integration, {
             return `
                 <span class="tagger-model-choice-actions">
                     <button type="button" class="btn btn-secondary btn-small" id="btn-tagger-toriigate-setup">
-                        <span aria-hidden="true">🛠️</span>
+                        <span aria-hidden="true"><svg class="icon" aria-hidden="true"><use href="#i-settings"/></svg></span>
                         <span>${this._escapeHtml(i18n('tagger.aestheticOpenSetup', 'Open Setup to install'))}</span>
                     </button>
                 </span>

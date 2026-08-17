@@ -347,7 +347,7 @@ function updateFolderNames() {
         if (isManualSortCollectionSlot(key)) {
             const name = getManualSortCollectionName(ManualSortState.collectionSlots[key]);
             const label = name || manualSortText('manual.collectSlotFallback', 'Collection', '收藏夹');
-            nameEl.textContent = `★ ${label}`;
+            nameEl.textContent = `${label}`;
             nameEl.title = formatManualSortI18n(
                 'manual.collectHint',
                 'Adds to “{name}” by reference — the file is not moved.',

@@ -108,12 +108,12 @@
         if (this.imageIds.length === 0) {
             list.innerHTML = `
                 <div class="dataset-empty-state">
-                    <span class="dataset-empty-icon" aria-hidden="true">📦</span>
+                    <span class="dataset-empty-icon" aria-hidden="true"><svg class="icon" aria-hidden="true"><use href="#i-package"/></svg></span>
                     <p class="dataset-empty-headline">${this._t('dataset.queueEmptyHeadline', 'No images yet')}</p>
                     <p class="dataset-empty-body">
                         <span class="dataset-empty-arrow">←</span>
                         ${this._t('dataset.queueEmptyBody',
-                            'Open the 🖼️ Gallery tab, click some images, then click "Add from Gallery" above.')}
+                            'Open the <svg class="icon" aria-hidden="true"><use href="#i-image"/></svg> Gallery tab, click some images, then click "Add from Gallery" above.')}
                     </p>
                 </div>
             `;
@@ -493,7 +493,7 @@
         thumb.appendChild(keep);
         const selected = document.createElement('span');
         selected.className = 'import-thumb-selected';
-        selected.textContent = '✓';
+        selected.innerHTML = "<svg class=\"icon\" aria-hidden=\"true\"><use href=\"#i-check\"/></svg>";
         selected.setAttribute('aria-hidden', 'true');
         thumb.appendChild(selected);
         const remove = document.createElement('button');

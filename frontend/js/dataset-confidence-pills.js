@@ -73,7 +73,7 @@
                 || 'Drop this tag from the caption';
             x.title = dropTitle;
             x.setAttribute('aria-label', `${dropTitle}: ${t.tag}`);
-            x.textContent = '✕';
+            x.innerHTML = "<svg class=\"icon\" aria-hidden=\"true\"><use href=\"#i-close\"/></svg>";
             x.addEventListener('click', () => dropTagFromCaption(String(t.tag || '')));
             node.appendChild(x);
             list.appendChild(node);

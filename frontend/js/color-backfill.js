@@ -296,7 +296,7 @@
             // Done mode: keep chip visible with a checkmark for 5s after completion.
             if (this.doneState) {
                 chip.hidden = false;
-                label.textContent = "✓";
+                label.innerHTML = "<svg class=\"icon\" aria-hidden=\"true\"><use href=\"#i-check\"/></svg>";
                 chip.setAttribute("aria-label", this.t(
                     `Color analysis complete — ${data.completed.toLocaleString()} analyzed`,
                     `色彩分析完成 — 已分析 ${data.completed.toLocaleString()}`,

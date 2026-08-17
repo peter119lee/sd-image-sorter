@@ -39,13 +39,13 @@ function showModelSetupGuide(pr) {
     const backdrop = document.createElement('div');
     backdrop.id = 'model-setup-guide-backdrop';
     backdrop.className = 'modal-backdrop visible';
-    backdrop.style.cssText = 'position:fixed;inset:0;background:rgba(8,12,24,0.72);backdrop-filter:blur(6px);z-index:9000;display:flex;align-items:center;justify-content:center;padding:24px;';
+    backdrop.style.cssText = 'position:fixed;inset:0;background:rgba(16, 16, 16, 0.72);z-index:9000;display:flex;align-items:center;justify-content:center;padding:24px;';
 
     const dialog = document.createElement('div');
     dialog.role = 'dialog';
     dialog.setAttribute('aria-modal', 'true');
     dialog.setAttribute('aria-labelledby', 'model-setup-guide-title');
-    dialog.style.cssText = 'background:var(--bg-card-solid,#0e1a2d);color:var(--text-primary,#eef2ff);border:1px solid var(--glass-border,rgba(191,219,254,0.18));border-radius:16px;padding:24px;max-width:560px;width:100%;max-height:calc(100vh - 48px);overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,0.5);';
+    dialog.style.cssText = 'background:var(--bg-card-solid,#1E1E1E);color:var(--text-primary,#FBF7F2);border:1px solid var(--glass-border,rgba(var(--accent-rgb), 0.18));border-radius:16px;padding:24px;max-width:560px;width:100%;max-height:calc(100vh - 48px);overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,0.5);';
 
     const stepsHtml = steps
         .map((step, i) => `<li style="margin:6px 0;line-height:1.5;">${escapeHtml(String(step))}</li>`)
@@ -54,8 +54,8 @@ function showModelSetupGuide(pr) {
     const targetDirHtml = targetDir
         ? `
             <div style="margin-top:14px;padding:12px;background:rgba(255,255,255,0.04);border-radius:10px;border:1px solid rgba(255,255,255,0.06);">
-                <div style="font-size:12px;color:var(--text-muted,#94a3b8);margin-bottom:6px;">${escapeHtml(dirLabel)}</div>
-                <code id="model-setup-guide-dir" style="display:block;word-break:break-all;font-size:12px;line-height:1.4;font-family:ui-monospace,Consolas,monospace;color:var(--text-primary,#eef2ff);">${escapeHtml(targetDir)}</code>
+                <div style="font-size:12px;color:var(--text-muted,#A6A6A6);margin-bottom:6px;">${escapeHtml(dirLabel)}</div>
+                <code id="model-setup-guide-dir" style="display:block;word-break:break-all;font-size:12px;line-height:1.4;font-family:ui-monospace,Consolas,monospace;color:var(--text-primary,#FBF7F2);">${escapeHtml(targetDir)}</code>
                 <button id="model-setup-guide-copy" type="button" class="btn btn-ghost btn-small" style="margin-top:8px;">${escapeHtml(copyLabel)}</button>
             </div>
         ` : '';
@@ -64,9 +64,9 @@ function showModelSetupGuide(pr) {
         <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:12px;">
             <div style="flex:1;">
                 <h3 id="model-setup-guide-title" style="margin:0;font-size:18px;line-height:1.3;">${escapeHtml(titleText)}</h3>
-                ${providerLabel ? `<div style="font-size:12px;color:var(--text-muted,#94a3b8);margin-top:4px;">${escapeHtml(providerLabel)}</div>` : ''}
+                ${providerLabel ? `<div style="font-size:12px;color:var(--text-muted,#A6A6A6);margin-top:4px;">${escapeHtml(providerLabel)}</div>` : ''}
             </div>
-            <button id="model-setup-guide-close-x" type="button" aria-label="${escapeHtml(closeLabel)}" style="background:none;border:none;color:var(--text-muted,#94a3b8);font-size:22px;line-height:1;cursor:pointer;padding:4px 8px;border-radius:8px;">×</button>
+            <button id="model-setup-guide-close-x" type="button" aria-label="${escapeHtml(closeLabel)}" style="background:none;border:none;color:var(--text-muted,#A6A6A6);font-size:22px;line-height:1;cursor:pointer;padding:4px 8px;border-radius:8px;">×</button>
         </div>
         <p style="margin:0 0 12px;line-height:1.5;">${escapeHtml(message)}</p>
         ${steps.length ? `<ol style="margin:0;padding-left:22px;">${stepsHtml}</ol>` : ''}

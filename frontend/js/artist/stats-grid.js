@@ -104,7 +104,7 @@ Object.assign(window.ArtistIdent, {
                 : this.tText('Click "Identify All Images" to start.', '点击“识别所有图片”开始。');
             grid.innerHTML = `
                 <div class="empty-state">
-                    <div class="empty-icon">🎨</div>
+                    <div class="empty-icon"><svg class="icon" aria-hidden="true"><use href="#i-palette"/></svg></div>
                     <p>${emptyTitle}</p>
                     <p class="empty-hint">${emptyHint}</p>
                 </div>

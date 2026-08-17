@@ -1081,7 +1081,7 @@
         // apart at a glance.
         node.classList.add('source-local');
         const idLabel = node.querySelector('.dataset-queue-id');
-        if (idLabel) idLabel.textContent = '📁 ' + (meta.filename || '').slice(-40);
+        if (idLabel) idLabel.textContent = (meta.filename || '').slice(-40);
     });
 
     // Local-source _setActive branch (FE-1 2b: formerly a DM._setActive
@@ -1126,7 +1126,7 @@
                     'Preview not loaded yet. Use "Load more previews" in Step 1 to hydrate this folder batch.');
             }
         }
-        if (filenameEl) filenameEl.textContent = `📁 ${filename}`;
+        if (filenameEl) filenameEl.textContent = `${filename}`;
         if (zoomBar) zoomBar.hidden = false;
         this._zoomLevel = 1;
         this._applyZoom?.();

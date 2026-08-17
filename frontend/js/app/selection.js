@@ -28,7 +28,7 @@ function syncSelectionModeButton() {
     );
 
     if (iconEl) {
-        iconEl.textContent = isSelecting ? '✦' : '✔';
+        iconEl.innerHTML = isSelecting ? "<svg class=\"icon\" aria-hidden=\"true\"><use href=\"#i-sparkle\"/></svg>" : "<svg class=\"icon\" aria-hidden=\"true\"><use href=\"#i-check\"/></svg>";
     }
 
     if (labelEl) {

@@ -43,7 +43,7 @@ function renderModelManager(models = []) {
         if (!mirrorRow) {
             mirrorRow = document.createElement('div');
             mirrorRow.id = 'model-mirror-row';
-            mirrorRow.style.cssText = 'display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;padding:10px 14px;margin-bottom:12px;background:rgba(255,255,255,0.03);border:1px solid rgba(191,219,254,0.08);border-radius:12px;';
+            mirrorRow.style.cssText = 'display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;padding:10px 14px;margin-bottom:12px;background:rgba(255,255,255,0.03);border:1px solid rgba(var(--accent-rgb), 0.08);border-radius:12px;';
             gridEl.parentElement.insertBefore(mirrorRow, gridEl);
         }
         const opts = (mirrorData?.options || ['auto', 'hf-mirror', 'modelscope']).map(
@@ -56,7 +56,7 @@ function renderModelManager(models = []) {
         mirrorRow.innerHTML = `
             <label style="font-size:13px;font-weight:600;color:var(--text-secondary);white-space:nowrap;">${escapeHtml(appT('models.mirrorLabel', 'Download Source'))}</label>
             <select class="input-field" id="model-mirror-select" style="flex:1;min-width:220px;font-size:12px;padding:6px 8px;">${opts}</select>
-            <div style="flex-basis:100%;font-size:11px;line-height:1.5;color:var(--text-tertiary,#8a94a6);">${escapeHtml(mirrorHint)}</div>
+            <div style="flex-basis:100%;font-size:11px;line-height:1.5;color:var(--text-tertiary,#989898);">${escapeHtml(mirrorHint)}</div>
         `;
         document.getElementById('model-mirror-select')?.addEventListener('change', async (e) => {
             try {

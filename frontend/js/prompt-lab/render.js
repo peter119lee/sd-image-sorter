@@ -99,10 +99,10 @@ Object.assign(window.PromptLab, {
                 <div class="slot-row ${hasConflict ? 'has-conflict' : ''}" data-slot="${encodedCategory}">
                     <div class="slot-header">
                         <button class="slot-lock ${isLocked ? 'locked' : ''}" data-cat="${encodedCategory}" title="${isLocked ? 'Unlock' : 'Lock'} (survives randomize)">
-                            ${isLocked ? '🔒' : '🔓'}
+                            ${isLocked ? '<svg class="icon" aria-hidden="true"><use href="#i-lock"/></svg>' : '<svg class="icon" aria-hidden="true"><use href="#i-unlock"/></svg>'}
                         </button>
                         <span class="slot-name">${safeCategory}</span>
-                        ${hasConflict ? '<span class="conflict-icon" title="Exclusion rule conflict">⚠️</span>' : ''}
+                        ${hasConflict ? '<span class="conflict-icon" title="Exclusion rule conflict"><svg class="icon" aria-hidden="true"><use href="#i-alert"/></svg></span>' : ''}
                     </div>
                     <div class="slot-tags">
                         ${selected.length > 0 ? selected.map((tag) => this._buildSlotTag(tag, cat)).join('') : `<span class="slot-empty">${this._escapeValue(this._t('promptlab.slotEmpty', 'Click tags in the browser to add'))}</span>`}
@@ -162,8 +162,8 @@ Object.assign(window.PromptLab, {
             <div class="preset-item" data-id="${preset.id}">
                 <span class="preset-name">${this._escapeValue(preset.name)}</span>
                 <div class="preset-actions">
-                    <button class="btn-preset-load" data-id="${preset.id}" title="Load preset">📂</button>
-                    <button class="btn-preset-delete" data-id="${preset.id}" title="Delete preset">🗑️</button>
+                    <button class="btn-preset-load" data-id="${preset.id}" title="Load preset"><svg class="icon" aria-hidden="true"><use href="#i-folder"/></svg></button>
+                    <button class="btn-preset-delete" data-id="${preset.id}" title="Delete preset"><svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg></button>
                 </div>
             </div>
         `).join('');
@@ -214,7 +214,7 @@ Object.assign(window.PromptLab, {
                     <span class="promptlab-resource-title">${safeName}</span>
                     ${safeMeta ? `<span class="promptlab-resource-meta">${safeMeta}</span>` : ''}
                 </div>
-                <button class="btn btn-small btn-ghost ${actionClass}" type="button" data-id="${safeId}" title="${this._escapeValue(this._t('common.delete', 'Delete'))}" aria-label="${this._escapeValue(this._t('common.delete', 'Delete'))}">🗑️</button>
+                <button class="btn btn-small btn-ghost ${actionClass}" type="button" data-id="${safeId}" title="${this._escapeValue(this._t('common.delete', 'Delete'))}" aria-label="${this._escapeValue(this._t('common.delete', 'Delete'))}"><svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg></button>
             </div>
         `;
     },
@@ -284,7 +284,7 @@ Object.assign(window.PromptLab, {
             conflicts.forEach((conflict) => {
                 const item = document.createElement('div');
                 item.className = 'warning-item';
-                item.textContent = `⚠️ ${conflict}`;
+                item.textContent = `${conflict}`;
                 fragment.appendChild(item);
             });
             warningsEl.replaceChildren(fragment);

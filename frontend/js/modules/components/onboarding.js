@@ -74,8 +74,8 @@ const OnboardingTour = (function() {
             id: 'complete',
             title: 'You\'re All Set!',
             content: `<p>The fastest way to start:</p>
-                <p><button type="button" class="btn btn-primary" data-onboarding-action="quickstart">🚀 Quick Start — choose a folder to scan</button></p>
-                <p class="helper-text">This opens the import dialog. After scanning, click <strong>🏷️ Tag</strong> to auto-tag with <strong>wd-swinv2</strong> — the balanced, recommended model, already selected for you.</p>
+                <p><button type="button" class="btn btn-primary" data-onboarding-action="quickstart"><svg class="icon" aria-hidden="true"><use href="#i-zap"/></svg> Quick Start — choose a folder to scan</button></p>
+                <p class="helper-text">This opens the import dialog. After scanning, click <strong><svg class="icon" aria-hidden="true"><use href="#i-tag"/></svg> Tag</strong> to auto-tag with <strong>wd-swinv2</strong> — the balanced, recommended model, already selected for you.</p>
                 <p>Or click anywhere outside this dialog to explore on your own.</p>`,
             target: null,
             position: 'center'
@@ -128,7 +128,7 @@ const OnboardingTour = (function() {
         {
             id: 'setup',
             title: '设置与模型',
-            content: `<p>点击右上角 <strong>⚙️ 设置图标</strong> 管理应用设置和 AI 模型。</p>
+            content: `<p>点击右上角 <strong><svg class="icon" aria-hidden="true"><use href="#i-settings"/></svg> 设置图标</strong> 管理应用设置和 AI 模型。</p>
                 <ul>
                     <li>WD14 打标模型</li>
                     <li>CLIP 相似图搜索模型</li>
@@ -142,8 +142,8 @@ const OnboardingTour = (function() {
             id: 'complete',
             title: '准备就绪！',
             content: `<p>最快的上手方式：</p>
-                <p><button type="button" class="btn btn-primary" data-onboarding-action="quickstart">🚀 快速开始 — 选择要扫描的文件夹</button></p>
-                <p class="helper-text">这会打开导入对话框。扫描完后点 <strong>🏷️ 打标</strong>，即可用 <strong>wd-swinv2</strong>（已为你选好的均衡推荐模型）自动打标。</p>
+                <p><button type="button" class="btn btn-primary" data-onboarding-action="quickstart"><svg class="icon" aria-hidden="true"><use href="#i-zap"/></svg> 快速开始 — 选择要扫描的文件夹</button></p>
+                <p class="helper-text">这会打开导入对话框。扫描完后点 <strong><svg class="icon" aria-hidden="true"><use href="#i-tag"/></svg> 打标</strong>，即可用 <strong>wd-swinv2</strong>（已为你选好的均衡推荐模型）自动打标。</p>
                 <p>或点击对话框外任意位置，自行探索。</p>`,
             target: null,
             position: 'center'
@@ -249,7 +249,7 @@ const OnboardingTour = (function() {
         tooltip.innerHTML = `
             <div class="onboarding-header">
                 <h3 id="onboarding-title" class="onboarding-title"></h3>
-                <button class="onboarding-lang" aria-label="Switch language" title="${isZh ? 'Switch to English' : '切换到中文'}">🌐</button>
+                <button class="onboarding-lang" aria-label="Switch language" title="${isZh ? 'Switch to English' : '切换到中文'}"><svg class="icon" aria-hidden="true"><use href="#i-globe"/></svg></button>
                 <button class="onboarding-skip" aria-label="${isZh ? '跳过引导' : 'Skip tour'}">
                     <span>${isZh ? '跳过' : 'Skip'}</span>
                 </button>

@@ -20,8 +20,8 @@
     gap: 0.6rem;
     padding: 0.6rem 0.85rem;
     margin: 0 0 0.75rem 0;
-    background: rgba(255, 176, 46, 0.12);
-    border: 1px solid rgba(255, 176, 46, 0.35);
+    background: rgba(var(--accent-rgb), 0.12);
+    border: 1px solid rgba(var(--accent-rgb), 0.35);
     border-radius: 8px;
     color: var(--text-primary, #f0f0f0);
     font-size: 0.9rem;
@@ -52,7 +52,7 @@
         banner.className = 'smart-tag-ollama-warning';
         banner.hidden = true;
         banner.innerHTML = `
-            <span class="smart-tag-ollama-icon" aria-hidden="true">⚠️</span>
+            <span class="smart-tag-ollama-icon" aria-hidden="true"><svg class="icon" aria-hidden="true"><use href="#i-alert"/></svg></span>
             <span class="smart-tag-ollama-text">
                 自然语言描述器尚未配置 — 请打开 VLM 设置，填入云端 API 端点（如 OpenAI / OpenRouter / Gemini），或确认本地 Ollama 正在运行。<br>
                 No natural-language captioner configured — open VLM Settings to add a cloud API endpoint (OpenAI / OpenRouter / Gemini, etc.), or start a local Ollama.

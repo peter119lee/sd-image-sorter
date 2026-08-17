@@ -120,8 +120,8 @@ Object.assign(SeparationConsole, {
             box.textContent = '';
             const title = document.createElement('div');
             title.className = 'sepcon-leaks-title';
-            title.textContent = sepconT('⚠ Pruned traits leaking back through NL captions:',
-                '⚠ 已剪除的特征从自然语言描述漏回来了：');
+            title.textContent = sepconT('Pruned traits leaking back through NL captions:',
+                '已剪除的特征从自然语言描述漏回来了：');
             box.appendChild(title);
             for (const [trait, count] of leaks) {
                 const line = document.createElement('div');

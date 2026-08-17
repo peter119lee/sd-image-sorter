@@ -115,7 +115,7 @@ function renderActiveTagFilters() {
         const removeEl = document.createElement('span');
         removeEl.className = 'remove-tag';
         removeEl.dataset.tag = tag;
-        removeEl.textContent = '✕';
+        removeEl.innerHTML = "<svg class=\"icon\" aria-hidden=\"true\"><use href=\"#i-close\"/></svg>";
         removeEl.addEventListener('click', () => removeTagFilter(tag));
 
         tagEl.appendChild(removeEl);

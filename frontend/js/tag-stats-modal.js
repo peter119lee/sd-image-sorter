@@ -38,7 +38,7 @@
         modal.innerHTML = `
             <div class="modal-backdrop"></div>
             <div class="modal-content tag-stats-content">
-                <button class="modal-close" id="${MODAL_ID}-close" aria-label="Close">✕</button>
+                <button class="modal-close" id="${MODAL_ID}-close" aria-label="Close"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button>
                 <h3 id="${MODAL_ID}-title" data-i18n="modal.tagStatsTitle">Tagging complete</h3>
                 <div class="tag-stats-grid">
                     <div class="tag-stats-cell"><span class="tag-stats-num" id="${MODAL_ID}-processed">0</span><span class="tag-stats-label" data-i18n="modal.tagStatsProcessed">images processed</span></div>

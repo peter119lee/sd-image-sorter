@@ -298,7 +298,7 @@
             rename.className = 'entry-library-menu-rename';
             rename.title = _t('library.renameTitle', 'Rename library');
             rename.setAttribute('aria-label', _t('library.renameTitle', 'Rename library'));
-            rename.textContent = '✎';
+            rename.innerHTML = "<svg class=\"icon\" aria-hidden=\"true\"><use href=\"#i-edit\"/></svg>";
             rename.addEventListener('click', async (e) => {
                 e.preventDefault();
                 e.stopPropagation();

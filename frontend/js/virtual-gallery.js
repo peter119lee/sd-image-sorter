@@ -7,20 +7,20 @@
 // Shared generator color map (DRY — also used in gallery.js).
 // Stay in sync with backend/metadata_parser.py::MetadataParser.GENERATORS.
 const GENERATOR_COLORS = {
-    comfyui: '#22c55e',
-    nai: '#f97316',
-    webui: '#3b82f6',
-    forge: '#8b5cf6',
-    reforge: '#a855f7',
-    fooocus: '#ec4899',
-    'easy-diffusion': '#14b8a6',
-    invokeai: '#0ea5e9',
-    swarmui: '#facc15',
-    drawthings: '#f472b6',
-    gemini: '#fbbf24',
-    'gpt-image': '#10b981',
-    others: '#94a3b8',
-    unknown: '#64748b'
+    comfyui: '#456852',
+    nai: '#685445',
+    webui: '#455368',
+    forge: '#504568',
+    reforge: '#574568',
+    fooocus: '#684556',
+    'easy-diffusion': '#456864',
+    invokeai: '#455d68',
+    swarmui: '#686145',
+    drawthings: '#684558',
+    gemini: '#685e45',
+    'gpt-image': '#45685d',
+    others: '#455468',
+    unknown: '#575759'
 };
 
 const VirtualGallery = {

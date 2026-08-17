@@ -87,11 +87,13 @@ function bindDatasetAuditLazyInit() {
     });
 }
 
+// Mirrors audio.js: the sort blip defaults OFF, so only an explicit stored
+// 'true' counts as enabled.
 function isSortAudioEnabled() {
     if (window.AudioManager && typeof window.AudioManager.enabled === 'boolean') {
         return window.AudioManager.enabled;
     }
-    return localStorage.getItem('sort-audio-enabled') !== 'false';
+    return localStorage.getItem('sort-audio-enabled') === 'true';
 }
 
 function syncSettingsSoundControl() {
@@ -111,7 +113,7 @@ function syncSettingsSoundControl() {
             ? appT('settings.soundToggleOff', 'Mute manual sort sounds')
             : appT('settings.soundToggleOn', 'Enable manual sort sounds')
     );
-    if (icon) icon.textContent = enabled ? '🔊' : '🔇';
+    if (icon) icon.innerHTML = enabled ? "<svg class=\"icon\" aria-hidden=\"true\"><use href=\"#i-volume\"/></svg>" : "<svg class=\"icon\" aria-hidden=\"true\"><use href=\"#i-volume-off\"/></svg>";
     if (label) {
         label.dataset.i18n = enabled ? 'settings.soundOn' : 'settings.soundOff';
         label.textContent = labelText;
@@ -123,7 +125,7 @@ function toggleSettingsSound() {
     if (window.AudioManager && typeof window.AudioManager.toggle === 'function') {
         enabled = window.AudioManager.toggle();
     } else {
-        enabled = !(localStorage.getItem('sort-audio-enabled') !== 'false');
+        enabled = localStorage.getItem('sort-audio-enabled') !== 'true';
         localStorage.setItem('sort-audio-enabled', enabled ? 'true' : 'false');
     }
     syncSettingsSoundControl();

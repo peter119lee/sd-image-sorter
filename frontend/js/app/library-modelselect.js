@@ -66,7 +66,7 @@ function renderModelSelectList() {
         return `
             <div class="model-select-item ${isSelected ? 'selected' : ''}" data-value="${safeValue}">
                 <div class="checkbox-custom" style="background: ${isSelected ? 'var(--accent-primary)' : 'transparent'}; border-color: ${isSelected ? 'var(--accent-primary)' : 'var(--border-color)'}">
-                    ${isSelected ? '✓' : ''}
+                    ${isSelected ? '<svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>' : ''}
                 </div>
                 <div class="item-text" title="${safeLabel}">${safeLabel}</div>
                 <div class="item-count">${item.count}</div>

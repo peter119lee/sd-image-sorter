@@ -108,7 +108,7 @@ async function _renderFolderBrowser(container, path) {
             '<div class="folder-browser-list">' + listHtml + '</div>' +
             '<div class="folder-browser-footer">' +
             '<button type="button" class="folder-browser-btn" id="folder-browser-cancel">' + escapeHtml(fbT('folderBrowser.cancel', 'Cancel')) + '</button>' +
-            '<button type="button" class="folder-browser-btn" id="folder-browser-select" style="background:rgba(255,138,61,0.2);color:var(--accent-primary);">' + escapeHtml(fbT('folderBrowser.select', 'Select This Folder')) + '</button>' +
+            '<button type="button" class="folder-browser-btn" id="folder-browser-select" style="background:rgba(var(--accent-rgb), 0.2);color:var(--accent-primary);">' + escapeHtml(fbT('folderBrowser.select', 'Select This Folder')) + '</button>' +
             '</div></div>';
         _attachFolderBrowserEvents(container, data);
     } catch (err) {

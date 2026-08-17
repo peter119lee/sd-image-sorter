@@ -307,7 +307,7 @@ Object.assign(window.SimilarImages, {
             // disabled (updateActionAvailability) because it can't succeed yet.
             const setupBtnHtml = result.available ? '' : `
                 <button type="button" class="btn btn-primary btn-small model-health-setup-btn" data-action="open-model-guidance">
-                    ⚙️ ${escapeHtml(this._t('models.openSetup', 'Open Setup / Download'))}
+                    <svg class="icon" aria-hidden="true"><use href="#i-settings"/></svg> ${escapeHtml(this._t('models.openSetup', 'Open Setup / Download'))}
                 </button>
             `;
             banner.innerHTML = `
@@ -327,7 +327,7 @@ Object.assign(window.SimilarImages, {
                     <span class="model-health-title">${escapeHtml(this._t('similar.setupNeedsTitle', 'Similarity setup needs one more step'))}</span>
                     <span>${escapeHtml(this._t('similar.statusLoadFailed', 'Similarity setup could not be checked right now.'))}</span>
                     <button type="button" class="btn btn-secondary btn-small model-health-setup-btn" data-action="open-model-guidance">
-                        ⚙️ ${escapeHtml(this._t('models.openSetup', 'Open Setup / Download'))}
+                        <svg class="icon" aria-hidden="true"><use href="#i-settings"/></svg> ${escapeHtml(this._t('models.openSetup', 'Open Setup / Download'))}
                     </button>
                 </div>
             `;

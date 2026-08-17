@@ -38,7 +38,7 @@ Object.assign(window.Gallery, {
         return `<button type="button" class="gallery-item-fav${on ? ' is-favorited' : ''}" `
             + `data-fav-id="${id}" aria-pressed="${on ? 'true' : 'false'}" `
             + `title="${this._escapeHtml(title)}" aria-label="${this._escapeHtml(title)}">`
-            + `<span aria-hidden="true">♥</span></button>`;
+            + `<span aria-hidden="true"><svg class="icon" aria-hidden="true"><use href="#i-heart"/></svg></span></button>`;
     },
 
     _applyFavoriteStateToDom() {

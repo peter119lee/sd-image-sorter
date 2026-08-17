@@ -364,9 +364,9 @@
                     border-radius: 8px; color: inherit; font: inherit;
                 }
                 .ccip-row:hover { background: rgba(255, 255, 255, 0.09); }
-                .ccip-row:focus-visible { outline: 2px solid rgba(180, 200, 255, 0.7); outline-offset: 1px; }
-                .ccip-row-medoid { border-color: rgba(120, 220, 160, 0.55); }
-                .ccip-row-outlier { border-color: rgba(255, 170, 90, 0.55); }
+                .ccip-row:focus-visible { outline: 2px solid rgba(var(--accent-rgb), 0.7); outline-offset: 1px; }
+                .ccip-row-medoid { border-color: rgba(var(--success-rgb), 0.55); }
+                .ccip-row-outlier { border-color: rgba(var(--accent-rgb), 0.55); }
                 .ccip-thumb {
                     width: 48px; height: 48px; object-fit: cover;
                     border-radius: 6px; flex: 0 0 auto; background: rgba(0, 0, 0, 0.25);

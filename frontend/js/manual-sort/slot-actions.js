@@ -461,7 +461,7 @@ function finishSorting() {
     // session no longer dead-ends (the summary toast above still reports the
     // stats). Reuses window.App.showPipelineNextStep.
     window.App?.showPipelineNextStep?.({
-        icon: '🗂️',
+        icon: 'i-folders',
         title: formatManualSortI18n('flow.sortDoneTitle', 'Sorting done — what next?'),
         actions: [
             { icon: '🔳', label: formatManualSortI18n('nav.censor', 'Censor Edit'), action: 'view:censor' },

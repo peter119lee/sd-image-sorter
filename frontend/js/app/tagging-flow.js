@@ -587,7 +587,7 @@ async function pollTagProgress(retryCount = 0) {
                 showToast(progress.message, 'warning');
             } else {
                 showPipelineNextStep({
-                    icon: '🏷️',
+                    icon: 'i-tag',
                     title: _taggedCount > 0
                         ? appT('flow.tagDoneTitle', 'Tagged {count} images — what next?').replace('{count}', String(_taggedCount))
                         : appT('flow.tagDoneTitleZero', 'Tagging complete — what next?'),
@@ -716,7 +716,7 @@ function _hideBgTagProgress() {
 
 function _showCompletionFlash() {
     const flash = document.createElement('div');
-    flash.style.cssText = 'position:fixed;inset:0;background:rgba(34,197,94,0.08);pointer-events:none;z-index:9999;animation:completionFlash 600ms ease-out forwards;';
+    flash.style.cssText = 'position:fixed;inset:0;background:rgba(var(--success-rgb), 0.08);pointer-events:none;z-index:9999;';
     document.body.appendChild(flash);
     setTimeout(() => flash.remove(), 700);
 }

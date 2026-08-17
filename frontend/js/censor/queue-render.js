@@ -62,7 +62,7 @@ function renderQueue() {
         CensorState.pendingActiveId = null;
         list.innerHTML = `
             <div class="queue-empty-state-v2">
-                <span class="empty-icon">📷</span>
+                <span class="empty-icon"><svg class="icon" aria-hidden="true"><use href="#i-image"/></svg></span>
                 <p>${escapeHtml(censorT('censor.noImages', null, 'No images selected'))}</p>
                 <small>${escapeHtml(censorT('censor.selectFromGallery', null, 'Select from Gallery'))}</small>
             </div>

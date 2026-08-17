@@ -31,35 +31,35 @@
         style.id = 'clip-tools-style';
         style.textContent = `
         .clip-tools-overlay{position:fixed;inset:0;z-index:9000;display:flex;align-items:center;
-            justify-content:center;background:rgba(8,11,20,0.62);backdrop-filter:blur(4px);}
-        .clip-tools-modal{background:var(--bg-elevated,#161b2c);border:1px solid rgba(255,255,255,0.12);
+            justify-content:center;background:rgba(14, 14, 14, 0.62);}
+        .clip-tools-modal{background:var(--bg-elevated,#212121);border:1px solid rgba(255,255,255,0.12);
             border-radius:14px;max-width:min(880px,92vw);max-height:88vh;overflow:auto;
-            box-shadow:0 24px 64px rgba(0,0,0,0.5);padding:18px 20px;color:var(--text-primary,#f1f5f9);}
+            box-shadow:0 24px 64px rgba(0,0,0,0.5);padding:18px 20px;color:var(--text-primary,#FBF5EF);}
         .clip-tools-head{display:flex;align-items:center;gap:10px;margin-bottom:14px;}
         .clip-tools-head h3{margin:0;font-size:15px;font-weight:700;flex:1;}
         .clip-tools-close{appearance:none;border:none;background:rgba(255,255,255,0.08);
-            color:var(--text-primary,#f1f5f9);width:28px;height:28px;border-radius:8px;cursor:pointer;font-size:15px;}
+            color:var(--text-primary,#FBF5EF);width:28px;height:28px;border-radius:8px;cursor:pointer;font-size:15px;}
         .clip-tools-close:hover{background:rgba(255,255,255,0.16);}
         .clip-tools-compare{display:flex;align-items:center;gap:18px;justify-content:center;flex-wrap:wrap;}
         .clip-tools-pic{display:flex;flex-direction:column;align-items:center;gap:6px;max-width:300px;}
         .clip-tools-pic img{max-width:280px;max-height:300px;border-radius:10px;border:1px solid rgba(255,255,255,0.12);}
-        .clip-tools-pic small{color:var(--text-secondary,#94a3b8);font-size:11px;max-width:280px;
+        .clip-tools-pic small{color:var(--text-secondary,#A6A6A6);font-size:11px;max-width:280px;
             overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
         .clip-tools-score{text-align:center;min-width:120px;}
         .clip-tools-score .num{font-size:34px;font-weight:800;line-height:1;}
-        .clip-tools-score .verdict{font-size:12px;margin-top:6px;color:var(--text-secondary,#94a3b8);}
+        .clip-tools-score .verdict{font-size:12px;margin-top:6px;color:var(--text-secondary,#A6A6A6);}
         .clip-tools-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;}
         .clip-tools-card{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.10);
             border-radius:10px;overflow:hidden;cursor:pointer;transition:border-color 120ms ease;}
-        .clip-tools-card:hover{border-color:var(--accent-primary,#7c8bff);}
+        .clip-tools-card:hover{border-color:var(--accent-primary,#E2C099);}
         .clip-tools-card img{width:100%;height:130px;object-fit:cover;display:block;background:rgba(0,0,0,0.3);}
         .clip-tools-card .meta{padding:6px 8px;display:flex;align-items:center;justify-content:space-between;gap:6px;}
-        .clip-tools-card .pct{font-weight:800;font-size:13px;color:var(--accent-primary,#7c8bff);}
+        .clip-tools-card .pct{font-weight:800;font-size:13px;color:var(--accent-primary,#E2C099);}
         .clip-tools-card .cmp{appearance:none;border:none;background:rgba(255,255,255,0.08);
-            color:var(--text-secondary,#cbd5e1);border-radius:6px;font-size:10px;padding:2px 6px;cursor:pointer;}
-        .clip-tools-card .cmp:hover{background:var(--accent-primary,#7c8bff);color:#fff;}
-        .clip-tools-note{color:var(--text-secondary,#94a3b8);font-size:12px;margin:0 0 12px;}
-        .clip-tools-empty{color:var(--text-secondary,#94a3b8);text-align:center;padding:28px 8px;}
+            color:var(--text-secondary,#D6D6D6);border-radius:6px;font-size:10px;padding:2px 6px;cursor:pointer;}
+        .clip-tools-card .cmp:hover{background:var(--accent-primary,#E2C099);color:#fff;}
+        .clip-tools-note{color:var(--text-secondary,#A6A6A6);font-size:12px;margin:0 0 12px;}
+        .clip-tools-empty{color:var(--text-secondary,#A6A6A6);text-align:center;padding:28px 8px;}
         `;
         document.head.appendChild(style);
     }
@@ -90,7 +90,7 @@
         close.type = 'button';
         close.className = 'clip-tools-close';
         close.setAttribute('aria-label', t('common.close', 'Close'));
-        close.textContent = '✕';
+        close.innerHTML = "<svg class=\"icon\" aria-hidden=\"true\"><use href=\"#i-close\"/></svg>";
         close.addEventListener('click', closeOverlay);
         head.append(h, close);
 
@@ -137,8 +137,8 @@
     function scoreColor(score) {
         if (score >= 0.95) return '#f87171';        // red — duplicate
         if (score >= 0.85) return '#fbbf24';        // amber — very similar
-        if (score >= 0.6) return 'var(--accent-primary,#7c8bff)';
-        return 'var(--text-secondary,#94a3b8)';
+        if (score >= 0.6) return 'var(--accent-primary,#E2C099)';
+        return 'var(--text-secondary,#A6A6A6)';
     }
 
     function renderCompare(body, data) {

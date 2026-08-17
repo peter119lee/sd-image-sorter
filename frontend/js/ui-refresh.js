@@ -59,6 +59,25 @@
             el.placeholder = this._t(key);
         },
 
+        /**
+         * Render a button icon.
+         *
+         * An "i-*" value is a Graphite sprite symbol and is emitted as real
+         * SVG markup. Anything else keeps the old escaped-text behaviour, so
+         * callers outside this file cannot inject HTML through it.
+         *
+         * This used to escape unconditionally, which meant every language
+         * switch rewrote the button contents and replaced the sprite icons
+         * with the emoji that were hard-coded at the call sites.
+         */
+        _iconHtml: function (icon) {
+            if (!icon) return '';
+            if (/^i-[a-z0-9-]+$/.test(icon)) {
+                return '<svg class="icon" aria-hidden="true"><use href="#' + icon + '"/></svg>';
+            }
+            return '<span aria-hidden="true">' + this._escape(icon) + '</span>';
+        },
+
         _setButton: function (selector, key, icon, titleKey) {
             var el = document.querySelector(selector);
             if (!el) return;
@@ -69,8 +88,7 @@
             // the dialog is open).
             if (el.dataset && el.dataset.i18nLocked === '1') return;
             var label = this._escape(this._t(key));
-            var iconHtml = icon ? '<span aria-hidden="true">' + this._escape(icon) + '</span>' : '';
-            el.innerHTML = iconHtml + '<span class="ui-label">' + label + '</span>';
+            el.innerHTML = this._iconHtml(icon) + '<span class="ui-label">' + label + '</span>';
             if (titleKey) {
                 var text = this._t(titleKey);
                 if (el.dataset.dynamicTitle !== 'true') {
@@ -185,9 +203,9 @@
                 this._setText('#gallery-empty-state h3', 'gallery.noImages');
                 this._setText('#gallery-empty-state p', 'gallery.scanPrompt');
             }
-            this._setButton('#empty-state-scan-btn', 'action.scan', '📂', 'action.scan');
+            this._setButton('#empty-state-scan-btn', 'action.scan', 'i-folder', 'action.scan');
             // v3.2.2: also localize the new "Clear all filters" button
-            this._setButton('#empty-state-clear-filters-btn', 'gallery.clearFilters', '🧹', 'gallery.clearFilters');
+            this._setButton('#empty-state-clear-filters-btn', 'gallery.clearFilters', 'i-broom', 'gallery.clearFilters');
             this._setText('#load-more-btn', 'gallery.loadMore');
             this._setText('#gallery-loading span', 'gallery.loading');
             this._setSummaryStrongs('#autosep-filter-summary', [
@@ -221,7 +239,7 @@
             this._setText('#view-autosep .panel-title', 'autosep.title');
             this._setText('#view-autosep .panel-description', 'autosep.description');
             this._setText('#view-autosep .filter-header-compact h4', 'filter.criteria');
-            this._setButton('#btn-autosep-filters', 'gallery.editFilters', '🔍', 'gallery.editFilters');
+            this._setButton('#btn-autosep-filters', 'gallery.editFilters', 'i-search', 'gallery.editFilters');
             this._setText('#autosep-scope-note', 'autosep.scopeNote');
             this._setText('#view-autosep .filter-section:nth-of-type(2) h4', 'autosep.destination');
             this._setButton('#btn-browse-destination', 'common.browse', null, 'common.browse');
@@ -231,7 +249,7 @@
             this._setText('#autosep-preview-list .autosep-preview-empty', 'autosep.previewEmpty');
             this._setText('#view-autosep .autosep-preview-hint', 'autosep.previewHint');
             this._setButton('#btn-preview-autosep', 'autosep.previewBtn', null, 'autosep.previewBtn');
-            this._setButton('#btn-execute-autosep', 'autosep.moveBtn', '📁', 'autosep.moveBtn');
+            this._setButton('#btn-execute-autosep', 'autosep.moveBtn', 'i-folder', 'autosep.moveBtn');
             window.updateAutoSepActionUi?.();
         },
 
@@ -244,7 +262,7 @@
             this._setText('#manual-sort-scope-note', 'manual.scopeNote');
             this._setText('#view-manual .space-indicator span', 'manual.skip');
             this._setText('#view-manual .filter-header-compact h4', 'filter.imagesToSort');
-            this._setButton('#btn-manual-sort-filters', 'gallery.editFilters', '🔍', 'gallery.editFilters');
+            this._setButton('#btn-manual-sort-filters', 'gallery.editFilters', 'i-search', 'gallery.editFilters');
             // v3.3.2 WB-S3: the start button reflects the selected Workbench mode
             // (A/B Showdown vs slot sort). Read the persisted mode so the
             // MutationObserver-driven re-apply keeps the right label.
@@ -254,7 +272,7 @@
                 if (sortMode === 'bracket') startSortKey = 'manual.startShowdown';
                 else if (sortMode === 'cull') startSortKey = 'manual.startCulling';
             } catch (e) { /* localStorage may be unavailable */ }
-            this._setButton('#btn-start-sorting', startSortKey, '🎮', startSortKey);
+            this._setButton('#btn-start-sorting', startSortKey, 'i-dice', startSortKey);
             this._setText('#gallery-preview-bar .minimap-label', 'manual.minimap');
             this._setTextAll('.minimap-legend .legend-item', ['manual.current', 'manual.sorted', 'manual.pending']);
             this._setTextAll('.progress-stat-label', ['manual.sorted', 'manual.skipped', 'manual.progress', 'manual.remaining', 'manual.speed']);
@@ -300,16 +318,16 @@
             this._setPlaceholder('#promptlab-recat-category', 'promptlab.recategorizeCategoryPlaceholder');
             this._setButton('#btn-promptlab-recategorize', 'common.save');
             this._setText('#view-promptlab .promptlab-builder-header h4', 'promptlab.slots');
-            this._setButton('#btn-promptlab-random', 'promptlab.randomize', '🎲', 'promptlab.randomize');
-            this._setButton('#btn-promptlab-clear', 'promptlab.clear', '🗑️', 'promptlab.clear');
+            this._setButton('#btn-promptlab-random', 'promptlab.randomize', 'i-dice', 'promptlab.randomize');
+            this._setButton('#btn-promptlab-clear', 'promptlab.clear', 'i-trash', 'promptlab.clear');
             this._setText('#view-promptlab .promptlab-output-header h4', 'promptlab.output');
-            this._setButton('#btn-promptlab-use-gallery', 'promptlab.findInGallery', '🔎', 'promptlab.findInGallery');
+            this._setButton('#btn-promptlab-use-gallery', 'promptlab.findInGallery', 'i-search', 'promptlab.findInGallery');
             this._setButton('#btn-promptlab-generate', 'promptlab.generate');
-            this._setButton('#btn-promptlab-copy', 'promptlab.copy', '📋', 'promptlab.copy');
-            this._setButton('#btn-promptlab-validate', 'promptlab.validate', '✅', 'promptlab.validate');
+            this._setButton('#btn-promptlab-copy', 'promptlab.copy', 'i-clipboard', 'promptlab.copy');
+            this._setButton('#btn-promptlab-validate', 'promptlab.validate', 'i-check', 'promptlab.validate');
             this._setPlaceholder('#promptlab-output', 'promptlab.outputPlaceholder');
             this._setText('#view-promptlab .promptlab-presets-header h5', 'promptlab.presets');
-            this._setButton('#btn-promptlab-save-preset', 'promptlab.savePreset', '💾', 'promptlab.savePreset');
+            this._setButton('#btn-promptlab-save-preset', 'promptlab.savePreset', 'i-save', 'promptlab.savePreset');
             this._setStaticText('#promptlab-categories .empty-state', 'promptlab.loadingCategories');
             this._setStaticText('#promptlab-slots .empty-state', 'promptlab.loadingSlots');
             this._setStaticText('#promptlab-presets .preset-empty', 'promptlab.noPresets');
@@ -327,10 +345,10 @@
             });
             this._setPlaceholder('#artist-model-path', 'artist.localModelPath');
             this._setText('#view-artist .control-section .helper-text', 'artist.belowThreshold');
-            this._setButton('#btn-identify-all', 'artist.identifyAll', '🎨', 'artist.identifyAll');
-            this._setButton('#btn-identify-selected', 'artist.identifySelected', '🎯', 'artist.identifySelected');
-            this._setButton('#btn-refresh-artist-stats', 'artist.refreshStats', '🔄', 'artist.refreshStats');
-            this._setButton('#btn-clear-artist-data', 'artist.clearPredictions', '🗑️', 'artist.clearPredictions');
+            this._setButton('#btn-identify-all', 'artist.identifyAll', 'i-palette', 'artist.identifyAll');
+            this._setButton('#btn-identify-selected', 'artist.identifySelected', 'i-target', 'artist.identifySelected');
+            this._setButton('#btn-refresh-artist-stats', 'artist.refreshStats', 'i-refresh', 'artist.refreshStats');
+            this._setButton('#btn-clear-artist-data', 'artist.clearPredictions', 'i-trash', 'artist.clearPredictions');
             this._setText('#view-artist .results-header h3', 'artist.topArtists');
             this._setViewToggle('#view-artist .toggle-btn[data-view="grid"]', 'artist.grid');
             this._setViewToggle('#view-artist .toggle-btn[data-view="list"]', 'artist.list');
@@ -341,14 +359,14 @@
         },
 
         _translateImageModal: function () {
-            this._setButton('#modal-prev-image', 'modal.prev', '←', 'modal.prev');
-            this._setButton('#modal-next-image', 'modal.next', '→', 'modal.next');
+            this._setButton('#modal-prev-image', 'modal.prev', 'i-arrow-left', 'modal.prev');
+            this._setButton('#modal-next-image', 'modal.next', 'i-arrow-right', 'modal.next');
             this._setButton('#btn-copy-prompt', 'modal.copyPrompt');
             this._setButton('#btn-copy-negative', 'modal.copyNegative');
             this._setButton('#btn-copy-tags', 'modal.copyTags');
             this._setButton('#btn-copy-params', 'modal.copyParams');
             this._setButton('#btn-copy-all', 'modal.copyAll');
-            this._setButton('#btn-reparse-metadata', 'modal.reparse', '↻', 'modal.reparse');
+            this._setButton('#btn-reparse-metadata', 'modal.reparse', 'i-refresh', 'modal.reparse');
             this._setTextAll('.modal-meta strong', ['modal.generator', 'modal.size', 'modal.checkpoint']);
             this._setText('#modal-loading-state', 'modal.loadingDetails');
             this._setText('#modal-img2img-badge', 'modal.img2img');
@@ -405,15 +423,16 @@
             // The app removes data-i18n during active runs so progress polling
             // can own this field without MutationObserver/i18n clobbering it.
             this._setStaticText('#tag-progress-text', 'modal.tagLoadingModel');
-            this._setButton('#btn-export-tags', 'modal.tagExport', '📤', 'modal.tagExport');
-            this._setButton('#btn-import-tags', 'modal.tagImport', '📥', 'modal.tagImport');
+            this._setButton('#btn-export-tags', 'modal.tagExport', 'i-upload', 'modal.tagExport');
+            this._setButton('#btn-import-tags', 'modal.tagImport', 'i-download', 'modal.tagImport');
             this._setButton('#btn-cancel-tag', 'modal.tagCancel');
             this._setButton('#btn-start-tag', 'modal.tagStart');
 
             this._setText('#analytics-modal h3', 'modal.analytics');
             this._setTextAll('#analytics-modal h4', ['modal.topCheckpoints', 'modal.topLoras', 'modal.topTags']);
 
-            this._setText('#export-title', 'modal.exportPrompts');
+            // The label span, not the <h3>: the heading also holds the sprite icon.
+            this._setText('#export-title-text', 'modal.exportPrompts');
             this._setButton('#btn-export-tags-alt', 'modal.exportTagsAlt');
             this._setButton('#btn-copy-export', 'modal.copyToClipboard');
 
@@ -468,7 +487,7 @@
                 webp: 'save.formatWebp'
             });
             this._setButton('#btn-cancel-save-options', 'save.cancel');
-            this._setButton('#btn-confirm-save-options', 'save.saveAll', '💾', 'save.saveAll');
+            this._setButton('#btn-confirm-save-options', 'save.saveAll', 'i-save', 'save.saveAll');
 
             this._setText('#model-select-title', 'modelSelect.title');
             this._setPlaceholder('#model-select-search', 'modelSelect.search');
@@ -477,9 +496,9 @@
 
             this._setText('#tags-library-modal h3', 'library.title');
             this._setText('#tags-library-modal .modal-description', 'library.description');
-            this._setButton('#library-tab-tags', 'library.tags', '🏷️', 'library.tags');
-            this._setButton('#library-tab-prompts', 'library.prompts', '📝', 'library.prompts');
-            this._setButton('#library-tab-loras', 'library.loras', '🧩', 'library.loras');
+            this._setButton('#library-tab-tags', 'library.tags', 'i-tag', 'library.tags');
+            this._setButton('#library-tab-prompts', 'library.prompts', 'i-edit', 'library.prompts');
+            this._setButton('#library-tab-loras', 'library.loras', 'i-layers', 'library.loras');
             this._setOptionText('#library-sort', {
                 frequency: 'library.sortFrequency',
                 alphabetical: 'library.sortAlpha'
@@ -492,7 +511,7 @@
         },
 
         _translateSelectionAndFilters: function () {
-            this._setButton('#btn-open-library-from-filter', 'filter.browseLibrary', '📚', 'filter.browseLibrary');
+            this._setButton('#btn-open-library-from-filter', 'filter.browseLibrary', 'i-book', 'filter.browseLibrary');
             this._setText('#filter-modal-title', 'filter.filterImages');
             this._setText('#generator-filters-heading', 'filter.generators');
             // Order MUST match index.html #modal-generator-filters checkbox order.
@@ -528,13 +547,13 @@
             this._setPlaceholder('#modal-checkpoint-search', 'filter.searchCheckpoints');
             this._setPlaceholder('#modal-lora-search', 'filter.searchLoras');
 
-            this._setButton('#btn-select-all', 'selection.selectAllFiltered', '✓✓', 'selection.selectAllFiltered');
-            this._setButton('#btn-invert-selection-filtered', 'selection.invertAllFiltered', '⇄', 'selection.invertAllFiltered');
-            this._setButton('#btn-move-selected', 'selection.moveSelected', '📁', 'selection.moveSelected');
-            this._setButton('#btn-copy-selected', 'selection.copySelected', '📄', 'selection.copySelected');
-            this._setButton('#btn-send-to-censor', 'selection.censorEdit', '🔳', 'gallery.contextSendToCensor');
-            this._setButton('#btn-remove-selected-gallery', 'selection.removeFromGallery', '🧹', 'selection.removeFromGallery');
-            this._setButton('#btn-delete-selected-files', 'selection.deleteSelectedFiles', '🗑', 'selection.deleteSelectedFiles');
+            this._setButton('#btn-select-all', 'selection.selectAllFiltered', 'i-check', 'selection.selectAllFiltered');
+            this._setButton('#btn-invert-selection-filtered', 'selection.invertAllFiltered', 'i-refresh', 'selection.invertAllFiltered');
+            this._setButton('#btn-move-selected', 'selection.moveSelected', 'i-folder', 'selection.moveSelected');
+            this._setButton('#btn-copy-selected', 'selection.copySelected', 'i-file', 'selection.copySelected');
+            this._setButton('#btn-send-to-censor', 'selection.censorEdit', 'i-grid', 'gallery.contextSendToCensor');
+            this._setButton('#btn-remove-selected-gallery', 'selection.removeFromGallery', 'i-broom', 'selection.removeFromGallery');
+            this._setButton('#btn-delete-selected-files', 'selection.deleteSelectedFiles', 'i-trash', 'selection.deleteSelectedFiles');
             this._setButton('#btn-clear-selection', 'selection.deselectAll');
         },
 

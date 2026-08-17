@@ -304,7 +304,7 @@
         if (member.suggested_keep) {
             const badge = document.createElement('span');
             badge.className = 'dup-keeper-badge';
-            badge.textContent = t('dup.keeperBadge', '★ Keep');
+            badge.textContent = t('dup.keeperBadge','Keep');
             box.appendChild(badge);
         }
 

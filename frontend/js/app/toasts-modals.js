@@ -449,6 +449,25 @@ function hidePipelineNextStep() {
     banner.hidden = true;
 }
 
+// Render a Graphite sprite icon into `el`, replacing whatever was there.
+// Callers name a sprite symbol ("i-check"); anything else is treated as plain
+// text so a stray string can never become markup. Built with DOM APIs rather
+// than innerHTML, so there is no HTML parsing on this path at all.
+const _SPRITE_NAME = /^i-[a-z0-9-]+$/;
+function _setSpriteIcon(el, icon) {
+    el.textContent = '';
+    if (!icon) return;
+    if (!_SPRITE_NAME.test(icon)) { el.textContent = icon; return; }
+    const svgNs = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(svgNs, 'svg');
+    svg.setAttribute('class', 'icon');
+    svg.setAttribute('aria-hidden', 'true');
+    const use = document.createElementNS(svgNs, 'use');
+    use.setAttribute('href', '#' + icon);
+    svg.appendChild(use);
+    el.appendChild(svg);
+}
+
 let _pipelineNextStepDismissBound = false;
 function showPipelineNextStep(opts = {}) {
     const banner = document.getElementById('pipeline-next-step');
@@ -458,7 +477,7 @@ function showPipelineNextStep(opts = {}) {
     const actionsEl = banner.querySelector('.pns-actions');
     if (!iconEl || !titleEl || !actionsEl) return;
 
-    iconEl.textContent = opts.icon || '✅';
+    _setSpriteIcon(iconEl, opts.icon || 'i-check');
     titleEl.textContent = opts.title || '';
     actionsEl.innerHTML = '';
     const actions = Array.isArray(opts.actions) ? opts.actions.slice(0, 3) : [];

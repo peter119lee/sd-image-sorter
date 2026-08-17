@@ -237,7 +237,7 @@
                 + toggle
                 + `<button type="button" class="folder-row-open" data-action="browse" data-path="${safePath}" `
                 + `aria-pressed="${isActive ? 'true' : 'false'}" title="${safePath}">`
-                + '<span class="folder-row-icon" aria-hidden="true">📁</span>'
+                + '<span class="folder-row-icon" aria-hidden="true"><svg class="icon" aria-hidden="true"><use href="#i-folder"/></svg></span>'
                 + `<span class="folder-row-name">${escapeHtml(node.name)}</span>`
                 + '</button></div>';
 
@@ -264,7 +264,7 @@
                 + '<button type="button" id="folder-tree-clear" class="collections-browsing-clear" '
                 + `title="${escapeHtml(t('folders.clearScope', 'Show all folders'))}" `
                 + `aria-label="${escapeHtml(t('folders.clearScope', 'Show all folders'))}">`
-                + '<span aria-hidden="true">✕</span></button>';
+                + '<span aria-hidden="true"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></span></button>';
             indicator.querySelector('#folder-tree-clear')
                 ?.addEventListener('click', () => this.clearBrowse());
             container.parentNode?.insertBefore(indicator, container.nextSibling);

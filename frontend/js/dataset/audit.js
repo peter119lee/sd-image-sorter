@@ -596,7 +596,7 @@
                 margin-left: 8px;
                 padding: 4px 10px;
                 font-size: 12px;
-                color: rgba(230, 230, 240, 0.85);
+                color: rgba(235, 235, 235, 0.85);
                 background: rgba(255, 255, 255, 0.06);
                 border: 1px solid rgba(255, 255, 255, 0.08);
                 border-radius: 999px;
@@ -608,7 +608,7 @@
             .dataset-audit-residue-clear {
                 background: transparent;
                 border: 0;
-                color: rgba(180, 200, 255, 0.95);
+                color: rgba(var(--accent-rgb), 0.95);
                 cursor: pointer;
                 padding: 0;
                 font: inherit;
@@ -616,7 +616,7 @@
             }
             .dataset-audit-residue-clear:hover { color: #fff; }
             .dataset-audit-residue-clear:focus-visible {
-                outline: 2px solid rgba(180, 200, 255, 0.7);
+                outline: 2px solid rgba(var(--accent-rgb), 0.7);
                 outline-offset: 2px;
                 border-radius: 4px;
             }
@@ -688,7 +688,10 @@
                 'Showing {filter} · {count} items',
                 { filter: filterName, count })
                 || `Showing ${filterName} · ${count} items`;
-            labelEl.textContent = `🔍 ${text} · `;
+            // No trailing separator: .dataset-audit-residue-strip is an
+            // inline-flex row with gap:8px, so the Clear button is already
+            // spaced off and a dangling "·" would just hang there.
+            labelEl.textContent = text;
         }
         const clearBtn = strip.querySelector('.dataset-audit-residue-clear');
         if (clearBtn) clearBtn.textContent = DM._t?.('common.clear', 'Clear') || 'Clear';

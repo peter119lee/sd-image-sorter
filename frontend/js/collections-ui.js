@@ -137,13 +137,13 @@
                 `<button type="button" class="collection-row-action" data-action="rename" `
                 + `data-id="${collection.id}" title="${escapeHtml(t('collections.rename', 'Rename'))}" `
                 + `aria-label="${escapeHtml(t('collections.rename', 'Rename'))}">`
-                + `<span aria-hidden="true">✎</span></button>`
+                + `<span aria-hidden="true"><svg class="icon" aria-hidden="true"><use href="#i-edit"/></svg></span></button>`
             );
             const deleteBtn = isFavorites ? '' : (
                 `<button type="button" class="collection-row-action collection-row-action-danger" data-action="delete" `
                 + `data-id="${collection.id}" title="${escapeHtml(t('collections.delete', 'Delete'))}" `
                 + `aria-label="${escapeHtml(t('collections.delete', 'Delete'))}">`
-                + `<span aria-hidden="true">🗑</span></button>`
+                + `<span aria-hidden="true"><svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg></span></button>`
             );
 
             return `<div class="collection-row${isActive ? ' is-active' : ''}${isFavorites ? ' is-favorites' : ''}" `
@@ -179,7 +179,7 @@
                 + `<button type="button" id="collections-clear-browse" class="collections-browsing-clear" `
                 + `title="${escapeHtml(t('collections.clearBrowse', 'Stop browsing this collection'))}" `
                 + `aria-label="${escapeHtml(t('collections.clearBrowse', 'Stop browsing this collection'))}">`
-                + `<span aria-hidden="true">✕</span></button>`;
+                + `<span aria-hidden="true"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></span></button>`;
             indicator.querySelector('#collections-clear-browse')
                 ?.addEventListener('click', () => this.clearBrowse());
             list.parentNode?.insertBefore(indicator, list.nextSibling);

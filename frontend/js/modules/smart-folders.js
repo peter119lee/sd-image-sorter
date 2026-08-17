@@ -166,7 +166,7 @@
             }
             const applyTitle = escapeHtml(t('Apply this filter preset', '应用此筛选预设'));
             return `<button type="button" class="smart-folder-row" data-smart-folder="${safeName}" title="${applyTitle}">`
-                + '<span class="smart-folder-icon" aria-hidden="true">🗂</span>'
+                + '<span class="smart-folder-icon" aria-hidden="true"><svg class="icon" aria-hidden="true"><use href="#i-folders"/></svg></span>'
                 + `<span class="smart-folder-name">${safeName}</span>`
                 + `<span class="smart-folder-count" data-smart-folder-count="${safeName}">${escapeHtml(countText)}</span>`
                 + '</button>';

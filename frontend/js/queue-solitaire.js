@@ -722,7 +722,7 @@
                         ${SECTION_COLORS.map((color) => `<option value="${escapeQueueHtml(color)}" ${section.color === color ? 'selected' : ''}>${escapeQueueHtml(color)}</option>`).join('')}
                     </select>
                     <button type="button" class="btn btn-secondary btn-small qs-profile-edit-filter" data-section-id="${escapeQueueHtml(section.id)}">${escapeQueueHtml(t('queueSolitaire.editSectionFilter', 'Edit Filter'))}</button>
-                    <button type="button" class="btn btn-ghost btn-small qs-profile-remove-section" data-section-id="${escapeQueueHtml(section.id)}">✕</button>
+                    <button type="button" class="btn btn-ghost btn-small qs-profile-remove-section" data-section-id="${escapeQueueHtml(section.id)}"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button>
                 </div>
                 <div class="qs-profile-card-summary">${escapeQueueHtml(buildProfileSummary(section.filters))}</div>
             </div>
@@ -1293,9 +1293,9 @@
                     <input type="text" class="qs-section-name" value="${sectionName}" data-section="${sectionId}">
                     <span class="qs-section-count">(${section.items.length})</span>
                     <div class="qs-section-actions">
-                        <button class="qs-section-btn qs-btn-select-all" data-section="${sectionId}" title="${selectAllLabel}" aria-label="${selectAllLabel}">✓</button>
-                        <button class="qs-section-btn qs-btn-rename" data-section="${sectionId}" title="${batchRenameLabel}" aria-label="${batchRenameLabel}">📝</button>
-                        ${section.id !== 'unsorted' ? `<button class="qs-section-btn qs-btn-remove" data-section="${sectionId}" title="${removeSectionLabel}" aria-label="${removeSectionLabel}" style="color:#ef4444;">✕</button>` : ''}
+                        <button class="qs-section-btn qs-btn-select-all" data-section="${sectionId}" title="${selectAllLabel}" aria-label="${selectAllLabel}"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg></button>
+                        <button class="qs-section-btn qs-btn-rename" data-section="${sectionId}" title="${batchRenameLabel}" aria-label="${batchRenameLabel}"><svg class="icon" aria-hidden="true"><use href="#i-edit"/></svg></button>
+                        ${section.id !== 'unsorted' ? `<button class="qs-section-btn qs-btn-remove" data-section="${sectionId}" title="${removeSectionLabel}" aria-label="${removeSectionLabel}" style="color:var(--danger);">✕</button>` : ''}
                     </div>
                 </div>
                 <div class="qs-section-grid ${emptyClass}" data-section="${sectionId}">

@@ -157,10 +157,12 @@ function updateCullProgress(result) {
     if (fill) fill.style.width = total ? `${Math.min(100, (index / total) * 100)}%` : '0%';
     const text = $('#cull-progress-text');
     if (text) text.textContent = `${Math.min(index + 1, total)} / ${total}`;
-    const keepTally = $('#cull-tally-keep');
-    if (keepTally) keepTally.textContent = `♥ ${kept}`;
-    const rejTally = $('#cull-tally-reject');
-    if (rejTally) rejTally.textContent = `✕ ${rejected}`;
+    // Write only the count spans: the sibling glyph and screen-reader word are
+    // the non-colour keep/reject distinction and must survive every update.
+    const keepTally = $('#cull-tally-keep-count');
+    if (keepTally) keepTally.textContent = String(kept);
+    const rejTally = $('#cull-tally-reject-count');
+    if (rejTally) rejTally.textContent = String(rejected);
 }
 
 // Brief keep/reject/skip stamp animation on the card.

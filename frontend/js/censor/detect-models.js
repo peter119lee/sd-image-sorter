@@ -549,15 +549,15 @@ function _showSam3CommonWordsPopup() {
     popup.style.cssText = [
         'position:fixed',
         'z-index:9100',
-        'background:var(--bg-card-solid,#0e1a2d)',
-        'border:1px solid var(--glass-border,rgba(191,219,254,0.18))',
+        'background:var(--bg-card-solid,#1E1E1E)',
+        'border:1px solid var(--glass-border,rgba(var(--accent-rgb), 0.18))',
         'border-radius:12px',
         'padding:10px 12px 12px',
         'width:min(320px, calc(100vw - 24px))',
         'max-height:min(420px, calc(100vh - 96px))',
         'overflow-y:auto',
         'box-shadow:0 16px 40px rgba(0,0,0,0.5)',
-        'color:var(--text-primary,#eef2ff)',
+        'color:var(--text-primary,#FBF7F2)',
     ].join(';') + ';';
 
     const closeLabel = (window.tKey?.('censor.sam3CloseHint', 'Close', '关闭')) || 'Close';
@@ -565,12 +565,12 @@ function _showSam3CommonWordsPopup() {
 
     let html = `
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-            <div style="flex:1;font-size:11px;color:var(--text-muted,#94a3b8);line-height:1.4;">${window.escapeHtml(headerHelp)}</div>
-            <button id="sam3-common-popup-close" type="button" aria-label="${window.escapeHtml(closeLabel)}" title="${window.escapeHtml(closeLabel)}" style="background:none;border:none;color:var(--text-muted,#94a3b8);font-size:18px;line-height:1;cursor:pointer;padding:2px 8px;border-radius:6px;flex-shrink:0;">×</button>
+            <div style="flex:1;font-size:11px;color:var(--text-muted,#A6A6A6);line-height:1.4;">${window.escapeHtml(headerHelp)}</div>
+            <button id="sam3-common-popup-close" type="button" aria-label="${window.escapeHtml(closeLabel)}" title="${window.escapeHtml(closeLabel)}" style="background:none;border:none;color:var(--text-muted,#A6A6A6);font-size:18px;line-height:1;cursor:pointer;padding:2px 8px;border-radius:6px;flex-shrink:0;">×</button>
         </div>
     `;
     for (const [group, words] of Object.entries(SAM3_COMMON_PROMPTS)) {
-        html += `<div style="font-size:11px;font-weight:700;color:var(--text-secondary,#cbd5e1);margin:8px 0 4px;">${window.escapeHtml(group)}</div>`;
+        html += `<div style="font-size:11px;font-weight:700;color:var(--text-secondary,#D6D6D6);margin:8px 0 4px;">${window.escapeHtml(group)}</div>`;
         html += '<div style="display:flex;flex-wrap:wrap;gap:4px;">';
         for (const word of words) {
             html += `<button type="button" class="btn btn-ghost btn-small sam3-word-chip" data-word="${window.escapeHtml(word)}" style="font-size:11px;padding:3px 8px;border-radius:6px;">${window.escapeHtml(word)}</button>`;

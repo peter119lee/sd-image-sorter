@@ -78,10 +78,10 @@
     margin-left: auto;
     padding: 6px 10px;
     min-width: 32px;
-    border-radius: 999px;
-    border: 1px solid rgba(45, 212, 191, 0.28);
-    background: rgba(45, 212, 191, 0.08);
-    color: #dffff9;
+    border-radius: var(--r-ctl, 4px);
+    border: 1px solid var(--border-strong, #3A3A3E);
+    background: var(--surface-2, #1C1C1E);
+    color: var(--text-2, #A6A6AB);
     font-size: 14px;
     cursor: pointer;
     transition: all 160ms ease;
@@ -94,17 +94,17 @@
     flex-wrap: wrap;
 }
 .guide-btn:hover {
-    background: rgba(45, 212, 191, 0.14);
-    border-color: rgba(45, 212, 191, 0.42);
-    transform: translateY(-1px);
+    background: var(--surface-3, #232326);
+    border-color: var(--border-strong, #3A3A3E);
+    color: var(--text, #E8E8EA);
 }
+/* First-visit hint. This was a looping pulse animation; motion is functional
+   only now, so the unseen state is carried by a static accent outline instead. */
 .guide-btn--pulse {
-    animation: guidePulse 2s ease-in-out 3;
+    border-color: var(--accent-line, rgba(200, 135, 60, 0.45));
+    color: var(--accent, #C8873C);
 }
-@keyframes guidePulse {
-    0%,100% { box-shadow: 0 0 0 0 rgba(45, 212, 191, 0.3); }
-    50% { box-shadow: 0 0 0 8px rgba(45, 212, 191, 0); }
-}
+
 .guide-overlay {
     position: fixed;
     inset: 0;
@@ -120,9 +120,7 @@
 .guide-overlay-backdrop {
     position: absolute;
     inset: 0;
-    background: rgba(3, 10, 15, 0.72);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
+    background: rgba(9, 9, 9, 0.72);
 }
 .guide-modal {
     position: relative;
@@ -130,9 +128,9 @@
     max-height: min(86vh, 860px);
     display: flex;
     flex-direction: column;
-    background: rgba(9, 21, 30, 0.96);
-    border: 1px solid rgba(184, 215, 233, 0.12);
-    border-radius: 24px;
+    background: rgba(20, 20, 20, 0.96);
+    border: 1px solid rgba(var(--accent-rgb), 0.12);
+    border-radius: var(--r-modal, 6px);
     overflow: hidden;
     box-shadow: 0 28px 60px rgba(0, 0, 0, 0.38);
 }
@@ -164,7 +162,7 @@
     width: 36px;
     height: 36px;
     border: none;
-    border-radius: 10px;
+    border-radius: var(--r-ctl, 4px);
     background: rgba(255,255,255,0.04);
     color: var(--text-secondary);
     cursor: pointer;
@@ -209,27 +207,27 @@
 }
 .guide-modal-action {
     padding: 10px 16px;
-    border-radius: 12px;
-    border: 1px solid rgba(255, 138, 61, 0.24);
-    background: rgba(255, 138, 61, 0.12);
-    color: #ffe3ca;
+    border-radius: var(--r-ctl, 4px);
+    border: 1px solid rgba(var(--accent-rgb), 0.24);
+    background: rgba(var(--accent-rgb), 0.12);
+    color: #F3E6D6;
     font-weight: 700;
     cursor: pointer;
 }
 .guide-modal-refresh-i18n {
     padding: 10px 14px;
-    border-radius: 12px;
-    border: 1px solid rgba(45, 212, 191, 0.28);
-    background: rgba(45, 212, 191, 0.10);
-    color: #dffff9;
+    border-radius: var(--r-ctl, 4px);
+    border: 1px solid rgba(var(--accent-rgb), 0.28);
+    background: rgba(var(--accent-rgb), 0.10);
+    color: #F3E6D6;
     font-weight: 600;
     font-size: 13px;
     cursor: pointer;
     transition: all 160ms ease;
 }
 .guide-modal-refresh-i18n:hover {
-    background: rgba(45, 212, 191, 0.18);
-    border-color: rgba(45, 212, 191, 0.45);
+    background: rgba(var(--accent-rgb), 0.18);
+    border-color: rgba(var(--accent-rgb), 0.45);
 }
 @media (max-width: 520px) {
     .guide-modal-footer {
@@ -248,7 +246,7 @@
     }
     .guide-modal {
         max-height: 90vh;
-        border-radius: 20px;
+        border-radius: var(--r-modal, 6px);
     }
     .guide-modal-header,
     .guide-modal-body,
@@ -305,11 +303,11 @@
                             <h3 class="guide-modal-title" id="guide-modal-title"></h3>
                             <span class="guide-modal-subtitle"></span>
                         </div>
-                        <button type="button" class="guide-modal-close" aria-label="Close">✕</button>
+                        <button type="button" class="guide-modal-close" aria-label="Close"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button>
                     </div>
                     <div class="guide-modal-body"></div>
                     <div class="guide-modal-footer">
-                        <button type="button" class="guide-modal-tour" title="Restart onboarding tour">🎓 Tour</button>
+                        <button type="button" class="guide-modal-tour" title="Restart onboarding tour"><svg class="icon" aria-hidden="true"><use href="#i-book"/></svg> Tour</button>
                         <button type="button" class="guide-modal-action"></button>
                     </div>
                 </div>
@@ -488,7 +486,7 @@
             button.dataset.guideTab = tabName;
             button.title = this._copy().button;
             button.setAttribute('aria-label', this._copy().button);
-            button.innerHTML = `<span aria-hidden="true">❔</span>`;
+            button.innerHTML = `<span aria-hidden="true"><svg class="icon" aria-hidden="true"><use href="#i-help"/></svg></span>`;
             button.addEventListener('click', () => this.show(tabName));
             return button;
         },
