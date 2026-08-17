@@ -7630,6 +7630,34 @@ html.lang-zh #view-censor .queue-action-btn span {
         margin-bottom: 8px;
     }
 
+    /* The column is an internal scroller here, so whatever is pinned to its
+       bottom edge is all the user is guaranteed to see. Pinning only the LAST
+       section left the primary action (Identify All) one section higher and
+       therefore below the fold as soon as anything was inserted above it.
+       Pin the run buttons and the maintenance actions together instead, and
+       let the model/vocabulary sections above take the scrolling. */
+    #view-artist .artist-controls-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        position: sticky;
+        bottom: 0;
+        z-index: 2;
+        margin-top: auto;
+        padding-top: 10px;
+        background: var(--bg-card);
+        border-top: 1px solid var(--border-strong);
+    }
+
+    /* Superseded by the pinned group above: a second sticky element inside it
+       would stack on the first and paint over the run buttons. */
+    #view-artist .artist-controls-actions .control-section:last-child {
+        position: static;
+        margin-top: 0;
+        padding-top: 0;
+        box-shadow: none;
+    }
+
     .artist-controls .control-section:last-child {
         position: sticky;
         bottom: 0;

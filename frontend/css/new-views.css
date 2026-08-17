@@ -814,6 +814,14 @@
     max-height: 100%;
 }
 
+/* Layout-neutral by default: the two action sections stay direct participants
+   of the .artist-controls flex column, so spacing, hairlines and :last-child
+   resolve exactly as they did before the wrapper existed. Only the
+   laptop-height rule in ui-refresh.css turns it into a real pinned footer. */
+.artist-controls-actions {
+    display: contents;
+}
+
 .control-section {
     padding-bottom: 16px;
     border-bottom: 1px solid var(--border-color);

@@ -3538,30 +3538,38 @@
                                 <div class="artist-vocabulary-result" id="artist-vocabulary-result" role="status" aria-live="polite"></div>
                             </div>
 
-                            <div class="control-section">
-                                <h3><svg class="icon" aria-hidden="true"><use href="#i-search"/></svg> <span data-i18n="artist.identification">Identification</span></h3>
-                                <button class="btn btn-primary btn-block" id="btn-identify-all">
-                                    <span><svg class="icon" aria-hidden="true"><use href="#i-palette"/></svg></span> <span data-i18n="artist.identifyAll">Identify All Images</span>
-                                </button>
-                                <button class="btn btn-secondary btn-block" id="btn-identify-selected">
-                                    <span><svg class="icon" aria-hidden="true"><use href="#i-target"/></svg></span> <span data-i18n="artist.identifySelected">Identify Selected</span>
-                                </button>
-                                <div class="progress-container" id="artist-progress-container" style="display: none;">
-                                    <div class="progress-bar">
-                                        <div class="progress-fill" id="artist-progress-fill"></div>
+                            <!-- The run buttons and the maintenance actions are pinned to
+                                 the bottom of this column as ONE group at laptop heights.
+                                 The column scrolls internally there, and pinning only the
+                                 last section left the primary action below the fold as soon
+                                 as a section was added above it. `display: contents` keeps
+                                 this wrapper layout-neutral at taller viewports. -->
+                            <div class="artist-controls-actions">
+                                <div class="control-section">
+                                    <h3><svg class="icon" aria-hidden="true"><use href="#i-search"/></svg> <span data-i18n="artist.identification">Identification</span></h3>
+                                    <button class="btn btn-primary btn-block" id="btn-identify-all">
+                                        <span><svg class="icon" aria-hidden="true"><use href="#i-palette"/></svg></span> <span data-i18n="artist.identifyAll">Identify All Images</span>
+                                    </button>
+                                    <button class="btn btn-secondary btn-block" id="btn-identify-selected">
+                                        <span><svg class="icon" aria-hidden="true"><use href="#i-target"/></svg></span> <span data-i18n="artist.identifySelected">Identify Selected</span>
+                                    </button>
+                                    <div class="progress-container" id="artist-progress-container" style="display: none;">
+                                        <div class="progress-bar">
+                                            <div class="progress-fill" id="artist-progress-fill"></div>
+                                        </div>
+                                        <span class="progress-text" id="artist-progress-text">Starting...</span>
                                     </div>
-                                    <span class="progress-text" id="artist-progress-text">Starting...</span>
                                 </div>
-                            </div>
 
-                            <div class="control-section">
-                                <h3><svg class="icon" aria-hidden="true"><use href="#i-chart"/></svg> <span data-i18n="artist.actions">Actions</span></h3>
-                                <button class="btn btn-ghost btn-block" id="btn-refresh-artist-stats">
-                                    <span><svg class="icon" aria-hidden="true"><use href="#i-refresh"/></svg></span> <span data-i18n="artist.refreshStats">Refresh Stats</span>
-                                </button>
-                                <button class="btn btn-ghost danger btn-block" id="btn-clear-artist-data">
-                                    <span><svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg></span> <span data-i18n="artist.clearPredictions">Clear All Predictions</span>
-                                </button>
+                                <div class="control-section">
+                                    <h3><svg class="icon" aria-hidden="true"><use href="#i-chart"/></svg> <span data-i18n="artist.actions">Actions</span></h3>
+                                    <button class="btn btn-ghost btn-block" id="btn-refresh-artist-stats">
+                                        <span><svg class="icon" aria-hidden="true"><use href="#i-refresh"/></svg></span> <span data-i18n="artist.refreshStats">Refresh Stats</span>
+                                    </button>
+                                    <button class="btn btn-ghost danger btn-block" id="btn-clear-artist-data">
+                                        <span><svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg></span> <span data-i18n="artist.clearPredictions">Clear All Predictions</span>
+                                    </button>
+                                </div>
                             </div>
                         </div>
 
