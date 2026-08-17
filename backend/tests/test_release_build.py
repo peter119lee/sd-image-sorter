@@ -346,17 +346,46 @@ def test_release_default_version_follows_app_info():
 
 def _stable_base_version(app_version: str) -> str:
     """Strip a prerelease suffix (``-beta.1`` / ``-rc.2`` / ``-alpha.3``) so
-    the public front-door docs can be checked against the STABLE line.
+    the stable-line docs can be checked against the STABLE version.
 
-    The README badge + ``/releases/latest/download/`` links must resolve to
-    the latest *stable* release (GitHub's "Latest" excludes prereleases), so
-    they advertise the base version (``3.5.0``) even while app_info.py carries
-    a prerelease string (``3.5.0-beta.1``). The prerelease suffix lives in the
-    app version, the version-specific release notes, and the release artifacts
-    — not on the repo's landing page. For a plain stable version this strip is
-    a no-op, so stable releases behave exactly as before.
+    The README badge, the CHANGELOG heading, and ``docs/RELEASE_NOTES_v<x>.md``
+    all track the stable line (``3.5.0``) even while app_info.py carries a
+    prerelease string (``3.5.0-beta.4``). For a plain stable version this strip
+    is a no-op, so stable releases behave exactly as before.
+
+    This deliberately no longer governs README *download* links. Those used to
+    embed ``sd-image-sorter-v{base_version}-...`` filenames under
+    ``/releases/latest/download/`` on the theory that "Latest" always resolves
+    to a stable tag. It does not: a prerelease published without the prerelease
+    flag becomes "Latest", and its assets carry the FULL version, so every
+    pinned link 404'd. See
+    ``test_release_public_docs_link_to_releases_page_not_pinned_assets``.
     """
     return re.split(r"-(?:alpha|beta|rc)\b", app_version, maxsplit=1)[0]
+
+
+def _read_app_info_constant(name: str) -> str:
+    match = re.search(
+        rf'^{name}\s*=\s*["\']([^"\']+)["\']',
+        (ROOT / "backend" / "app_info.py").read_text(encoding="utf-8"),
+        re.MULTILINE,
+    )
+    assert match is not None, f"{name} is missing from backend/app_info.py"
+    return match.group(1)
+
+
+# Asset-name suffixes the README must keep naming so a reader landing on the
+# releases page can still pick the right file for their platform. These are the
+# four *user-installable* assets of the six that build_release_packages.py
+# publishes; the other two are updater-only and are asserted separately.
+_README_PLATFORM_ASSET_SUFFIXES = (
+    "windows-portable.zip",
+    "linux.tar.gz",
+    "linux-portable-x86_64.tar.gz",
+    "linux-portable-aarch64.tar.gz",
+)
+
+_README_UPDATER_ONLY_ASSETS = ("app-patch.zip", "release-manifest.json")
 
 
 def test_release_public_docs_versions_follow_app_info():
@@ -365,28 +394,64 @@ def test_release_public_docs_versions_follow_app_info():
     readme_text = (ROOT / "README.md").read_text(encoding="utf-8")
     changelog_text = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
 
-    # README (the stable front door) tracks the base version; a prerelease
-    # must not rewrite the landing page or its latest-download links.
+    # README badge (the stable front door) tracks the base version; a
+    # prerelease must not rewrite the landing page badge.
     assert f"version-{base_version}-ff8a00" in readme_text
-    assert f"sd-image-sorter-v{base_version}-windows-portable.zip" in readme_text
-    assert f"sd-image-sorter-v{base_version}-linux.tar.gz" in readme_text
-    # The Linux portable bundle is the recommended path for non-Windows
-    # users on distros without a working Python 3.12+. Phase 2 ships both
-    # x86_64 (PCs / laptops / x86 servers) and aarch64 (Raspberry Pi 5,
-    # AWS Graviton, ARM Linux servers); README must keep BOTH download
-    # links alive in lockstep with app_info.py.
-    assert f"sd-image-sorter-v{base_version}-linux-portable-x86_64.tar.gz" in readme_text
-    assert f"sd-image-sorter-v{base_version}-linux-portable-aarch64.tar.gz" in readme_text
     assert re.search(
         rf"^## \[{re.escape(base_version)}\] - \d{{4}}-\d{{2}}-\d{{2}}$",
         changelog_text,
         re.MULTILINE,
     )
-    assert "sd-image-sorter-v3.2.0-" not in readme_text
-    assert f"tar xzf sd-image-sorter-v{base_version}-linux.tar.gz" in readme_text
-    # Mirrors the bash example for the portable variant so the doc test
-    # catches a stale ``tar xzf`` name on the next version bump.
-    assert f"tar xzf sd-image-sorter-v{base_version}-linux-portable-x86_64.tar.gz" in readme_text
+
+
+def test_release_public_docs_link_to_releases_page_not_pinned_assets():
+    """README download links must survive a version bump.
+
+    ``/releases/latest/download/<name>`` requires the EXACT asset filename and
+    supports no wildcard, so a hardcoded name dies the moment the version moves.
+    That is not hypothetical: the README shipped
+    ``sd-image-sorter-v3.5.0-windows-portable.zip`` while the published latest
+    release was ``v3.5.0-beta.4``, whose assets carry the full version. Every
+    download link on the landing page returned 404.
+
+    The contract is therefore: link to the releases PAGE, which never rots, and
+    keep the per-platform filename guidance in prose so a reader can still act
+    correctly once they get there.
+    """
+    readme_text = (ROOT / "README.md").read_text(encoding="utf-8")
+
+    assert "/releases/latest/download/" not in readme_text, (
+        "README must not hardcode a release-asset download URL: that form "
+        "needs an exact filename and 404s on the next version bump."
+    )
+    pinned = sorted(set(re.findall(r"sd-image-sorter-v\d[\w.]*-[\w.\-]+", readme_text)))
+    assert not pinned, f"README pins version-specific asset filenames: {pinned}"
+
+    # Built from app_info.py so an owner/repo rename cannot silently leave the
+    # landing page pointing at a URL that only survives via a GitHub redirect.
+    owner = _read_app_info_constant("GITHUB_OWNER")
+    repo = _read_app_info_constant("GITHUB_REPO")
+    assert f"https://github.com/{owner}/{repo}/releases/latest" in readme_text
+
+    for suffix in _README_PLATFORM_ASSET_SUFFIXES:
+        assert suffix in readme_text, (
+            f"README must still name {suffix}; without it the releases page is "
+            "an unlabelled asset dump and the reader cannot choose a platform."
+        )
+    for updater_only in _README_UPDATER_ONLY_ASSETS:
+        assert updater_only in readme_text, (
+            f"README must warn that {updater_only} is updater-only, so nobody "
+            "downloads it by hand and reports a broken install."
+        )
+
+    # Copy-pasteable extract commands must be version-agnostic for the same
+    # reason the URLs are: a pinned name here fails on the user's terminal.
+    assert "tar xzf sd-image-sorter-*-linux.tar.gz" in readme_text
+    assert "tar xzf sd-image-sorter-*-linux-portable-x86_64.tar.gz" in readme_text
+
+    # Bilingual README: the picker must exist in BOTH language sections.
+    assert "Releases page" in readme_text
+    assert "Releases 页面" in readme_text
 
 
 def test_release_packages_use_version_specific_release_notes(tmp_path):

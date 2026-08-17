@@ -23,15 +23,20 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/peter119lee/sd-image-sorter/releases/latest/download/sd-image-sorter-v3.5.0-windows-portable.zip"><b>Download for Windows</b></a>
-  ·
-  <a href="https://github.com/peter119lee/sd-image-sorter/releases/latest/download/sd-image-sorter-v3.5.0-linux-portable-x86_64.tar.gz"><b>Linux x86_64 (portable)</b></a>
-  ·
-  <a href="https://github.com/peter119lee/sd-image-sorter/releases/latest/download/sd-image-sorter-v3.5.0-linux-portable-aarch64.tar.gz"><b>Linux aarch64 (portable)</b></a>
-  ·
-  <a href="https://github.com/peter119lee/sd-image-sorter/releases/latest/download/sd-image-sorter-v3.5.0-linux.tar.gz">Linux (source)</a>
+  <a href="https://github.com/peter119lee/sd-image-sorter/releases/latest"><b>⬇️ Download</b></a>
   ·
   <a href="#quick-start">Quick Start</a>
+</p>
+
+<p align="center">
+  <sub>
+    Windows → <code>windows-portable.zip</code> ·
+    Linux without Python 3.12+ → <code>linux-portable-x86_64.tar.gz</code> / <code>linux-portable-aarch64.tar.gz</code> ·
+    Linux with Python 3.12+ → <code>linux.tar.gz</code><br>
+    Windows 选 <code>windows-portable.zip</code> ·
+    Linux 没装 Python 3.12+ 选 <code>linux-portable-x86_64.tar.gz</code> / <code>linux-portable-aarch64.tar.gz</code> ·
+    已有 Python 3.12+ 选 <code>linux.tar.gz</code>
+  </sub>
 </p>
 
 <p align="center">
@@ -237,9 +242,20 @@
 
 ## 60 秒上手
 
+所有安装包都放在 **[Releases 页面](https://github.com/peter119lee/sd-image-sorter/releases/latest)** 的 **Assets** 区域。按下表对号入座下载一个就好：
+
+| 你的系统 | 下载这个文件 | 启动方式 |
+|:--|:--|:--|
+| **Windows** | `sd-image-sorter-<版本>-windows-portable.zip` | 解压后双击 `run-portable.bat` |
+| **Linux，没装 Python 3.12+** | Intel/AMD 用 `sd-image-sorter-<版本>-linux-portable-x86_64.tar.gz`（约 80 MB）；ARM / 树莓派用 `sd-image-sorter-<版本>-linux-portable-aarch64.tar.gz`（约 75 MB） | 解压后 `./run-portable.sh` |
+| **Linux，已有 Python 3.12+** | `sd-image-sorter-<版本>-linux.tar.gz` | 解压后 `./run.sh` |
+
+> [!WARNING]
+> **不要下载** `app-patch.zip` 和 `release-manifest.json`。这两个只给应用内的「检查更新」用，手动下载装不起来。
+
 ### Windows
 
-1. 下载 [sd-image-sorter-v3.5.0-windows-portable.zip](https://github.com/peter119lee/sd-image-sorter/releases/latest/download/sd-image-sorter-v3.5.0-windows-portable.zip)
+1. 在 [Releases 页面](https://github.com/peter119lee/sd-image-sorter/releases/latest) 下载 `windows-portable.zip`
 2. 解压到任意目录
 3. 双击 `run-portable.bat`
 4. 浏览器会自动打开 `http://localhost:8487`
@@ -249,18 +265,18 @@
 
 **便携版（推荐，无需系统 Python）：**
 
-按 CPU 架构挑一个：
+在 [Releases 页面](https://github.com/peter119lee/sd-image-sorter/releases/latest) 按 CPU 架构挑一个：
 
 - **x86_64**（一般 PC、Intel/AMD 桌面/笔电、Steam Deck、传统 x86 服务器）
-  下载 [sd-image-sorter-v3.5.0-linux-portable-x86_64.tar.gz](https://github.com/peter119lee/sd-image-sorter/releases/latest/download/sd-image-sorter-v3.5.0-linux-portable-x86_64.tar.gz)（约 80 MB）
+  下载 `linux-portable-x86_64.tar.gz`（约 80 MB）
 - **aarch64 / arm64**（Raspberry Pi 4 / 5、ARM Linux 服务器、AWS Graviton、Apple Silicon 在 Linux 下）
-  下载 [sd-image-sorter-v3.5.0-linux-portable-aarch64.tar.gz](https://github.com/peter119lee/sd-image-sorter/releases/latest/download/sd-image-sorter-v3.5.0-linux-portable-aarch64.tar.gz)（约 75 MB）
+  下载 `linux-portable-aarch64.tar.gz`（约 75 MB）
 
 解压并执行（指令一样，看你下哪个 tarball）：
 
 ```bash
-# 例如 x86_64
-tar xzf sd-image-sorter-v3.5.0-linux-portable-x86_64.tar.gz
+# 例如 x86_64；通配符会匹配到你实际下载的版本号
+tar xzf sd-image-sorter-*-linux-portable-x86_64.tar.gz
 cd sd-image-sorter
 chmod +x run-portable.sh
 ./run-portable.sh
@@ -270,11 +286,11 @@ chmod +x run-portable.sh
 
 **源码版（需要自己装 Python 3.12+）：**
 
-1. 下载 [sd-image-sorter-v3.5.0-linux.tar.gz](https://github.com/peter119lee/sd-image-sorter/releases/latest/download/sd-image-sorter-v3.5.0-linux.tar.gz)
+1. 在 [Releases 页面](https://github.com/peter119lee/sd-image-sorter/releases/latest) 下载 `linux.tar.gz`
 2. 解压并执行：
 
 ```bash
-tar xzf sd-image-sorter-v3.5.0-linux.tar.gz
+tar xzf sd-image-sorter-*-linux.tar.gz
 cd sd-image-sorter
 chmod +x run.sh
 ./run.sh
@@ -642,9 +658,20 @@ See [Why Choose Us](docs/WHY_CHOOSE_US.md) for detailed comparison.
 
 ### Quick Start
 
+Every build lives under **Assets** on the **[Releases page](https://github.com/peter119lee/sd-image-sorter/releases/latest)**. Grab exactly one:
+
+| Your system | Download this file | How to start it |
+|:--|:--|:--|
+| **Windows** | `sd-image-sorter-<version>-windows-portable.zip` | Extract, double-click `run-portable.bat` |
+| **Linux without Python 3.12+** | `sd-image-sorter-<version>-linux-portable-x86_64.tar.gz` (Intel/AMD, ~80 MB) or `sd-image-sorter-<version>-linux-portable-aarch64.tar.gz` (ARM / Raspberry Pi, ~75 MB) | Extract, run `./run-portable.sh` |
+| **Linux with Python 3.12+** | `sd-image-sorter-<version>-linux.tar.gz` | Extract, run `./run.sh` |
+
+> [!WARNING]
+> **Do not download** `app-patch.zip` or `release-manifest.json`. Those are consumed by the in-app updater only and will not install by hand.
+
 #### Windows Portable
 
-1. Download [sd-image-sorter-v3.5.0-windows-portable.zip](https://github.com/peter119lee/sd-image-sorter/releases/latest/download/sd-image-sorter-v3.5.0-windows-portable.zip)
+1. Download `windows-portable.zip` from the [Releases page](https://github.com/peter119lee/sd-image-sorter/releases/latest)
 2. Extract it anywhere
 3. Double-click `run-portable.bat`
 4. Your browser opens `http://localhost:8487`
@@ -656,14 +683,15 @@ On NVIDIA machines, first launch may spend extra time at `Checking Windows ONNX 
 
 **Portable (recommended, no system Python needed):**
 
-Pick the right tarball for your CPU:
+Pick the right tarball for your CPU on the [Releases page](https://github.com/peter119lee/sd-image-sorter/releases/latest):
 
-- **x86_64** — typical PCs, Intel/AMD laptops, Steam Deck, traditional x86 servers. ~80 MB.
-- **aarch64 / arm64** — Raspberry Pi 4 / 5, ARM Linux servers, AWS Graviton, Apple Silicon under Linux. ~75 MB.
+- **x86_64** — typical PCs, Intel/AMD laptops, Steam Deck, traditional x86 servers. Download `linux-portable-x86_64.tar.gz`, ~80 MB.
+- **aarch64 / arm64** — Raspberry Pi 4 / 5, ARM Linux servers, AWS Graviton, Apple Silicon under Linux. Download `linux-portable-aarch64.tar.gz`, ~75 MB.
 
 ```bash
-# x86_64 example (commands identical for aarch64; just download the matching tarball)
-tar xzf sd-image-sorter-v3.5.0-linux-portable-x86_64.tar.gz
+# x86_64 example (commands identical for aarch64; just download the matching tarball).
+# The wildcard matches whichever version you downloaded.
+tar xzf sd-image-sorter-*-linux-portable-x86_64.tar.gz
 cd sd-image-sorter
 chmod +x run-portable.sh
 ./run-portable.sh
@@ -673,8 +701,10 @@ Works on every modern Linux distro on either architecture, including ones whose 
 
 **Source (bring your own Python 3.12 / 3.13):**
 
+Download `linux.tar.gz` from the [Releases page](https://github.com/peter119lee/sd-image-sorter/releases/latest), then:
+
 ```bash
-tar xzf sd-image-sorter-v3.5.0-linux.tar.gz
+tar xzf sd-image-sorter-*-linux.tar.gz
 cd sd-image-sorter
 chmod +x run.sh
 ./run.sh
