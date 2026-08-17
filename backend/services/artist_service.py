@@ -20,7 +20,13 @@ from exceptions import (
 
 import database as db
 from artist_identifier import (
+    ARTIST_CONFIDENCE_HIGH,
+    ARTIST_CONFIDENCE_LOW,
+    ARTIST_CONFIDENCE_NONE,
+    ARTIST_CONFIDENT_THRESHOLD,
     ARTIST_THRESHOLD_DEFAULT,
+    artist_confidence_advisory,
+    classify_artist_confidence,
     get_artist_identifier as default_get_artist_identifier,
 )
 from image_fingerprint import compute_image_content_fingerprint
@@ -87,6 +93,46 @@ class _E2EArtistIdentifierStub:
 
 def _e2e_artist_identifier_getter(**kwargs: Any) -> _E2EArtistIdentifierStub:
     return _E2EArtistIdentifierStub(threshold=float(kwargs.get("threshold") or 0.0))
+
+
+def normalize_identification(result: Dict[str, Any]) -> Dict[str, Any]:
+    """Turn a raw identifier result into the tiered payload the app publishes.
+
+    This is the last gate before an artist name reaches the database, so it
+    re-derives the tier rather than trusting the identifier: only a
+    high-confidence result may keep a real name in ``artist``. Identifiers that
+    predate the tiered contract (E2E stubs, local ONNX wrappers) simply have
+    their tier computed from the confidence they already return.
+    """
+    confidence = float(result.get("confidence") or 0.0)
+    level = str(result.get("confidence_level") or "").strip().lower()
+    if level not in (ARTIST_CONFIDENCE_HIGH, ARTIST_CONFIDENCE_LOW, ARTIST_CONFIDENCE_NONE):
+        level = classify_artist_confidence(confidence)
+
+    raw_artist = str(result.get("artist") or "undefined").strip() or "undefined"
+    candidate = result.get("candidate_artist")
+    if not candidate and raw_artist != "undefined":
+        candidate = raw_artist
+    if level == ARTIST_CONFIDENCE_NONE:
+        candidate = None
+
+    vocabulary_size = int(result.get("vocabulary_size") or 0)
+    return {
+        "artist": raw_artist if level == ARTIST_CONFIDENCE_HIGH else "undefined",
+        "confidence": confidence,
+        "confidence_level": level,
+        "candidate_artist": candidate or None,
+        "out_of_vocabulary_likely": bool(
+            result.get("out_of_vocabulary_likely", level != ARTIST_CONFIDENCE_HIGH)
+        ),
+        "vocabulary_size": vocabulary_size,
+        "advisory": str(
+            result.get("advisory")
+            or artist_confidence_advisory(level, vocabulary_size=vocabulary_size)
+        ),
+        "top_predictions": list(result.get("top_predictions") or []),
+        "model_loaded": bool(result.get("model_loaded")),
+    }
 
 
 class ArtistService:
@@ -314,9 +360,10 @@ class ArtistService:
             model_source=model_source,
             use_gpu=use_gpu,
         )
-        result = identifier.identify_with_threshold(image_path, top_k, threshold)
-        if result.get("error"):
-            raise ServiceError(result["error"])
+        raw_result = identifier.identify_with_threshold(image_path, top_k, threshold)
+        if raw_result.get("error"):
+            raise ServiceError(raw_result["error"])
+        result = normalize_identification(raw_result)
         self._verify_source_fingerprint(
             image_path=image_path,
             expected_fingerprint=content_fingerprint,
@@ -325,21 +372,14 @@ class ArtistService:
         written = self._store_prediction(
             image_id=image_id,
             artist=result["artist"],
-            confidence=float(result["confidence"]),
-            top_predictions=list(result["top_predictions"]),
+            confidence=result["confidence"],
+            top_predictions=result["top_predictions"],
             content_fingerprint=content_fingerprint,
         )
         if not written:
             raise ServiceError(ARTIST_PUBLISH_STALE_ERROR)
 
-        return {
-            "image_id": image_id,
-            "artist": result["artist"],
-            "confidence": float(result["confidence"]),
-            "top_predictions": list(result["top_predictions"]),
-            "model_loaded": bool(result.get("model_loaded")),
-            "experimental": True,
-        }
+        return {"image_id": image_id, "experimental": True, **result}
 
     def run_batch_identification(
         self,
@@ -418,9 +458,10 @@ class ArtistService:
                     image_id=image_id,
                     image_path=image_path,
                 )
-                result = identifier.identify_with_threshold(image_path, top_k, threshold)
-                if result.get("error"):
-                    raise RuntimeError(result["error"])
+                raw_result = identifier.identify_with_threshold(image_path, top_k, threshold)
+                if raw_result.get("error"):
+                    raise RuntimeError(raw_result["error"])
+                result = normalize_identification(raw_result)
                 self._verify_source_fingerprint(
                     image_path=image_path,
                     expected_fingerprint=content_fingerprint,
@@ -429,8 +470,8 @@ class ArtistService:
                 prediction = {
                     "image_id": image_id,
                     "artist": result["artist"],
-                    "confidence": float(result["confidence"]),
-                    "top_predictions": list(result["top_predictions"]),
+                    "confidence": result["confidence"],
+                    "top_predictions": result["top_predictions"],
                     "content_fingerprint": content_fingerprint,
                 }
                 with db.get_db() as conn:
@@ -441,7 +482,9 @@ class ArtistService:
                 public_result = {
                     "image_id": image_id,
                     "artist": result["artist"],
-                    "confidence": float(result["confidence"]),
+                    "confidence": result["confidence"],
+                    "confidence_level": result["confidence_level"],
+                    "candidate_artist": result["candidate_artist"],
                 }
                 results.append(public_result)
                 emit({"result": public_result})
@@ -479,15 +522,22 @@ class ArtistService:
             cursor.execute("SELECT COUNT(*) FROM artist_predictions")
             identified_images = int(cursor.fetchone()[0] or 0)
 
-            # Sub-threshold rows (legacy data written before the identify
-            # pipeline enforced its confidence floor) fold into "undefined"
-            # instead of surfacing 0.1%-confidence noise as a found artist
-            # (v3.5.0 audit).
+            # Rows split into three disjoint buckets that sum to
+            # identified_images. Existing rows are classified by the confidence
+            # they were stored with -- nothing is rewritten -- so labels written
+            # by the old un-tiered pipeline surface as low-confidence here
+            # instead of continuing to pass as identified artists.
             cursor.execute(
                 "SELECT COUNT(*) FROM artist_predictions WHERE artist = 'undefined' OR confidence < ?",
                 (ARTIST_THRESHOLD_DEFAULT,),
             )
             undefined_count = int(cursor.fetchone()[0] or 0)
+
+            artist_counts: Dict[str, int] = {}
+            artist_stats: Dict[str, Dict[str, float]] = {}
+            low_confidence_artist_counts: Dict[str, int] = {}
+            confident_count = 0
+            low_confidence_count = 0
 
             cursor.execute(
                 """
@@ -497,25 +547,65 @@ class ArtistService:
                 GROUP BY artist
                 ORDER BY count DESC
                 """,
-                (ARTIST_THRESHOLD_DEFAULT,),
+                (ARTIST_CONFIDENT_THRESHOLD,),
             )
-            artist_counts: Dict[str, int] = {}
-            artist_stats: Dict[str, Dict[str, float]] = {}
             for row in cursor.fetchall():
                 artist = str(row[0] or "")
-                artist_counts[artist] = int(row[1] or 0)
+                count = int(row[1] or 0)
+                confident_count += count
+                artist_counts[artist] = count
                 artist_stats[artist] = {
-                    "count": float(row[1] or 0),
+                    "count": float(count),
                     "avg_confidence": float(row[2] or 0.0),
                     "max_confidence": float(row[3] or 0.0),
                 }
+
+            cursor.execute(
+                """
+                SELECT artist, COUNT(*) as count
+                FROM artist_predictions
+                WHERE artist != 'undefined' AND confidence >= ? AND confidence < ?
+                GROUP BY artist
+                ORDER BY count DESC
+                """,
+                (ARTIST_THRESHOLD_DEFAULT, ARTIST_CONFIDENT_THRESHOLD),
+            )
+            for row in cursor.fetchall():
+                count = int(row[1] or 0)
+                low_confidence_count += count
+                low_confidence_artist_counts[str(row[0] or "")] = count
 
         return {
             "total_images": total_images,
             "identified_images": identified_images,
             "undefined_count": undefined_count,
+            "confident_count": confident_count,
+            "low_confidence_count": low_confidence_count,
+            "confident_threshold": ARTIST_CONFIDENT_THRESHOLD,
             "artist_counts": artist_counts,
             "artist_stats": artist_stats,
+            "low_confidence_artist_counts": low_confidence_artist_counts,
+        }
+
+    def lookup_vocabulary(self, names: List[str]) -> Dict[str, Any]:
+        """Answer "can this model ever name these artists?" without guessing.
+
+        A name that is not in the vocabulary can never be predicted, so telling
+        the user that up front is strictly more useful than the nearest wrong
+        match the model would otherwise return for their images.
+        """
+        identifier = self._identifier_getter()
+        vocabulary_size = int(getattr(identifier, "vocabulary_size", 0) or 0)
+        known: Dict[str, bool] = {}
+        if vocabulary_size:
+            for name in names:
+                normalized = str(name or "").strip()
+                if normalized:
+                    known[normalized] = bool(identifier.knows_artist(normalized))
+        return {
+            "vocabulary_size": vocabulary_size,
+            "vocabulary_loaded": vocabulary_size > 0,
+            "known": known,
         }
 
     def get_artist_images(self, *, artist_name: str, limit: int, offset: int) -> Dict[str, Any]:
@@ -549,6 +639,9 @@ class ArtistService:
             )
             rows = cursor.fetchall()
 
+        # confidence_level is derived from the stored confidence at read time,
+        # so rows written by the older un-tiered pipeline are marked as suspect
+        # without rewriting a single one of the user's existing labels.
         images = [
             {
                 "image_id": int(row[0]),
@@ -557,6 +650,7 @@ class ArtistService:
                 "artist": str(row[3] or ""),
                 "confidence": float(row[4] or 0.0),
                 "confidence_percent": round(float(row[4] or 0.0) * 100, 1),
+                "confidence_level": classify_artist_confidence(float(row[4] or 0.0)),
             }
             for row in rows
         ]
@@ -571,8 +665,20 @@ class ArtistService:
         }
 
     def list_artists(self) -> Dict[str, Any]:
+        """Return the loaded model's artist vocabulary.
+
+        Before a real label source is loaded, ``ArtistIdentifier.artists`` still
+        holds the hardcoded DEFAULT_ARTISTS sample list. Returning that as "the
+        known artists" would misrepresent what the model can actually name, so
+        an unloaded identifier reports an empty vocabulary instead.
+        """
         identifier = self._identifier_getter()
-        return {"artists": identifier.get_artists_list()}
+        vocabulary_size = int(getattr(identifier, "vocabulary_size", 0) or 0)
+        return {
+            "artists": identifier.get_artists_list() if vocabulary_size else [],
+            "vocabulary_size": vocabulary_size,
+            "vocabulary_loaded": vocabulary_size > 0,
+        }
 
     def clear_predictions(self) -> Dict[str, str]:
         with self._batch_lock:

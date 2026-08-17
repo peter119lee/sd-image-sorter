@@ -101,7 +101,36 @@ from artist.runtime_paths import (
 _model = None
 _processor = None
 _model_lock = threading.Lock()
+
+# ---------------------------------------------------------------------------
+# Confidence policy (measured 2026-08-17, n=250 ground-truth images from a
+# Danbooru-named library where the filename token is the artist tag, run
+# against the shipped Kaloscope 39,261-class weights).
+#
+#   top-1 >= 0.20 :  66 labels, 92% correct,  6% out-of-vocabulary
+#   0.03 .. 0.20  :  79 labels, 28% correct, 65% out-of-vocabulary
+#   top-1 <  0.03 : 105 labels,  2% correct, 97% out-of-vocabulary
+#
+# The top-1 softmax score does rank correct answers above wrong ones
+# (Mann-Whitney AUC 0.946), and none of the alternatives measured on the same
+# sample beat it: margin top1-top2 0.947, top1/top2 ratio 0.931, top-5 mass
+# 0.930, distribution entropy 0.907. But the two distributions overlap across
+# almost the entire range (the band [0.009, 0.882] holds 93% of the correct and
+# 94% of the wrong answers), so NO threshold cleanly separates them - at 0.30
+# precision is still only 96% while 45% of the correct answers are discarded.
+#
+# Therefore the score is used to TIER the answer, not to decide whether to
+# assert one. Only the high tier may be presented (and stored) as an
+# identification; the middle tier is an explicitly unconfirmed suggestion; and
+# below the floor we say "probably not in this model's vocabulary", which is
+# what 97% of those cases actually are.
 ARTIST_THRESHOLD_DEFAULT = 0.03
+ARTIST_CONFIDENT_THRESHOLD = 0.20
+
+ARTIST_CONFIDENCE_HIGH = "high"
+ARTIST_CONFIDENCE_LOW = "low"
+ARTIST_CONFIDENCE_NONE = "none"
+
 _model_source = None
 ARTIST_LSNET_RUNTIME_REVISION = "416d945e65b81ced93f1e762349d790ca92106b1"
 ARTIST_LSNET_RUNTIME_ZIP_URL = (
@@ -114,6 +143,52 @@ _MAX_ARTIST_RUNTIME_UNCOMPRESSED_BYTES = 256 * 1024 * 1024
 def _is_kaloscope_model_id(model_id: Optional[str]) -> bool:
     normalized = str(model_id or "").strip().lower()
     return normalized == "heathcliff01/kaloscope2.0"
+
+
+def classify_artist_confidence(
+    confidence: float,
+    *,
+    threshold: float = ARTIST_THRESHOLD_DEFAULT,
+) -> str:
+    """Bucket a top-1 score into the tier the app is allowed to present.
+
+    ``threshold`` is the caller's own floor. It can only tighten the result:
+    a caller cannot lower it far enough to have a guess asserted as a fact.
+    """
+    value = float(confidence or 0.0)
+    floor = max(float(threshold or 0.0), 0.0)
+    if value >= ARTIST_CONFIDENT_THRESHOLD and value >= floor:
+        return ARTIST_CONFIDENCE_HIGH
+    if value > 0.0 and value >= floor and value >= ARTIST_THRESHOLD_DEFAULT:
+        return ARTIST_CONFIDENCE_LOW
+    return ARTIST_CONFIDENCE_NONE
+
+
+def artist_confidence_advisory(level: str, *, vocabulary_size: int = 0) -> str:
+    """Plain-language explanation of what a tier does and does not mean."""
+    vocabulary = (
+        f"{vocabulary_size:,}-artist vocabulary" if vocabulary_size else "artist vocabulary"
+    )
+    if level == ARTIST_CONFIDENCE_HIGH:
+        return (
+            "Confident match. Measured on a ground-truth sample, about 1 in 13 "
+            "matches at this confidence is still wrong. / "
+            f"高置信度匹配。在实测样本中，这一档仍约有 1/13 是错的。"
+        )
+    if level == ARTIST_CONFIDENCE_LOW:
+        return (
+            "Unconfirmed suggestion, not an identification. Most results at this "
+            f"confidence are wrong, usually because the real artist is not in the "
+            f"model's {vocabulary}. Confirm it yourself before trusting it. / "
+            "这只是低置信度候选，不是识别结果。这一档大多数是错的，通常是因为真实画师"
+            "不在模型的画师词表里。请自行确认后再使用。"
+        )
+    return (
+        f"No match. The artist is probably not in this model's {vocabulary}, so no "
+        "name is offered rather than naming the closest wrong one. / "
+        "没有匹配。该画师大概率不在此模型的画师词表内，因此不提供任何名字，"
+        "而不是给出最接近的错误名字。"
+    )
 
 
 def _normalize_state_dict_keys(state_dict):
@@ -202,6 +277,10 @@ class ArtistIdentifier:
         # the hardcoded DEFAULT_ARTISTS sample list and pass them off as real
         # predictions. See ``identify`` for the honest-refusal path.
         self._has_class_mapping: bool = artists_list is not None
+        # Lazily built lowercase index over ``artists`` for knows_artist(); the
+        # Kaloscope vocabulary is 39,261 entries, so a linear scan per lookup
+        # would be wasteful.
+        self._artist_lookup: Optional[set] = None
         self._model: Any = None
         self._session: Any = None
         self._processor: Any = None
@@ -339,6 +418,7 @@ class ArtistIdentifier:
         self._transform = transform
         self.artists = artists
         self._has_class_mapping = True
+        self._artist_lookup = None
         self._backend = "kaloscope"
         logger.info("Loaded Kaloscope model '%s' with %d artist classes", model_name, len(self.artists))
 
@@ -456,6 +536,7 @@ class ArtistIdentifier:
                     self.artists = [self._model.config.id2label.get(i, f"unknown_{i}")
                                    for i in range(len(self._model.config.id2label))]
                     self._has_class_mapping = True
+                    self._artist_lookup = None
 
                 logger.info(f"Loaded model with {len(self.artists)} styles")
             self._load_error = None
@@ -506,11 +587,21 @@ class ArtistIdentifier:
 
         Returns:
             {
-                "artist": str,  # "undefined" if below threshold
+                "artist": str,  # the identified artist, or "undefined"
                 "confidence": float,
+                "confidence_level": "high" | "low" | "none",
+                "candidate_artist": str | None,  # best guess when not asserted
+                "out_of_vocabulary_likely": bool,
+                "vocabulary_size": int,
+                "advisory": str,
                 "top_predictions": [{"artist": str, "confidence": float}, ...],
                 "model_loaded": bool,
             }
+
+        ``artist`` is only ever a real name in the "high" tier. Everything below
+        it comes back as ``"undefined"`` with the guess carried separately in
+        ``candidate_artist``, so a suggestion is never mistaken for a fact by a
+        caller that only reads ``artist``.
         """
         self.load()
 
@@ -519,6 +610,11 @@ class ArtistIdentifier:
             "confidence": 0.0,
             "top_predictions": [],
             "model_loaded": self._model is not None and self._model != "placeholder",
+            "confidence_level": ARTIST_CONFIDENCE_NONE,
+            "candidate_artist": None,
+            "out_of_vocabulary_likely": False,
+            "vocabulary_size": self.vocabulary_size,
+            "advisory": "",
         }
 
         if self._model == "placeholder":
@@ -583,15 +679,26 @@ class ArtistIdentifier:
                 )
                 return result
 
-            # Set main result based on threshold
+            # Tier the answer instead of asserting whatever clears a threshold.
             if result["top_predictions"]:
                 top = result["top_predictions"][0]
-                if top["confidence"] >= threshold:
-                    result["artist"] = top["artist"]
-                    result["confidence"] = top["confidence"]
-                else:
-                    result["artist"] = "undefined"
-                    result["confidence"] = top["confidence"]
+                confidence = float(top["confidence"])
+                level = classify_artist_confidence(confidence, threshold=threshold)
+                result["confidence"] = confidence
+                result["confidence_level"] = level
+                result["artist"] = (
+                    top["artist"] if level == ARTIST_CONFIDENCE_HIGH else "undefined"
+                )
+                # Below the floor the top-1 is right ~2% of the time, so naming
+                # it is worse than saying nothing; the raw ranking stays in
+                # top_predictions for anyone who explicitly wants to inspect it.
+                result["candidate_artist"] = (
+                    top["artist"] if level != ARTIST_CONFIDENCE_NONE else None
+                )
+                result["out_of_vocabulary_likely"] = level != ARTIST_CONFIDENCE_HIGH
+                result["advisory"] = artist_confidence_advisory(
+                    level, vocabulary_size=result["vocabulary_size"]
+                )
 
         except Exception as e:
             logger.error(f"Error identifying {image_path}: {e}")
@@ -663,6 +770,32 @@ class ArtistIdentifier:
     def get_artists_list(self) -> List[str]:
         """Get the list of known artists."""
         return self.artists.copy()
+
+    @property
+    def vocabulary_size(self) -> int:
+        """How many artists this model can actually name.
+
+        Zero when no real label source is loaded, so callers never quote the
+        hardcoded DEFAULT_ARTISTS sample list as if it were the model's answer
+        set.
+        """
+        return len(self.artists) if self._has_class_mapping else 0
+
+    def knows_artist(self, name: str) -> bool:
+        """Whether ``name`` is in the model's answer set.
+
+        A False here is the single most useful thing the feature can tell a
+        user: if the artist is not in the vocabulary, every prediction for
+        their images is guaranteed to name somebody else.
+        """
+        if not self._has_class_mapping:
+            return False
+        normalized = str(name or "").strip().lower()
+        if not normalized:
+            return False
+        if self._artist_lookup is None:
+            self._artist_lookup = {str(a).strip().lower() for a in self.artists}
+        return normalized in self._artist_lookup
 
     @staticmethod
     def is_available() -> bool:

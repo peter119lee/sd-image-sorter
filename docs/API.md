@@ -1237,7 +1237,17 @@ Compare prompt generation options.
 
 > **Warning: Experimental Feature**
 >
-> Artist identification is experimental. It uses a predefined label list and may not accurately identify all artists. The feature is provided for exploration purposes and should not be relied upon for critical workflows.
+> Artist identification is experimental. Only a `confidence_level` of `high` is an identification; everything below it is an unconfirmed suggestion, and roughly two thirds of a typical Danbooru-sourced library falls outside the model's artist vocabulary entirely.
+
+**Confidence tiers.** Measured on 250 ground-truth images against the shipped Kaloscope weights:
+
+| `confidence_level` | top-1 score | measured precision | out-of-vocabulary share |
+|---|---|---|---|
+| `high` | >= 0.20 | 92% | 6% |
+| `low` | 0.03 - 0.20 | 28% | 65% |
+| `none` | < 0.03 | 2% | 97% |
+
+Only the `high` tier ever puts a real name in `artist` (and in the `artist_predictions` table). The `low` tier returns the guess in `candidate_artist` for the user to confirm. The request-level `threshold` can only tighten this — it cannot make the backend assert a guess.
 
 #### POST /api/artists/identify
 Identify artist for one image.
@@ -1246,7 +1256,7 @@ Identify artist for one image.
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `image_id` | int | required | Image ID to identify |
-| `threshold` | float | 0.35 | Minimum confidence threshold (0.0-1.0) |
+| `threshold` | float | 0.03 | Extra confidence floor (0.0-1.0); tightens only |
 | `top_k` | int | 5 | Number of top predictions to return (1-20) |
 
 **Response:**
@@ -1255,6 +1265,11 @@ Identify artist for one image.
   "image_id": 1,
   "artist": "greg_rutkowski",
   "confidence": 0.78,
+  "confidence_level": "high",
+  "candidate_artist": "greg_rutkowski",
+  "out_of_vocabulary_likely": false,
+  "vocabulary_size": 39261,
+  "advisory": "Confident match. ...",
   "top_predictions": [
     {"artist": "greg_rutkowski", "confidence": 0.78},
     {"artist": "alphonse_mucha", "confidence": 0.45}
@@ -1264,6 +1279,8 @@ Identify artist for one image.
 }
 ```
 
+A low-confidence result instead returns `"artist": "undefined"`, `"confidence_level": "low"`, and the guess in `candidate_artist`.
+
 #### POST /api/artists/identify-batch
 Start batch identification.
 
@@ -1271,8 +1288,10 @@ Start batch identification.
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `image_ids` | int[] | required | List of image IDs |
-| `threshold` | float | 0.35 | Minimum confidence threshold |
+| `threshold` | float | 0.03 | Extra confidence floor; tightens only |
 | `top_k` | int | 5 | Number of predictions per image |
+
+Each `results[]` entry carries `artist`, `confidence`, `confidence_level`, and `candidate_artist`.
 
 #### GET /api/artists/batch-progress
 Get identification progress.
@@ -1286,13 +1305,25 @@ List artist models.
 Get Kaloscope / LSNet runtime diagnostics for the frontend banner.
 
 #### GET /api/artists/stats
-Get artist stats.
+Get artist stats. `undefined_count`, `low_confidence_count` and `confident_count` are disjoint and sum to `identified_images`. `artist_counts` / `artist_stats` cover only confident rows; `low_confidence_artist_counts` holds the rest, including labels written before tiering existed.
 
 #### GET /api/artists/images/{artist_name}
-List images associated with an artist prediction.
+List images associated with an artist prediction. Each entry carries a `confidence_level` derived from its stored confidence, so pre-tiering labels are still marked as suspect.
 
 #### GET /api/artists/list
-Get known artist list.
+Get the loaded model's artist list. `vocabulary_loaded` is false (and `artists` empty) until a real label source is loaded, rather than returning the placeholder sample list.
+
+#### GET /api/artists/vocabulary
+Check whether specific artists exist in the loaded model's answer set.
+
+**Parameters:** repeat `name` per artist, e.g. `?name=ko_yu&name=sakura_shiori`.
+
+**Response:**
+```json
+{"vocabulary_size": 39261, "vocabulary_loaded": true, "known": {"ko_yu": true, "sakura_shiori": false}}
+```
+
+An artist that is absent can never be predicted, so every identification over their images will name somebody else.
 
 #### DELETE /api/artists/clear
 Clear artist predictions.

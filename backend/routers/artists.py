@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 from artist_identifier import (
     get_artist_identifier,
+    ARTIST_CONFIDENT_THRESHOLD,
     ARTIST_THRESHOLD_DEFAULT,
 )
 from config import ARTIST_HF_MODEL_ID, ARTIST_MODELSCOPE_MODEL_ID
@@ -83,8 +84,16 @@ class IdentifyBatchRequest(ArtistModelConfig):
 
 class IdentifyResponse(BaseModel):
     image_id: int
+    # Only ever a real name when confidence_level == "high". Every other tier
+    # reports "undefined" here and carries the guess in candidate_artist, so a
+    # caller that reads only `artist` can never mistake a guess for a fact.
     artist: str
     confidence: float
+    confidence_level: str = "none"
+    candidate_artist: Optional[str] = None
+    out_of_vocabulary_likely: bool = False
+    vocabulary_size: int = 0
+    advisory: str = ""
     top_predictions: List[dict]
     model_loaded: bool
     # P0-5: Artist identifier uses a hardcoded label list, not a real trained model.
@@ -116,8 +125,21 @@ class StatsResponse(BaseModel):
     total_images: int
     identified_images: int
     undefined_count: int
+    # undefined_count + low_confidence_count + confident_count == identified_images.
+    # Only confident_count rows are presented as identified artists; the rest are
+    # unconfirmed guesses (many of them written before the tiering existed).
+    confident_count: int = 0
+    low_confidence_count: int = 0
+    confident_threshold: float = ARTIST_CONFIDENT_THRESHOLD
     artist_counts: dict
     artist_stats: Dict[str, Dict[str, float]] = Field(default_factory=dict)
+    low_confidence_artist_counts: Dict[str, int] = Field(default_factory=dict)
+
+
+class VocabularyResponse(BaseModel):
+    vocabulary_size: int
+    vocabulary_loaded: bool
+    known: Dict[str, bool] = Field(default_factory=dict)
 
 
 class ArtistImageResponse(BaseModel):
@@ -126,6 +148,7 @@ class ArtistImageResponse(BaseModel):
     artist: str
     confidence: float
     confidence_percent: float
+    confidence_level: str = "none"
     path: str
 
 
@@ -483,6 +506,31 @@ async def list_artists(
 ):
     """Get the list of known artists."""
     return service.list_artists()
+
+
+@router.get(
+    "/vocabulary",
+    response_model=VocabularyResponse,
+    summary="Check whether artists exist in the model's answer set",
+    description="""
+Report the size of the loaded model's artist vocabulary, and for each supplied
+`name`, whether that artist is in it.
+
+An artist that is not in the vocabulary can never be predicted, so every
+identification run over their images will name somebody else. Checking here is
+strictly more informative than reading the nearest wrong match.
+
+`vocabulary_loaded` is false when no real label source is loaded yet (run an
+identification first); in that case `known` is empty rather than answered from
+the placeholder sample list.
+    """,
+)
+async def lookup_artist_vocabulary(
+    name: List[str] = Query(default_factory=list),
+    service: ArtistService = Depends(get_artist_service),
+):
+    """Answer "can this model ever name these artists?"."""
+    return VocabularyResponse(**service.lookup_vocabulary(name))
 
 
 @router.delete("/clear")
