@@ -2550,12 +2550,100 @@ li > .icon {
     color: var(--text-2);
 }
 
-/* [hidden] guard (the documented .btn trap): .btn's own display rule outranks
-   the UA [hidden]{display:none}, so `button.hidden = true` in library-health.js
-   was silently ignored and the recovery control stayed on screen even with
-   nothing left to recover. Same guard as .similar-embed-row / .gallery-action-bar. */
-#btn-metadata-reparse[hidden] {
+/* --- [hidden] guards ------------------------------------------------------
+   The UA rule is `[hidden] { display: none }` at specificity 0-0-1, so ANY
+   class or id rule that sets `display` outranks it and `el.hidden = true`
+   becomes a silent no-op. `#btn-metadata-reparse` and `.similar-embed-row` were
+   each found this way months apart, so a sweep was run over every element the
+   app marks hidden: ten more were leaking, five of them purely because of
+   `.btn`. The `.btn[hidden]` rule below covers that whole family — present and
+   future — instead of naming each button. Guarded by
+   tests/e2e/specs/desktop-layout-guards.spec.ts, which fails if any element
+   carrying `hidden` computes to something other than display:none. */
+.btn[hidden],
+.helper-text[hidden],
+.sepcon-health-results[hidden],
+.dup-summary[hidden],
+.bg-tag-reset-btn[hidden],
+.btn-reset-operation[hidden],
+/* similar/status.js hides these three whenever CLIP is not ready or nothing is
+   indexed yet; without a guard the Similar view showed its tab strip, its stats
+   row and a second "build the index" card on top of the setup CTA. */
+#similar-stats[hidden],
+.similar-tabs[hidden],
+.scope-status-card[hidden] {
     display: none;
+}
+
+#view-dataset .dataset-zoom-toolbar[hidden],
+#view-dataset .dataset-trainer-settings[hidden] {
+    display: none;
+}
+
+/* --- Stuck-job recovery: a secondary action, never a competing one --------
+   Offered inside a progress panel once a job has been stranded in
+   `cancelling`. It sits beside the panel's own Cancel/Hide controls, so it
+   stays on the neutral surface with a hairline border — the amber accent
+   belongs to the primary action alone. */
+
+.btn-reset-operation {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+    padding: 8px 14px;
+    background: var(--surface-2);
+    color: var(--text-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    font-size: 13px;
+    cursor: pointer;
+    transition:
+        background var(--duration-fast) var(--ease-out),
+        border-color var(--duration-fast) var(--ease-out),
+        color var(--duration-fast) var(--ease-out);
+}
+
+.btn-reset-operation:hover:not(:disabled) {
+    background: var(--surface-3);
+    border-color: var(--border-strong);
+    color: var(--text);
+}
+
+.btn-reset-operation:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.bg-tag-reset-btn {
+    background: var(--surface-2);
+    border-color: var(--border);
+    color: var(--text-2);
+}
+
+.bg-tag-reset-btn:hover:not(:disabled) {
+    background: var(--surface-3);
+    color: var(--text);
+}
+
+.bg-tag-reset-btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+/* --- Artist cards: scroll the grid, never stack the rows -----------------
+   .artist-grid declares only grid-template-columns, so every row is an
+   implicit `auto` track. Once the container height is definite and smaller
+   than the content (1366x768 leaves the results panel 160px), Chrome sizes
+   those tracks from each item's automatic minimum -- which `.artist-card`'s
+   own `overflow: hidden` zeroes -- and then hands each row an equal share of
+   the 160px instead of its content height. Measured at 1366x768: 26.5px rows
+   under 135.5px cards, so every card painted over the one below it and only
+   the last row's confidence line stayed readable. Pinning the implicit rows
+   to their content restores the 145.5px pitch and lets the grid's existing
+   overflow-y: auto do the scrolling. */
+.artist-grid {
+    grid-auto-rows: min-content;
 }
 
 /* --- Sidecar caption: adjacent to the prompt, never mistaken for one ------- */

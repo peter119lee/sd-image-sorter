@@ -738,6 +738,7 @@
             </div>
             <span class="bg-tag-progress-text" id="bg-move-progress-text">Moving files...</span>
             <button class="bg-tag-progress-btn bg-tag-stop-btn bg-scan-stop-btn" id="bg-move-cancel" title="Stop moving" data-i18n-title="move.bgStopTitle">⏹</button>
+            <button class="bg-tag-progress-btn bg-tag-reset-btn" id="bg-move-reset" type="button" hidden data-i18n="job.resetStuck" data-i18n-title="job.resetStuckTitle" title="Clear a move that never finished stopping">Reset stuck job</button>
         </div>
 
         <!-- v3.3.2 Phase-1: Delete-to-Trash Progress Bar (gallery selection delete runs as a background job) -->
@@ -747,6 +748,7 @@
             </div>
             <span class="bg-tag-progress-text" id="bg-delete-progress-text">Moving to Trash...</span>
             <button class="bg-tag-progress-btn bg-tag-stop-btn bg-scan-stop-btn" id="bg-delete-cancel" title="Stop deleting" data-i18n-title="delete.bgStopTitle">⏹</button>
+            <button class="bg-tag-progress-btn bg-tag-reset-btn" id="bg-delete-reset" type="button" hidden data-i18n="job.resetStuck" data-i18n-title="job.resetStuckTitle" title="Clear a delete that never finished stopping">Reset stuck job</button>
         </div>
 
         <!-- v3.3.2 Phase-1: Remove-from-Gallery Progress Bar (gallery selection remove runs as a background job) -->
@@ -756,6 +758,7 @@
             </div>
             <span class="bg-tag-progress-text" id="bg-remove-progress-text">Removing from gallery...</span>
             <button class="bg-tag-progress-btn bg-tag-stop-btn bg-scan-stop-btn" id="bg-remove-cancel" title="Stop removing" data-i18n-title="remove.bgStopTitle">⏹</button>
+            <button class="bg-tag-progress-btn bg-tag-reset-btn" id="bg-remove-reset" type="button" hidden data-i18n="job.resetStuck" data-i18n-title="job.resetStuckTitle" title="Clear a remove that never finished stopping">Reset stuck job</button>
         </div>
 
         <!-- Main Content Area -->
@@ -7714,6 +7717,7 @@
     <script src="/static/js/app/tagger-defaults.js"></script>
     <script src="/static/js/app/selection.js"></script>
     <script src="/static/js/app/view-switch.js"></script>
+    <script src="/static/js/app/stuck-job-reset.js"></script>
     <script src="/static/js/app/gallery-bulk-actions.js"></script>
     <script src="/static/js/app/gallery-bulk-jobs.js"></script>
     <script src="/static/js/app/nav-toolbar.js"></script>

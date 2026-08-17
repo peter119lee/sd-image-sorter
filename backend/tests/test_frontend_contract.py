@@ -2529,3 +2529,113 @@ def test_artist_copy_no_longer_tells_users_to_lower_the_threshold():
             assert "0.02" not in match.group("value"), (
                 f"{pack_name}:{key} still recommends the obsolete low-threshold band"
             )
+
+
+# Every job whose cancel publishes a non-terminal ``cancelling`` state that only
+# its worker can clear, paired with the endpoint that clears it when the worker
+# is gone. Tag export is deliberately absent: it has no ``cancelling`` state, so
+# the only way it strands is stuck at ``running`` -- exactly what its reset
+# refuses with 409 -- and a button that can only ever be refused is not a
+# recovery path. See .plans/sd-image-sorter-release/decisions.md.
+STUCK_JOB_RESET_ENDPOINTS = (
+    "/api/move/reset",
+    "/api/batch-move/reset",
+    "/api/images/delete-selected/reset",
+    "/api/images/remove-selected/reset",
+)
+
+
+def test_every_stuck_job_reset_endpoint_is_reachable_from_the_ui():
+    """A reset nothing calls is not a fix — it is a restart with extra steps.
+
+    All four endpoints existed and worked for months while no frontend module
+    called any of them, so a stuck job still meant restarting the app. This
+    fails if one is orphaned again.
+    """
+    repo_root = Path(__file__).resolve().parents[2]
+    frontend_js = repo_root / "frontend" / "js"
+    sources = {
+        path: path.read_text(encoding="utf-8")
+        for path in _iter_frontend_js_files(frontend_js)
+    }
+
+    for endpoint in STUCK_JOB_RESET_ENDPOINTS:
+        callers = [
+            path.name for path, source in sources.items() if f"'{endpoint}'" in source
+        ]
+        assert callers, f"no frontend module calls {endpoint}"
+
+    # The recovery control must stay manual. Auto-calling it would hide the real
+    # failure and could race a worker that is still finishing — which is the one
+    # thing the endpoint's 409 exists to refuse.
+    helper = (frontend_js / "app" / "stuck-job-reset.js").read_text(encoding="utf-8")
+    assert "addEventListener('click'" in helper, (
+        "the reset must be user-initiated, never fired by the poller"
+    )
+    assert "apiStatus) === 409" in helper, (
+        "409 has to be told apart from a real failure, or a correct refusal "
+        "renders as a broken feature"
+    )
+
+
+def test_stuck_job_reset_controls_carry_a_hidden_guard():
+    """`.btn`-family display rules outrank the UA `[hidden]` rule.
+
+    The reset buttons start hidden and are revealed only after a stall, so a
+    missing guard would put them on screen permanently — the same defect that
+    kept ``#btn-metadata-reparse`` visible with nothing left to recover.
+    """
+    repo_root = Path(__file__).resolve().parents[2]
+    tokens = (repo_root / "frontend" / "css" / "tokens.css").read_text(encoding="utf-8")
+    for selector in (".bg-tag-reset-btn[hidden]", ".btn-reset-operation[hidden]"):
+        assert selector in tokens, f"{selector} has no display:none guard"
+
+
+def test_manual_sort_undo_failure_reports_the_backend_reason():
+    """"Failed to undo" alone reads as "undo is broken".
+
+    The service answers with an actionable sentence (which file is in the way
+    and what to do about it); the catch used to throw it away.
+    """
+    repo_root = Path(__file__).resolve().parents[2]
+    slot_actions = (
+        repo_root / "frontend" / "js" / "manual-sort" / "slot-actions.js"
+    ).read_text(encoding="utf-8")
+    packs = _locale_pack_sources(repo_root)
+
+    assert "manual.undoFailedWithReason" in slot_actions, (
+        "undo must mirror the move/skip paths and pass {reason} through"
+    )
+    for pack_name, source in packs.items():
+        match = re.search(
+            r"^\s*'manual\.undoFailedWithReason'\s*:\s*'(?P<value>[^']*)'",
+            source,
+            re.MULTILINE,
+        )
+        assert match is not None, f"{pack_name} is missing manual.undoFailedWithReason"
+        assert "{reason}" in match.group("value"), (
+            f"{pack_name}:manual.undoFailedWithReason drops the reason placeholder"
+        )
+
+
+def test_autosep_error_panel_uses_the_shared_error_formatter():
+    """It was the one error surface printing the backend string raw.
+
+    ``services/sorting/batch_move.py`` normalizes these causes (single line,
+    basename only, capped at 140 chars) specifically so they survive the
+    jargon/length filter in ``modules/utils/errors.js`` intact.
+    """
+    repo_root = Path(__file__).resolve().parents[2]
+    move_progress = (
+        repo_root / "frontend" / "js" / "autosep" / "move-progress.js"
+    ).read_text(encoding="utf-8")
+
+    formatter = re.search(
+        r"function formatAutosepMoveError\(entry\)\s*\{(?P<body>.*?)\n\}",
+        move_progress,
+        re.DOTALL,
+    )
+    assert formatter is not None
+    assert "formatUserError(error)" in formatter.group("body"), (
+        "the Auto-Separate error panel must route through the shared formatter"
+    )

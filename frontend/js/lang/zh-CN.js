@@ -1071,6 +1071,7 @@ window.I18nLang_zhCN = {
     'manual.undoEmpty': '没有可撤销的操作',
     'manual.undoSuccess': '已撤销上一步',
     'manual.undoFailed': '撤销失败',
+    'manual.undoFailedWithReason': '撤销失败：{reason}',
     'manual.finishSummary': '排序完成：已分类 {sorted} 张，已跳过 {skipped} 张，用时 {time}。',
     'manual.sortingPaused': '排序已暂停，稍后可以继续。',
     'manual.redoEmpty': '没有可重做的操作',
@@ -2295,6 +2296,14 @@ window.I18nLang_zhCN = {
     'remove.bgStopTitle': '停止移除',
     'selection.removeCancelled': '已停止。取消前已移除 {count} 条图片记录。',
     'selection.largeFilteredConfirm': '这将一次性选择当前筛选命中的 {count} 张图片，可能占用较多内存。要继续吗？',
+
+    // Recovery control shown when a job never finishes stopping (see
+    // frontend/js/app/stuck-job-reset.js).
+    'job.resetStuck': '重置卡住的任务',
+    'job.resetStuckTitle': '清除一直停不下来的任务，让你可以重新开始',
+    'job.resetStuckDone': '已清除卡住的任务，可以重新开始了。',
+    'job.resetStuckStillRunning': '这个任务仍在运行。请等它结束后再试。',
+    'job.resetStuckFailed': '无法重置卡住的任务',
 
     // ========================
     // Batch Tag Export Modal

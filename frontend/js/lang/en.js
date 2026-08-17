@@ -1060,6 +1060,7 @@ window.I18nLang_en = {
     'manual.undoEmpty': 'Nothing to undo',
     'manual.undoSuccess': 'Undid last action',
     'manual.undoFailed': 'Failed to undo',
+    'manual.undoFailedWithReason': 'Failed to undo: {reason}',
     'manual.finishSummary': 'Sorting complete. {sorted} sorted, {skipped} skipped in {time}.',
     'manual.sortingPaused': 'Sorting paused. You can resume later.',
     'manual.redoEmpty': 'Nothing to redo',
@@ -2119,6 +2120,14 @@ window.I18nLang_en = {
     'remove.bgStopTitle': 'Stop removing',
     'selection.removeCancelled': 'Stopped. Removed {count} image record(s) before cancelling.',
     'selection.largeFilteredConfirm': 'This will select {count} current filter matches and may use a lot of memory. Continue?',
+
+    // Recovery control shown when a job never finishes stopping (see
+    // frontend/js/app/stuck-job-reset.js).
+    'job.resetStuck': 'Reset stuck job',
+    'job.resetStuckTitle': 'Clear a job that never finished stopping, so you can start again',
+    'job.resetStuckDone': 'Cleared the stuck job. You can start again.',
+    'job.resetStuckStillRunning': 'That job is still running. Wait for it to finish, then try again.',
+    'job.resetStuckFailed': 'Could not reset the stuck job',
 
     // ========================
     // Batch Tag Export Modal

@@ -351,6 +351,20 @@ async function performSkip(fast = false) {
     }
 }
 
+// The backend refuses an undo it cannot perform and says exactly why — e.g.
+// "another file named '00042.png' is already in 'library'. Move or rename it,
+// then undo again." That arrives as the HTTPException detail, wrapped in the
+// service's own "Could not undo last action:" preamble. Strip the preamble so
+// the toast does not state the failure twice; fall back to the whole message
+// if the wording ever changes, because a redundant sentence still beats losing
+// the reason.
+function describeUndoFailure(error) {
+    const raw = typeof error?.message === 'string' ? error.message.trim() : '';
+    if (!raw) return '';
+    const match = /^could not undo last action:\s*(\S[\s\S]*)$/i.exec(raw);
+    return (match ? match[1] : raw).trim();
+}
+
 async function undoLastAction() {
     const { $, API, showToast } = window.App;
 
@@ -375,7 +389,13 @@ async function undoLastAction() {
         showToast(manualSortText('manual.undoSuccess', 'Undid last action', '已撤销上一步'), 'info');
     } catch (error) {
         Logger.error('Failed to undo:', error);
-        showToast(manualSortText('manual.undoFailed', 'Failed to undo', '撤销失败'), 'error');
+        const reason = describeUndoFailure(error);
+        showToast(
+            reason
+                ? formatManualSortI18n('manual.undoFailedWithReason', 'Failed to undo: {reason}', { reason })
+                : manualSortText('manual.undoFailed', 'Failed to undo', '撤销失败'),
+            'error'
+        );
     }
 }
 

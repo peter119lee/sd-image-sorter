@@ -7588,6 +7588,27 @@ html.lang-zh #view-censor .queue-action-btn span {
         align-items: stretch;
     }
 
+    /* The two informational blocks stacked above the results can together take
+       415px of a 696px column (measured at 1366x768 with the first-run card and
+       the model banner both showing), leaving the results panel ~90px — a
+       sliver, not a panel. Let them yield and scroll internally so the grid
+       keeps a workable height. */
+    #view-artist .workspace-start-card,
+    #view-artist .model-health-banner {
+        flex: 0 1 auto;
+        min-height: 0;
+        max-height: 26vh;
+        overflow-y: auto;
+    }
+
+    #view-artist .artist-stats {
+        flex: 0 0 auto;
+    }
+
+    .artist-main {
+        min-height: 232px;
+    }
+
     .artist-controls,
     .artist-results,
     .artist-details {

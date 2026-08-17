@@ -15,6 +15,10 @@
 // State for move operation
 let autosepMoveController = null;
 let autosepMoveTracker = null;
+// Cancel here publishes `cancelling` and leaves the terminal write to the
+// worker, so a dead worker strands this panel — and every later Auto-Separate
+// run — until the app restarts. This tracks how long it has been stranded.
+let autosepMoveStuckWatcher = createStuckJobWatcher();
 
 function showAutosepMoveProgress(total) {
     // The Auto-Separate markup uses .autosep-pane-action-body / -preview-body
@@ -30,6 +34,7 @@ function showAutosepMoveProgress(total) {
 
     const cancelLabel = tKey('autosep.cancel', 'Cancel', '取消');
     const hideLabel = tKey('autosep.hide', 'Hide', '隐藏');
+    const resetLabel = stuckJobResetLabel();
 
     // Check if progress element already exists
     let progressEl = document.getElementById('autosep-move-progress');
@@ -51,6 +56,7 @@ function showAutosepMoveProgress(total) {
             <div class="operation-controls">
                 <button class="btn-cancel-operation" id="btn-cancel-autosep-move">${window.escapeHtml(cancelLabel)}</button>
                 <button class="btn-cancel-operation" id="btn-hide-autosep-move">${window.escapeHtml(hideLabel)}</button>
+                <button class="btn-reset-operation" id="btn-reset-autosep-move" type="button" hidden>${window.escapeHtml(resetLabel)}</button>
             </div>
         `;
         container.appendChild(progressEl);
@@ -58,8 +64,10 @@ function showAutosepMoveProgress(total) {
         // Re-localize labels in case language changed since last time.
         const existingCancelBtn = document.getElementById('btn-cancel-autosep-move');
         const existingHideBtn = document.getElementById('btn-hide-autosep-move');
+        const existingResetBtn = document.getElementById('btn-reset-autosep-move');
         if (existingCancelBtn) existingCancelBtn.textContent = cancelLabel;
         if (existingHideBtn) existingHideBtn.textContent = hideLabel;
+        if (existingResetBtn) existingResetBtn.textContent = resetLabel;
     }
 
     progressEl.classList.add('visible');
@@ -105,6 +113,18 @@ function showAutosepMoveProgress(total) {
             hideAutosepMoveProgress();
         };
     }
+    const resetBtn = document.getElementById('btn-reset-autosep-move');
+    setStuckJobResetVisible(resetBtn, false);
+    autosepMoveStuckWatcher = createStuckJobWatcher();
+    bindStuckJobResetButton(resetBtn, {
+        endpoint: '/api/batch-move/reset',
+        onCleared: () => {
+            // The job is gone, so the panel has nothing left to report: fold it
+            // away and let the user start a new run.
+            if (autosepMoveController) autosepMoveController.active = false;
+            hideAutosepMoveProgress();
+        },
+    });
 }
 
 function hideAutosepMoveProgress() {
@@ -112,6 +132,8 @@ function hideAutosepMoveProgress() {
     if (progressEl) {
         progressEl.classList.remove('visible');
     }
+    setStuckJobResetVisible(document.getElementById('btn-reset-autosep-move'), false);
+    autosepMoveStuckWatcher = createStuckJobWatcher();
     if (autosepMoveTracker && typeof window.App?.resetProgressTracker === 'function') {
         window.App.resetProgressTracker(autosepMoveTracker);
     }
@@ -130,7 +152,14 @@ function formatAutosepMoveError(entry) {
         throw new TypeError('Auto-Separate error detail requires non-empty filename and error fields');
     }
 
-    return `${filename}: ${error}`;
+    // This panel used to be the one error surface that printed the backend
+    // string raw, so it missed the shared localization and message mapping
+    // every other surface gets. No context label: the panel already sits under
+    // the move it belongs to, and the filename below is the subject.
+    // services/sorting/batch_move.py normalizes these causes (single line,
+    // basename only, capped at 140 chars) precisely so they survive the
+    // jargon/length filter in modules/utils/errors.js intact.
+    return `${filename}: ${formatUserError(error)}`;
 }
 
 function preserveAutosepMoveErrorDetails() {
@@ -254,6 +283,15 @@ async function pollAutosepMoveProgress(expectedTotal, destination) {
             } else {
                 idlePolls = 0;
             }
+
+            // `cancelling` is not a terminal status, so a worker that died
+            // holding it keeps this loop and this panel alive forever, and
+            // every later batch move is refused with 409. Offer the reset once
+            // the state has genuinely stopped moving.
+            setStuckJobResetVisible(
+                document.getElementById('btn-reset-autosep-move'),
+                isStuckJobStalled(autosepMoveStuckWatcher, progress.status)
+            );
 
             if (progress.status === 'done') {
                 setTimeout(() => {

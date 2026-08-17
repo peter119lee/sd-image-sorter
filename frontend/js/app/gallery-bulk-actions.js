@@ -101,6 +101,13 @@ async function deleteGalleryImagesByIds(imageIds) {
                 await API.startDeleteJob(ids, { selectionToken });
                 result = await pollDeleteProgressUntilDone();
             }
+            if (result?.status === 'reset') {
+                // Stranded job cleared by the user; the reset control already
+                // reported it and there is no run result to summarize.
+                await loadImages();
+                loadStats();
+                return;
+            }
             if (result?.status === 'error') {
                 showToast(
                     formatUserError(null, appT('selection.deleteFailed', 'Failed to move selected image files to Trash')),
@@ -207,6 +214,13 @@ async function removeGalleryImagesByIds(imageIds) {
             } else {
                 await API.startRemoveJob(ids, { selectionToken });
                 result = await pollRemoveProgressUntilDone();
+            }
+            if (result?.status === 'reset') {
+                // Stranded job cleared by the user; the reset control already
+                // reported it and there is no run result to summarize.
+                await loadImages();
+                await loadStats();
+                return;
             }
             if (result?.status === 'error') {
                 showToast(
@@ -339,6 +353,16 @@ async function moveOrCopyGalleryImages(imageIds, operation = 'move', options = {
             if (start?.status !== 'done') {
                 finalProgress = await pollMoveProgressUntilDone();
             }
+            if (finalProgress?.status === 'reset') {
+                // The user cleared a job stranded in `cancelling`. The reset
+                // control already reported the outcome, and there is no run
+                // result to summarize; refresh so partially-moved files show
+                // their new locations.
+                resetSelectionDataCache();
+                await loadImages();
+                await loadStats();
+                return;
+            }
             if (finalProgress?.status === 'error') {
                 showToast(
                     finalProgress.message || appT('selection.moveCopyFailed', 'Failed to {operation} selected images')
@@ -421,6 +445,20 @@ async function moveOrCopyGalleryImages(imageIds, operation = 'move', options = {
     });
 }
 
+// The three background bars below all poll a job that `cancel` can strand in
+// `cancelling` forever. Each keeps its own stall watcher so the recovery button
+// appears only on the bar whose job is actually stuck.
+const _bgMoveStuckWatcher = createStuckJobWatcher();
+const _bgDeleteStuckWatcher = createStuckJobWatcher();
+const _bgRemoveStuckWatcher = createStuckJobWatcher();
+
+function _syncBgJobResetButton(buttonSelector, watcher, progress, { endpoint, onCleared }) {
+    const button = $(buttonSelector);
+    if (!button) return;
+    bindStuckJobResetButton(button, { endpoint, onCleared });
+    setStuckJobResetVisible(button, isStuckJobStalled(watcher, progress?.status));
+}
+
 // v3.3.0 USR-1: floating move/copy progress bar (mirrors bg-scan-progress).
 function _showBgMoveProgress() {
     const bar = $('#bg-move-progress');
@@ -430,6 +468,8 @@ function _showBgMoveProgress() {
 function _hideBgMoveProgress() {
     const bar = $('#bg-move-progress');
     if (bar) bar.style.display = 'none';
+    setStuckJobResetVisible($('#bg-move-reset'), false);
+    _bgMoveStuckWatcher.cancellingSince = 0;
 }
 
 function _updateBgMoveProgress(progress) {
@@ -462,6 +502,7 @@ function _updateBgMoveProgress(progress) {
 async function pollMoveProgressUntilDone() {
     _showBgMoveProgress();
     const TERMINAL = new Set(['done', 'cancelled', 'error', 'idle']);
+    let stuckReset = false;
     try {
         // Loop until the job reports a terminal state. 300ms cadence matches
         // the scan/batch-move pollers.
@@ -471,6 +512,15 @@ async function pollMoveProgressUntilDone() {
             _updateBgMoveProgress(progress);
             if (TERMINAL.has(progress?.status)) {
                 return progress;
+            }
+            // `cancelling` is not terminal, so a worker that died holding it
+            // keeps this loop running forever. Offer the manual reset instead.
+            _syncBgJobResetButton('#bg-move-reset', _bgMoveStuckWatcher, progress, {
+                endpoint: '/api/move/reset',
+                onCleared: () => { stuckReset = true; },
+            });
+            if (stuckReset) {
+                return { status: 'reset', results: [] };
             }
             await new Promise((resolve) => setTimeout(resolve, 300));
         }
@@ -489,6 +539,8 @@ function _showBgDeleteProgress() {
 function _hideBgDeleteProgress() {
     const bar = $('#bg-delete-progress');
     if (bar) bar.style.display = 'none';
+    setStuckJobResetVisible($('#bg-delete-reset'), false);
+    _bgDeleteStuckWatcher.cancellingSince = 0;
 }
 
 function _updateBgDeleteProgress(progress) {
@@ -514,6 +566,7 @@ function _updateBgDeleteProgress(progress) {
 async function pollDeleteProgressUntilDone() {
     _showBgDeleteProgress();
     const TERMINAL = new Set(['done', 'cancelled', 'error', 'idle']);
+    let stuckReset = false;
     try {
         // eslint-disable-next-line no-constant-condition
         while (true) {
@@ -521,6 +574,13 @@ async function pollDeleteProgressUntilDone() {
             _updateBgDeleteProgress(progress);
             if (TERMINAL.has(progress?.status)) {
                 return progress;
+            }
+            _syncBgJobResetButton('#bg-delete-reset', _bgDeleteStuckWatcher, progress, {
+                endpoint: '/api/images/delete-selected/reset',
+                onCleared: () => { stuckReset = true; },
+            });
+            if (stuckReset) {
+                return { status: 'reset', deleted: 0, failed: [] };
             }
             await new Promise((resolve) => setTimeout(resolve, 300));
         }
@@ -538,6 +598,8 @@ function _showBgRemoveProgress() {
 function _hideBgRemoveProgress() {
     const bar = $('#bg-remove-progress');
     if (bar) bar.style.display = 'none';
+    setStuckJobResetVisible($('#bg-remove-reset'), false);
+    _bgRemoveStuckWatcher.cancellingSince = 0;
 }
 
 function _updateBgRemoveProgress(progress) {
@@ -563,6 +625,7 @@ function _updateBgRemoveProgress(progress) {
 async function pollRemoveProgressUntilDone() {
     _showBgRemoveProgress();
     const TERMINAL = new Set(['done', 'cancelled', 'error', 'idle']);
+    let stuckReset = false;
     try {
         // eslint-disable-next-line no-constant-condition
         while (true) {
@@ -570,6 +633,13 @@ async function pollRemoveProgressUntilDone() {
             _updateBgRemoveProgress(progress);
             if (TERMINAL.has(progress?.status)) {
                 return progress;
+            }
+            _syncBgJobResetButton('#bg-remove-reset', _bgRemoveStuckWatcher, progress, {
+                endpoint: '/api/images/remove-selected/reset',
+                onCleared: () => { stuckReset = true; },
+            });
+            if (stuckReset) {
+                return { status: 'reset', removed: 0, missing_ids: [] };
             }
             await new Promise((resolve) => setTimeout(resolve, 300));
         }
