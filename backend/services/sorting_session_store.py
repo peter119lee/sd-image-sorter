@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import time
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
 
@@ -68,10 +70,60 @@ def read_persisted_session(path: Path) -> Dict[str, Any]:
 
 
 def write_persisted_session(path: Path, data: Dict[str, Any]) -> None:
-    """Write a persisted sort-session JSON file."""
+    """Write a persisted sort-session JSON file through a sibling temp file.
+
+    This runs after every manual-sort keypress, so writing straight at the live
+    file left it truncated for the whole duration of each save: a crash, power
+    loss or closed console during that window made the undo history
+    unreadable. Same temp-then-``replace`` convention as
+    dataset_session.manifest_store.
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8") as handle:
-        json.dump(data, handle)
+    temp_path = path.with_name(f".{path.name}.tmp")
+    try:
+        with temp_path.open("w", encoding="utf-8") as handle:
+            json.dump(data, handle)
+            handle.flush()
+            try:
+                os.fsync(handle.fileno())
+            except OSError:
+                pass
+        temp_path.replace(path)
+    except BaseException:
+        temp_path.unlink(missing_ok=True)
+        raise
+
+
+def quarantine_unreadable_session_file(path: Path, reason: str) -> Optional[Path]:
+    """Move an unparseable session file aside and report it.
+
+    The undo stack is the only record that makes a manual-sort session
+    reversible, so an unreadable file is preserved next to the original instead
+    of being deleted like an unsupported-schema one. Taking it out of the load
+    path also stops every later start failing on the same bytes. Returns the
+    quarantine path, or ``None`` when the file could not be moved.
+    """
+    stamp = time.strftime("%Y%m%d-%H%M%S")
+    quarantine_path = path.with_name(f"{path.name}.corrupt-{stamp}")
+    counter = 1
+    while quarantine_path.exists():
+        quarantine_path = path.with_name(f"{path.name}.corrupt-{stamp}-{counter}")
+        counter += 1
+    try:
+        path.replace(quarantine_path)
+    except OSError as exc:
+        logger.error(
+            "Manual sort session at %s could not be restored (%s) and could not be "
+            "moved aside either (%s); the undo history is unavailable.",
+            path, reason, exc,
+        )
+        return None
+    logger.error(
+        "Manual sort session at %s could not be restored (%s). The unreadable file was "
+        "kept at %s and the undo history for that session is unavailable.",
+        path, reason, quarantine_path,
+    )
+    return quarantine_path
 
 
 def discard_persisted_session_files(reason: str, paths: Iterable[Path]) -> None:
@@ -101,6 +153,7 @@ __all__ = [
     "find_existing_session_file",
     "get_session_file_candidates",
     "parse_persisted_session_version",
+    "quarantine_unreadable_session_file",
     "read_persisted_session",
     "remove_session_files",
     "write_persisted_session",

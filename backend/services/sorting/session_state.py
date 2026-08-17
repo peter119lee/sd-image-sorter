@@ -24,6 +24,7 @@ from services.sorting_models import (
 )
 from services.sorting_session_store import (
     SORT_SESSION_SCHEMA_VERSION,
+    quarantine_unreadable_session_file,
     read_persisted_session,
 )
 from utils.path_validation import normalize_user_path, validate_folder_path
@@ -310,7 +311,16 @@ class SessionStateMixin:
                 if not session_file.exists():
                     continue
                 try:
-                    data = read_persisted_session(session_file)
+                    try:
+                        data = read_persisted_session(session_file)
+                        if not isinstance(data, dict):
+                            raise ValueError("Persisted session is not a JSON object")
+                    except ValueError as exc:
+                        # Unparseable content (the truncated-file case): keep the
+                        # bytes, take them out of the load path, and say so at
+                        # ERROR instead of dropping the undo history in silence.
+                        quarantine_unreadable_session_file(session_file, str(exc))
+                        continue
 
                     try:
                         session_version = self._parse_persisted_session_version(data)

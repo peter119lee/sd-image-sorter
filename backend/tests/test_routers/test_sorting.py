@@ -3431,6 +3431,73 @@ def test_coerce_unknown_mode_falls_back_to_slot():
     assert coerced["mode"] == "slot"
 
 
+def test_persisted_session_write_survives_a_crash_mid_dump(tmp_path: Path, monkeypatch):
+    """A kill during the after-every-keypress save must not eat the undo history.
+
+    ``open("w")`` truncated the live session file before the first byte of the
+    new payload was written, so any interruption left an unparseable file.
+    """
+    from services import sorting_session_store as store
+
+    session_path = tmp_path / "sort-session.json"
+    payload = {
+        "session_schema_version": store.SORT_SESSION_SCHEMA_VERSION,
+        "active": True,
+        "history": [{"image_id": 7, "original_path": "/library/00042.png"}],
+    }
+    store.write_persisted_session(session_path, payload)
+    original_bytes = session_path.read_bytes()
+
+    def die_mid_dump(_data, handle, **_kwargs):
+        handle.write('{"session_schema_version": 1, "active": true, "hist')
+        raise OSError("simulated power loss")
+
+    monkeypatch.setattr(store.json, "dump", die_mid_dump)
+
+    with pytest.raises(OSError):
+        store.write_persisted_session(session_path, payload)
+
+    assert session_path.read_bytes() == original_bytes
+    assert store.read_persisted_session(session_path)["history"] == payload["history"]
+    assert [entry.name for entry in tmp_path.iterdir()] == [session_path.name]
+
+
+def test_unreadable_session_file_is_preserved_and_reported(tmp_path: Path, monkeypatch, caplog):
+    """An unparseable session file must not be silently dropped and re-failed.
+
+    Before: the generic handler logged a warning, kept the empty default
+    session, and left the broken file in place so every later start failed the
+    same way. The undo stack that could reverse the sort was simply gone.
+    """
+    import logging
+
+    from services import sorting_service as sorting_module
+    from services.sorting_service import SortingService
+
+    session_path = tmp_path / "sort-session.json"
+    truncated = '{"session_schema_version": 1, "active": true, "history": [{"image_id'
+    session_path.write_text(truncated, encoding="utf-8")
+
+    monkeypatch.setattr(sorting_module, "SESSION_FILE", str(session_path))
+    monkeypatch.setattr(sorting_module, "LEGACY_SESSION_FILE", str(session_path))
+    service = SortingService()
+
+    with caplog.at_level(logging.ERROR):
+        service.load_session_from_disk()
+
+    assert service.get_sort_session()["active"] is False
+    # The broken file is out of the load path, so the next start is clean...
+    assert not session_path.exists()
+    # ...but the bytes are kept instead of thrown away.
+    quarantined = list(tmp_path.glob("sort-session.json.corrupt-*"))
+    assert len(quarantined) == 1
+    assert quarantined[0].read_text(encoding="utf-8") == truncated
+    assert any(
+        record.levelno >= logging.ERROR and "could not be restored" in record.getMessage()
+        for record in caplog.records
+    )
+
+
 # ---------------------------------------------------------------------------
 # v3.3.2 Sort & Cull Workbench — WB-S2: A/B "King-of-Hill" bracket mode.
 # A champion stays; each remaining candidate challenges it; N-1 comparisons →
