@@ -31,6 +31,7 @@ from model_download_sources import (
     get_hf_endpoint_order,
     log_model_artifact_status,
 )
+from tagger_download import _validated_model_revision
 
 logger = logging.getLogger("oppai_oracle_tagger")
 
@@ -81,7 +82,8 @@ class _LoaderMixin:
             return False
 
     def _download_with_fallback(
-        self, *, repo_id: str, filename: str, local_dir: str
+        self, *, repo_id: str, filename: str, local_dir: str,
+        revision: Optional[str] = None,
     ) -> str:
         assert _svc().hf_hub is not None
         endpoints = get_hf_endpoint_order(model_name=f"OppaiOracle {self.model_name}")
@@ -97,16 +99,19 @@ class _LoaderMixin:
                     "Downloading %s from %s via %s",
                     filename, repo_id, endpoint_label(endpoint),
                 )
-                resolved_path = _svc().hf_hub.hf_hub_download(
-                    repo_id=repo_id,
-                    filename=filename,
-                    local_dir=local_dir,
-                    endpoint=endpoint,
-                )
+                kwargs: Dict[str, Any] = {
+                    "repo_id": repo_id,
+                    "filename": filename,
+                    "local_dir": local_dir,
+                    "endpoint": endpoint,
+                }
+                if revision is not None:
+                    kwargs["revision"] = revision
+                resolved_path = _svc().hf_hub.hf_hub_download(**kwargs)
                 log_model_artifact_status(
                     logger,
                     model_id=self.model_name,
-                    revision=None,
+                    revision=revision,
                     endpoint=endpoint,
                     model_dir=Path(local_dir),
                     required_files=(filename,),
@@ -130,6 +135,7 @@ class _LoaderMixin:
                 f"Available: {[n for n,c in TAGGER_MODELS.items() if c.get('runtime_backend') == 'oppai-oracle']}"
             )
         repo_id = model_cfg["repo_id"]
+        revision = _validated_model_revision(self.model_name, model_cfg)
         subfolder = str(model_cfg.get("repo_subfolder") or "").strip("/\\")
         model_file = model_cfg["model_file"]
         tags_file = model_cfg["tags_file"]
@@ -149,6 +155,7 @@ class _LoaderMixin:
             logger.info("Downloading OppaiOracle model %s ...", self.model_name)
             model_path = self._download_with_fallback(
                 repo_id=repo_id, filename=_hf_filename(model_file), local_dir=local_dir,
+                revision=revision,
             )
             if not self._validate_model_file(model_path):
                 raise RuntimeError("Downloaded OppaiOracle model file is invalid.")
@@ -156,13 +163,14 @@ class _LoaderMixin:
         if not os.path.isfile(tags_path) or os.path.getsize(tags_path) <= 0:
             tags_path = self._download_with_fallback(
                 repo_id=repo_id, filename=_hf_filename(tags_file), local_dir=local_dir,
+                revision=revision,
             )
 
         required_files = (_hf_filename(model_file), _hf_filename(tags_file))
         missing = log_model_artifact_status(
             logger,
             model_id=self.model_name,
-            revision=None,
+            revision=revision,
             endpoint="local",
             model_dir=Path(local_dir),
             required_files=required_files,
@@ -184,6 +192,7 @@ class _LoaderMixin:
             try:
                 self._download_with_fallback(
                     repo_id=repo_id, filename=_hf_filename(extra), local_dir=local_dir,
+                    revision=revision,
                 )
             except Exception as exc:
                 logger.warning("Optional file %s not available: %s", extra, exc)

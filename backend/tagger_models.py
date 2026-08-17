@@ -11,12 +11,24 @@ tests/test_config_pins.py Groups H and I. After an ``importlib.reload(config)``
 (tests/test_artist_gpu_toggle.py, tests/test_main_logging.py) the facade now
 rebinds to this module's unchanged object, so the pre-split reload divergence
 (report finding F1) is reduced, not worsened.
+
+Every entry pins ``revision`` to a 40-character commit hash. An unpinned entry
+resolves the repo's ``main``, which means an upstream re-upload silently changes
+what a user's tagger produces and can invalidate the measured operating points
+recorded in the comments below. The 2026-08-17 pinning pass took each hash from
+the installed copy where one exists (the commit is recorded in
+``data/models/**/.cache/huggingface/download/*.metadata``) and cross-checked it
+against the HuggingFace model API; entries with no local copy were pinned to the
+upstream head, i.e. exactly what ``main`` already resolved to, so no model
+version changed. When bumping a model, benchmark the new revision before
+changing the hash - the thresholds here were tuned against these weights.
 """
 
 TAGGER_MODELS: dict = {
     "wd-eva02-large-tagger-v3": {
         "writer_family": "wd14",
         "repo_id": "SmilingWolf/wd-eva02-large-tagger-v3",
+        "revision": "b25b82a03f7282e41aa2f257a52c7583b710bd1c",
         "model_file": "model.onnx",
         "tags_file": "selected_tags.csv",
         "runtime_safety_tier": "heavy",
@@ -40,6 +52,7 @@ TAGGER_MODELS: dict = {
     "wd-convnext-tagger-v3": {
         "writer_family": "wd14",
         "repo_id": "SmilingWolf/wd-convnext-tagger-v3",
+        "revision": "d39e46de298d27340111b64965e20b8185c407e6",
         "model_file": "model.onnx",
         "tags_file": "selected_tags.csv",
         "runtime_safety_tier": "balanced",
@@ -51,6 +64,7 @@ TAGGER_MODELS: dict = {
     "wd-vit-tagger-v3": {
         "writer_family": "wd14",
         "repo_id": "SmilingWolf/wd-vit-tagger-v3",
+        "revision": "7f6b584d0bd3f55c4531f14ba3d4761b2bccdc0f",
         "model_file": "model.onnx",
         "tags_file": "selected_tags.csv",
         "runtime_safety_tier": "light",
@@ -62,6 +76,7 @@ TAGGER_MODELS: dict = {
     "wd-vit-large-tagger-v3": {
         "writer_family": "wd14",
         "repo_id": "SmilingWolf/wd-vit-large-tagger-v3",
+        "revision": "ae469aa2e4706a3af08d3673cf73a11d1add314c",
         "model_file": "model.onnx",
         "tags_file": "selected_tags.csv",
         "runtime_safety_tier": "balanced",
@@ -73,6 +88,7 @@ TAGGER_MODELS: dict = {
     "camie-tagger-v2": {
         "writer_family": "camie",
         "repo_id": "Camais03/camie-tagger-v2",
+        "revision": "7d40c1b85b86ab4f607b2caf26b1b50c99db743e",
         "model_file": "camie-tagger-v2.onnx",
         "tags_file": "camie-tagger-v2-metadata.json",
         "runtime_safety_tier": "heavy",
@@ -98,6 +114,7 @@ TAGGER_MODELS: dict = {
     "pixai-tagger-v0.9": {
         "writer_family": "pixai",
         "repo_id": "deepghs/pixai-tagger-v0.9-onnx",
+        "revision": "d8cf666911a2c3d10d586d7823259192313c7eb7",
         "model_file": "model.onnx",
         "tags_file": "selected_tags.csv",
         "runtime_safety_tier": "heavy",
@@ -120,6 +137,12 @@ TAGGER_MODELS: dict = {
     },
     "toriigate-0.5": {
         "repo_id": "Minthy/ToriiGate-0.5",
+        # ToriiGate downloads via snapshot_download in toriigate_tagger.py
+        # rather than the shared tagger download path, so the constant
+        # TORIIGATE_COMMIT_HASH reads this value back instead of duplicating
+        # it. Deliberately NOT the upstream head: trust_remote_code=True means
+        # the repo can execute code on load, so the pin is a reviewed commit.
+        "revision": "667e771497abcfa38637e1d308cb495beb68d803",
         "model_file": "config.json",
         "tags_file": "",
         "runtime_backend": "toriigate",
@@ -174,6 +197,7 @@ TAGGER_MODELS: dict = {
         # WD14-style single input, so we route it through a dedicated
         # OppaiOracleTagger class via runtime_backend = "oppai-oracle".
         "repo_id": "Grio43/OppaiOracle",
+        "revision": "96992fa30568c386e9fe7c8a1a68f798a3202c09",
         "repo_subfolder": "V1.1_onnx",
         "model_file": "model.onnx",
         "tags_file": "selected_tags.csv",

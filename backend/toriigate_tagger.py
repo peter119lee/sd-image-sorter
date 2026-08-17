@@ -31,8 +31,10 @@ logger = logging.getLogger(__name__)
 
 # SECURITY: Pin HuggingFace model revision to prevent supply-chain attacks.
 # snapshot_download() fetches from a remote repo; without a pinned commit, a
-# compromised or hijacked repo could serve malicious model files.
-TORIIGATE_COMMIT_HASH = "667e771497abcfa38637e1d308cb495beb68d803"
+# compromised or hijacked repo could serve malicious model files. The hash lives
+# in the catalog so the model-inventory tooling sees the same pin the downloader
+# uses; reading it back here keeps the two from drifting apart.
+TORIIGATE_COMMIT_HASH = TAGGER_MODELS["toriigate-0.5"]["revision"]
 TORIIGATE_REQUIRED_FILES = (
     "config.json",
     "model.safetensors",
