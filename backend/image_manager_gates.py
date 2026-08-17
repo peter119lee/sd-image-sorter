@@ -58,8 +58,41 @@ def _has_source_fingerprint(existing: Optional[Dict[str, Any]]) -> bool:
         return False
 
 
-def _is_unchanged_scan_hit(existing: Optional[Dict[str, Any]], stat_result: os.stat_result) -> bool:
-    """Skip reparsing files whose source fingerprint and metadata status still match."""
+def _sidecar_fingerprint_changed(
+    existing: Optional[Dict[str, Any]],
+    sidecar_fingerprint: Optional[str],
+) -> bool:
+    """Return True when the sidecars beside the image differ from the indexed ones.
+
+    ``sidecar_fingerprint`` is the value ``compute_sidecar_fingerprint`` just
+    read off the disk: ``''`` for "no sidecar", a digest when there is one, and
+    ``None`` for "could not look" — which can never justify a re-read.
+
+    A stored NULL means the row predates migration 043, and every one of the
+    owner's 6,842 rows reads NULL right after it. Re-parsing all of them would
+    make the first rescan after upgrading cost a full re-import, so an
+    un-fingerprinted row is only re-read when it actually has a sidecar now:
+    that is the whole population whose caption text may be missing or stale.
+    """
+    if sidecar_fingerprint is None:
+        return False
+    stored = existing.get("sidecar_fingerprint") if existing else None
+    if stored is None:
+        return bool(sidecar_fingerprint)
+    return str(stored) != str(sidecar_fingerprint)
+
+
+def _is_unchanged_scan_hit(
+    existing: Optional[Dict[str, Any]],
+    stat_result: os.stat_result,
+    sidecar_fingerprint: Optional[str] = None,
+) -> bool:
+    """Skip reparsing files whose source fingerprint and metadata status still match.
+
+    ``sidecar_fingerprint`` defaults to None ("not questioned") so callers that
+    only care about the image bytes keep their behaviour; the scan pipeline
+    always passes the freshly computed value.
+    """
     if not existing or not existing.get("is_readable", 1):
         return False
     if existing.get("metadata_status") != "complete":
@@ -67,6 +100,8 @@ def _is_unchanged_scan_hit(existing: Optional[Dict[str, Any]], stat_result: os.s
     if _needs_content_fingerprint_backfill(existing):
         return False
     if _needs_metadata_parser_upgrade(existing):
+        return False
+    if _sidecar_fingerprint_changed(existing, sidecar_fingerprint):
         return False
     return _source_fingerprint_matches(existing, stat_result)
 

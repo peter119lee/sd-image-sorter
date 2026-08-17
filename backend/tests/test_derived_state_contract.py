@@ -32,8 +32,15 @@ from services.derived_state_service import (
 )
 
 
+# The two length bounds are only there to stop the scanner running away across
+# unrelated code; they are not a statement about the statements. They used to be
+# 900/500, which the scan upsert in db_images_write._upsert_image_record had
+# almost outgrown: adding one more column to its SET list (migration 043's
+# `sidecar_fingerprint`) pushed it past the tail bound and dropped the app's
+# largest `content_fingerprint` writer out of this audit entirely, silently. A
+# wider window can only ever find more statements, never fewer.
 DERIVED_IMAGE_UPDATE_RE = re.compile(
-    r"UPDATE\s+images\s+SET[\s\S]{0,900}?content_fingerprint[\s\S]{0,500}?"
+    r"UPDATE\s+images\s+SET[\s\S]{0,1400}?content_fingerprint[\s\S]{0,1000}?"
     r"WHERE\s+id\s*=\s*\?(?:\s+AND\s+content_fingerprint\s*(?:=\s*\?|IS\s+NULL))?",
     re.IGNORECASE | re.MULTILINE,
 )
@@ -60,6 +67,11 @@ EXPECTED_DERIVED_IMAGE_UPDATE_STATEMENTS = Counter({
         # Migration 042 added `sidecar_caption` to the same SET list: it is a
         # parsed text field written from the scan record like `prompt`, not a
         # derived-state field, so this stays one writer with one owner.
+        # Migration 043 added `sidecar_fingerprint` next to it. That IS a
+        # fingerprint, but of the caption files beside the image rather than of
+        # the image's own pixels: it gates whether the scan re-reads a sidecar
+        # and never participates in derived-state invalidation, so it belongs to
+        # the scan upsert and adds no new `content_fingerprint` writer.
         "db_images_write.py",
         "UPDATE images SET filename = ?, generator = ?, prompt = ?, sidecar_caption = ?, negative_prompt = ?, "
         "metadata_json = ?, width = ?, height = ?, file_size = ?, checkpoint = ?, "
@@ -67,6 +79,7 @@ EXPECTED_DERIVED_IMAGE_UPDATE_STATEMENTS = Counter({
         "is_readable = ?, read_error = ?, source_mtime_ns = COALESCE(?, source_mtime_ns), "
         "source_size = COALESCE(?, source_size), metadata_status = ?, "
         "content_fingerprint = COALESCE(?, content_fingerprint), "
+        "sidecar_fingerprint = COALESCE(?, sidecar_fingerprint), "
         "library_order_time = COALESCE(library_order_time, created_at, ?), "
         "source_file_mtime = COALESCE(?, source_file_mtime), "
         "created_at = COALESCE(library_order_time, created_at, ?), "

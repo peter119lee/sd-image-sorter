@@ -68,6 +68,7 @@ def _build_placeholder_record(
             "source_size": int(stat_result.st_size),
             "metadata_status": "pending",
             "content_fingerprint": existing.get("content_fingerprint"),
+            "sidecar_fingerprint": existing.get("sidecar_fingerprint"),
         }
 
     return {
@@ -93,6 +94,9 @@ def _build_placeholder_record(
         "source_size": int(stat_result.st_size),
         "metadata_status": "pending",
         "content_fingerprint": None,
+        # None, not '': the placeholder has not questioned the filesystem about
+        # sidecars, and the metadata stage that does is what should record it.
+        "sidecar_fingerprint": None,
     }
 
 
@@ -118,6 +122,7 @@ def _build_metadata_success_record(
     metadata: Dict[str, Any],
     *,
     content_fingerprint: Optional[str] = None,
+    sidecar_fingerprint: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Convert parsed metadata into a database row update."""
     metadata_json = compact_metadata_json(metadata.get("metadata"))
@@ -149,6 +154,9 @@ def _build_metadata_success_record(
         "source_size": int(stat_result.st_size),
         "metadata_status": "error" if metadata_error else "complete",
         "content_fingerprint": content_fingerprint,
+        # The sidecars this parse actually saw. Storing it here is what lets the
+        # next scan tell an edited caption from an untouched one.
+        "sidecar_fingerprint": sidecar_fingerprint,
         "raw_metadata_gz": _compress_raw_metadata_text(metadata.get("raw_metadata_text")),
     }
 
@@ -187,4 +195,8 @@ def _build_metadata_error_record(
         "source_size": source_size,
         "metadata_status": "error",
         "content_fingerprint": None,
+        # An unreadable row is never an unchanged scan hit, so there is nothing
+        # for a sidecar fingerprint to gate; leaving it None keeps any stored
+        # value (COALESCE in _upsert_image_record) rather than inventing one.
+        "sidecar_fingerprint": None,
     }

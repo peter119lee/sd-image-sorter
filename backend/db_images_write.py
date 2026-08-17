@@ -252,6 +252,10 @@ def _upsert_image_record(
         ):
             _clear_image_derived_state(cursor, image_id)
 
+        # sidecar_fingerprint is COALESCEd rather than assigned: a NULL in the
+        # record means the caller could not question the filesystem about
+        # sidecars, which must not be mistaken for "this image has no sidecar"
+        # (recorded as an empty string by sidecar_fingerprint.py).
         cursor.execute(
             """
             UPDATE images
@@ -274,6 +278,7 @@ def _upsert_image_record(
                 source_size = COALESCE(?, source_size),
                 metadata_status = ?,
                 content_fingerprint = COALESCE(?, content_fingerprint),
+                sidecar_fingerprint = COALESCE(?, sidecar_fingerprint),
                 library_order_time = COALESCE(library_order_time, created_at, ?),
                 source_file_mtime = COALESCE(?, source_file_mtime),
                 created_at = COALESCE(library_order_time, created_at, ?),
@@ -305,6 +310,7 @@ def _upsert_image_record(
                 incoming_source_size,
                 metadata_status,
                 record.get("content_fingerprint"),
+                record.get("sidecar_fingerprint"),
                 record.get("library_order_time"),
                 record.get("source_file_mtime"),
                 record.get("created_at"),
@@ -326,9 +332,9 @@ def _upsert_image_record(
             INSERT INTO images
             (path, filename, generator, prompt, sidecar_caption, negative_prompt, metadata_json,
              width, height, file_size, checkpoint, checkpoint_normalized, loras, model_hash, is_readable, read_error,
-             source_mtime_ns, source_size, metadata_status, content_fingerprint,
+             source_mtime_ns, source_size, metadata_status, content_fingerprint, sidecar_fingerprint,
              library_order_time, source_file_mtime, created_at, raw_metadata_gz, indexed_at, library_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?)
             """,
             (
                 path,
@@ -351,6 +357,7 @@ def _upsert_image_record(
                 record.get("source_size"),
                 metadata_status,
                 record.get("content_fingerprint"),
+                record.get("sidecar_fingerprint"),
                 record.get("library_order_time"),
                 record.get("source_file_mtime"),
                 record.get("created_at"),

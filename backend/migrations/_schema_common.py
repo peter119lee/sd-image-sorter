@@ -41,6 +41,7 @@ FULL_SCHEMA_STATEMENTS: tuple[str, ...] = (
         source_size INTEGER,
         metadata_status TEXT DEFAULT 'complete',
         content_fingerprint TEXT,
+        sidecar_fingerprint TEXT,
         library_order_time DATETIME,
         source_file_mtime DATETIME,
         created_at DATETIME,
@@ -241,6 +242,10 @@ LEGACY_IMAGE_COLUMNS: tuple[tuple[str, str], ...] = (
     ("source_size", "INTEGER"),
     ("metadata_status", "TEXT DEFAULT 'complete'"),
     ("content_fingerprint", "TEXT"),
+    # v3.5.x: digest of the sidecars present when this row was last parsed, so
+    # a .txt written or edited AFTER indexing stops being invisible to the scan
+    # (migration 043). NULL means "never fingerprinted".
+    ("sidecar_fingerprint", "TEXT"),
     ("library_order_time", "DATETIME"),
     ("source_file_mtime", "DATETIME"),
     # v3.2.2: timestamp columns that exist in FULL_SCHEMA but were

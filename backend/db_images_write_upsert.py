@@ -137,7 +137,7 @@ def _get_existing_images_by_paths(
                    width, height, file_size, checkpoint, checkpoint_normalized, loras, model_hash,
                    library_order_time, source_file_mtime, created_at,
                    is_readable, read_error, source_mtime_ns, source_size, metadata_status,
-                   content_fingerprint, tagged_at, ai_caption, aesthetic_score,
+                   content_fingerprint, sidecar_fingerprint, tagged_at, ai_caption, aesthetic_score,
                    COALESCE(library_id, 'main') AS library_id,
                    CASE WHEN embedding IS NOT NULL THEN 1 ELSE 0 END AS has_embedding,
                    EXISTS(SELECT 1 FROM artist_predictions ap WHERE ap.image_id = images.id) AS has_artist_predictions

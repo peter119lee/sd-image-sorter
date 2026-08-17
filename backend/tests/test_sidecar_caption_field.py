@@ -138,6 +138,135 @@ class TestScanPersistsSidecarCaption:
         assert not (row["prompt"] or "").strip()
 
 
+class TestSidecarArrivingAfterIndexingIsSeen:
+    """A sidecar written after the image was indexed used to be invisible forever.
+
+    The scan fingerprint was ``(image mtime, image size)`` only. Writing or
+    editing a ``.txt`` next to an already-indexed image changes neither, so
+    ``_is_unchanged_scan_hit`` reported the row as unchanged and the new caption
+    text was never read - not by this scan, not by any later one. Measured on the
+    owner's library: every one of the 5,242 rows whose file still exists has a
+    ``.txt`` beside it, and 5,214 of those sidecars are newer than the image they
+    describe.
+    """
+
+    LATER_CAPTION = "1girl, blue_hair, twintails, smiling, outdoors, highres"
+    EDITED_CAPTION = "1boy, short_hair, armor, holding sword"
+
+    def test_a_sidecar_written_after_indexing_is_read_on_the_next_scan(
+        self,
+        test_db,
+        tmp_path: Path,
+    ):
+        image_path = _blank_image(tmp_path / "late-sidecar.png")
+        image_manager.scan_folder(str(tmp_path), recursive=False)
+        assert not (_row_for(image_path)["sidecar_caption"] or "").strip()
+        indexed_stat = image_path.stat()
+
+        (tmp_path / "late-sidecar.txt").write_text(
+            self.LATER_CAPTION, encoding="utf-8"
+        )
+        image_manager.scan_folder(str(tmp_path), recursive=False)
+
+        # The image itself is untouched, which is exactly why the old
+        # (mtime, size) fingerprint could not notice.
+        assert image_path.stat().st_mtime_ns == indexed_stat.st_mtime_ns
+        assert image_path.stat().st_size == indexed_stat.st_size
+        row = _row_for(image_path)
+        assert row["sidecar_caption"] == self.LATER_CAPTION
+        assert not (row["prompt"] or "").strip(), (
+            "a re-read must route sidecar text the same way as a first read (21fd5e8)"
+        )
+
+    def test_editing_a_sidecar_after_indexing_replaces_the_stored_text(
+        self,
+        test_db,
+        tmp_path: Path,
+    ):
+        image_path = _blank_image(tmp_path / "edited-sidecar.png")
+        sidecar = tmp_path / "edited-sidecar.txt"
+        sidecar.write_text(DANBOORU_CAPTION, encoding="utf-8")
+        image_manager.scan_folder(str(tmp_path), recursive=False)
+        assert _row_for(image_path)["sidecar_caption"] == DANBOORU_CAPTION
+
+        sidecar.write_text(self.EDITED_CAPTION, encoding="utf-8")
+        image_manager.scan_folder(str(tmp_path), recursive=False)
+
+        row = _row_for(image_path)
+        assert row["sidecar_caption"] == self.EDITED_CAPTION
+        assert not (row["prompt"] or "").strip()
+
+    def test_deleting_a_sidecar_after_indexing_clears_the_stored_text(
+        self,
+        test_db,
+        tmp_path: Path,
+    ):
+        image_path = _blank_image(tmp_path / "removed-sidecar.png")
+        sidecar = tmp_path / "removed-sidecar.txt"
+        sidecar.write_text(DANBOORU_CAPTION, encoding="utf-8")
+        image_manager.scan_folder(str(tmp_path), recursive=False)
+        assert _row_for(image_path)["sidecar_caption"] == DANBOORU_CAPTION
+
+        sidecar.unlink()
+        image_manager.scan_folder(str(tmp_path), recursive=False)
+
+        assert not (_row_for(image_path)["sidecar_caption"] or "").strip()
+
+    def test_an_untouched_sidecar_keeps_the_scan_cheap(
+        self,
+        test_db,
+        tmp_path: Path,
+    ):
+        """The fix must not turn every rescan into a full re-parse."""
+        image_path = _blank_image(tmp_path / "stable-sidecar.png")
+        (tmp_path / "stable-sidecar.txt").write_text(
+            DANBOORU_CAPTION, encoding="utf-8"
+        )
+        image_manager.scan_folder(str(tmp_path), recursive=False)
+
+        result = image_manager.scan_folder(str(tmp_path), recursive=False)
+
+        assert result["unchanged"] == 1
+        assert _row_for(image_path)["sidecar_caption"] == DANBOORU_CAPTION
+
+    def test_an_image_with_no_sidecar_at_all_stays_an_unchanged_hit(
+        self,
+        test_db,
+        tmp_path: Path,
+    ):
+        _blank_image(tmp_path / "bare.png")
+        image_manager.scan_folder(str(tmp_path), recursive=False)
+
+        result = image_manager.scan_folder(str(tmp_path), recursive=False)
+
+        assert result["unchanged"] == 1
+
+    def test_a_legacy_row_with_no_stored_fingerprint_only_rereads_when_a_sidecar_exists(
+        self,
+        test_db,
+        tmp_path: Path,
+    ):
+        """Rows indexed before this column exists must not all re-parse.
+
+        The owner's database is at schema version 41 with 6,842 rows, so every
+        row reads NULL here right after the migration. A NULL means "never
+        fingerprinted", which is only worth paying for when a sidecar is
+        actually present.
+        """
+        bare = _blank_image(tmp_path / "legacy-bare.png")
+        tagged = _blank_image(tmp_path / "legacy-tagged.png")
+        (tmp_path / "legacy-tagged.txt").write_text(DANBOORU_CAPTION, encoding="utf-8")
+        image_manager.scan_folder(str(tmp_path), recursive=False)
+        with db.get_db() as conn:
+            conn.execute("UPDATE images SET sidecar_caption = NULL, sidecar_fingerprint = NULL")
+
+        result = image_manager.scan_folder(str(tmp_path), recursive=False)
+
+        assert result["unchanged"] == 1, "only the row with a sidecar should re-read"
+        assert not (_row_for(bare)["sidecar_caption"] or "").strip()
+        assert _row_for(tagged)["sidecar_caption"] == DANBOORU_CAPTION
+
+
 class TestBothFieldsAreSearchable:
     def _seed(self, *, path: str, prompt=None, caption=None) -> int:
         image_id = db.add_image(

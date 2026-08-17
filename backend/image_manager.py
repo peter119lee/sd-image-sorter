@@ -30,6 +30,7 @@ from database import (
     STALE_PENDING_METADATA_READ_ERROR,
 )
 from image_fingerprint import compute_image_content_fingerprint
+from sidecar_fingerprint import compute_sidecar_fingerprint
 from metadata_storage import compact_metadata_json
 from metadata_parser import PARSED_METADATA_VERSION, parse_image
 from exceptions import ScanError, ScanCancelledError, FileOperationError
@@ -152,6 +153,9 @@ def _parse_metadata_job(job: Dict[str, Any]) -> Dict[str, Any]:
                 stat_result,
                 metadata,
                 content_fingerprint=content_fingerprint,
+                # Recorded from the parse that just ran, so the next scan can
+                # tell an edited or newly-arrived sidecar from an untouched one.
+                sidecar_fingerprint=compute_sidecar_fingerprint(image_path),
             ),
             "error": None,
         }
@@ -871,7 +875,14 @@ def scan_folder(
                     try:
                         stat = cached_stat if cached_stat is not None else os.stat(image_path)
                         existing = existing_rows.get(normalize_indexed_image_path(image_path))
-                        if not force_reparse and _is_unchanged_scan_hit(existing, stat):
+                        # A .txt written or edited after indexing moves neither
+                        # the image's mtime nor its size, so without this the
+                        # row below is a permanent unchanged hit and its caption
+                        # text is never read again.
+                        sidecar_fingerprint = compute_sidecar_fingerprint(image_path)
+                        if not force_reparse and _is_unchanged_scan_hit(
+                            existing, stat, sidecar_fingerprint
+                        ):
                             result["updated"] += 1
                             result["unchanged"] += 1
                             generator = existing.get("generator") or "unknown"
