@@ -31,7 +31,7 @@ from services.dataset_export._constants import (
 )
 from services.dataset_sidecar import (
     MAX_DATASET_SIDECAR_BYTES,
-    dataset_sidecar_tag_rows,
+    dataset_sidecar_caption_rows,
     read_dataset_sidecar,
 )
 from services.tag_export_service import (
@@ -414,7 +414,10 @@ def _render_dataset_sidecar(
                 MAX_DATASET_SIDECAR_BYTES,
             )
             if source_caption is not None:
-                effective_tags = dataset_sidecar_tag_rows(source_caption)
+                # A local item has no ``images`` row, so its caption arrives as
+                # text. How much of it may be treated as a list of tags depends
+                # on the caption's format — see dataset_sidecar_caption_rows.
+                effective_tags = dataset_sidecar_caption_rows(source_caption)
         template_options = (
             _build_dataset_template_options(request, blacklist_set)
             if content_mode == "template"
