@@ -136,7 +136,14 @@ def _find_output_owner(
 
 
 def _output_path_claims(path: str, owner: str) -> Dict[str, str]:
-    """Build the occupancy entries for one written sidecar."""
+    """Build the occupancy entries for one written sidecar.
+
+    Read AFTER the sidecar was written, so the ``file:`` key it records has to
+    still be the identity that any hard-link alias of this destination will
+    report. ``_write_sidecar_atomically`` guarantees that by never
+    rename-publishing over a name that other names link to — see the note
+    there before changing either side.
+    """
     return {key: owner for key in _output_path_keys(path)}
 
 
@@ -265,18 +272,107 @@ def _allocate_output_path(
     return _SidecarAllocation("write", path=primary_path)
 
 
+def _sidecar_payload(content: str) -> bytes:
+    """Encode one caption exactly as the text writer below would.
+
+    newline="\\n" (P3-14): keep sidecars LF on Windows too — some trainer
+    stacks treat a CRLF caption line as content. ``str.encode`` performs no
+    newline translation, so the two writers stay byte-identical.
+    """
+    return content.encode("utf-8")
+
+
+def _destination_has_other_links(target: Path) -> bool:
+    """Return whether other directory entries point at this destination's file."""
+    try:
+        return os.stat(target).st_nlink > 1
+    except OSError:
+        return False
+
+
+def _overwrite_in_place(target: Path, payload: bytes) -> None:
+    """Replace a file's contents without replacing the file itself."""
+    with open(target, "r+b") as handle:
+        handle.write(payload)
+        handle.truncate(len(payload))
+        handle.flush()
+        try:
+            os.fsync(handle.fileno())
+        except OSError:
+            pass
+
+
+def _discard_sidecar_backup(backup_path: Path) -> None:
+    """Drop a backup whose caption is no longer the one on disk.
+
+    The caption itself is already settled by the time this runs, so a backup
+    that refuses to go is left behind rather than turned into a row failure —
+    the same call the dataset export makes after a successful row publish.
+    """
+    try:
+        backup_path.unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
+def _write_sidecar_preserving_links(target: Path, content: str) -> None:
+    """Update a sidecar that other names hard-link to, keeping those links.
+
+    Rename-publishing here would hand this name a private new inode and leave
+    every alias holding the stale caption, so the bytes have to go through the
+    shared file. To keep an interrupted write from truncating the caption the
+    user already had, the previous bytes are first copied to an fsync'd sibling
+    backup and written back if the update fails. That is recovery rather than
+    atomicity: a hard kill mid-write can still leave a partial caption, but the
+    previous one survives beside it as ``.<name>.bak`` instead of being gone.
+    """
+    previous = target.read_bytes()
+    backup_path = target.with_name(f".{target.name}.bak")
+    with open(backup_path, "wb") as handle:
+        handle.write(previous)
+        handle.flush()
+        try:
+            os.fsync(handle.fileno())
+        except OSError:
+            pass
+    try:
+        _overwrite_in_place(target, _sidecar_payload(content))
+    except BaseException:
+        try:
+            _overwrite_in_place(target, previous)
+        except OSError as restore_error:
+            # Keep the backup: it is now the only copy of the user's caption.
+            raise OSError(
+                "Sidecar update failed and the previous caption could not be "
+                f"restored to {target}; it is kept at {backup_path}: {restore_error}"
+            ) from restore_error
+        _discard_sidecar_backup(backup_path)
+        raise
+    _discard_sidecar_backup(backup_path)
+
+
 def _write_sidecar_atomically(path: str, content: str) -> None:
-    """Write one caption sidecar through a sibling temp file.
+    """Publish one caption sidecar without severing hard links.
 
     ``beside_image`` mode writes into the user's own image folders, so writing
     straight at the target truncated whatever caption was already there for the
-    whole duration of the write. Same temp-then-``replace`` convention the
-    combined export below already uses.
+    whole duration of the write. Publishing a fsync'd sibling temp file with
+    ``replace`` fixes that — the same convention the combined export below
+    already uses — but only while the destination name is its file's ONLY name.
 
-    newline="\\n" (P3-14): keep sidecars LF on Windows too — some trainer
-    stacks treat a CRLF caption line as content.
+    ``replace`` points the name at a brand-new inode. Over a destination that
+    other names hard-link to, that silently severs the user's link (each alias
+    keeps the old inode and its stale caption) and, because
+    ``_output_path_keys`` identifies a destination by ``st_dev``/``st_ino``, it
+    also blinds the batch's own alias guard: the second of two aliased
+    destinations no longer looks like a file this run already wrote, so the
+    export reports two successful captions where one of them is stale. A
+    destination with other links is therefore updated in place instead.
     """
     target = Path(path)
+    if _destination_has_other_links(target):
+        _write_sidecar_preserving_links(target, content)
+        return
     temp_path = target.with_name(f".{target.name}.tmp")
     try:
         with open(temp_path, "w", encoding="utf-8", newline="\n") as handle:

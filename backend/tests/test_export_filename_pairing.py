@@ -30,6 +30,8 @@ this fix aligns the ``folder`` mode with the same behavior.
 """
 from __future__ import annotations
 
+import builtins
+import errno
 import os
 from pathlib import Path
 import pytest
@@ -361,6 +363,145 @@ def test_beside_image_overwrite_rejects_hardlinked_sidecar_aliases(
     assert "dup.txt" in message
     assert "dup.png" in message
     assert "already taken" in message
+
+
+def test_beside_image_overwrite_keeps_hardlinked_aliases_as_one_caption(
+    test_client, test_db, tmp_path: Path
+):
+    """The rejected alias must still BE the winner's file, byte for byte.
+
+    An ``exported == 1`` count is not enough on its own. Publishing the caption
+    by rename also produces that count once the batch stops recognising the
+    alias, but it hands the winner a private new inode and leaves the alias
+    holding whatever stale caption was there before — two divergent files where
+    the user had one, reported as a clean export. So this pins the bytes and
+    the shared identity rather than the tally.
+    """
+    id_a, path_a = _stage_image(tmp_path, "a", "dup.png", "alpha_tag")
+    id_b, path_b = _stage_image(tmp_path, "b", "dup.jpg", "beta_tag")
+    sidecar_a = path_a.with_suffix(".txt")
+    sidecar_b = path_b.with_suffix(".txt")
+    # Longer than either caption, so a write that forgot to truncate would
+    # leave a readable tail of it behind.
+    sidecar_a.write_text("a much longer preexisting caption", encoding="utf-8")
+    os.link(sidecar_a, sidecar_b)
+    shared_inode = sidecar_a.stat().st_ino
+
+    resp = test_client.post("/api/tags/export-batch", json={
+        "image_ids": [id_a, id_b],
+        "output_folder": "",
+        "output_mode": "beside_image",
+        "content_mode": "tags",
+        "overwrite_policy": "overwrite",
+        "normalize_tag_underscores": False,
+    })
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["exported"] == 1
+
+    # Still one file under two names: the export did not sever the user's link.
+    assert os.path.samefile(sidecar_a, sidecar_b)
+    assert sidecar_a.stat().st_ino == shared_inode
+    assert sidecar_b.stat().st_ino == shared_inode
+    assert sidecar_a.stat().st_nlink == 2
+
+    # That one file holds exactly the winner's caption — no tail of the caption
+    # it replaced, and nothing from the image whose write was refused.
+    assert sidecar_a.read_bytes() == b"alpha_tag"
+    assert sidecar_b.read_bytes() == b"alpha_tag"
+
+    # Nothing was staged and abandoned in the user's own image folders.
+    assert sorted(entry.name for entry in path_a.parent.iterdir()) == [
+        "dup.png",
+        "dup.txt",
+    ]
+    assert sorted(entry.name for entry in path_b.parent.iterdir()) == [
+        "dup.jpg",
+        "dup.txt",
+    ]
+
+
+class _BinaryHandleThatDiesOnWrite:
+    """A binary handle that lands a partial prefix and then fails.
+
+    Models a disk-full write against the shared-file update path: some bytes
+    reach the caption before the error, which is what would leave it truncated
+    if nothing put the previous one back.
+    """
+
+    def __init__(self, handle):
+        self._handle = handle
+
+    def __enter__(self):
+        self._handle.__enter__()
+        return self
+
+    def __exit__(self, *exc_info):
+        return self._handle.__exit__(*exc_info)
+
+    def write(self, payload):
+        self._handle.write(bytes(payload)[:4])
+        raise OSError(errno.ENOSPC, "simulated drive full mid-write")
+
+    def __getattr__(self, name):
+        return getattr(self._handle, name)
+
+
+def test_hardlinked_sidecar_write_that_dies_midway_keeps_the_existing_caption(
+    test_client, test_db, tmp_path: Path, monkeypatch
+):
+    """A hardlinked destination cannot be rename-published, so the guarantee
+    that an interrupted write never truncates the user's caption has to be
+    carried by the in-place path too — for both names of the file."""
+    id_a, path_a = _stage_image(tmp_path, "a", "dup.png", "alpha_tag")
+    _, path_b = _stage_image(tmp_path, "b", "dup.jpg", "beta_tag")
+    sidecar_a = path_a.with_suffix(".txt")
+    sidecar_b = path_b.with_suffix(".txt")
+    sidecar_a.write_text("a caption the user wrote by hand", encoding="utf-8")
+    os.link(sidecar_a, sidecar_b)
+    original_bytes = sidecar_a.read_bytes()
+    shared_inode = sidecar_a.stat().st_ino
+
+    real_open = builtins.open
+    killed: list[str] = []
+
+    def open_that_dies_updating_the_shared_caption(file, mode="r", *args, **kwargs):
+        handle = real_open(file, mode, *args, **kwargs)
+        # One-shot: the recovery write that puts the old caption back reopens
+        # the same path the same way and must be allowed to finish.
+        if str(mode) == "r+b" and not killed and Path(str(file)) == sidecar_a:
+            killed.append(str(file))
+            return _BinaryHandleThatDiesOnWrite(handle)
+        return handle
+
+    monkeypatch.setattr(builtins, "open", open_that_dies_updating_the_shared_caption)
+
+    resp = test_client.post("/api/tags/export-batch", json={
+        "image_ids": [id_a],
+        "output_folder": "",
+        "output_mode": "beside_image",
+        "content_mode": "tags",
+        "overwrite_policy": "overwrite",
+        "normalize_tag_underscores": False,
+    })
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+
+    assert killed, "the in-place caption update never ran, so nothing was exercised"
+    assert data["exported"] == 0
+    assert data["error_count"] == 1
+
+    # The caption the user wrote by hand is intact under both names — not the
+    # four-byte fragment the failed write managed to land.
+    assert sidecar_a.read_bytes() == original_bytes
+    assert sidecar_b.read_bytes() == original_bytes
+    assert os.path.samefile(sidecar_a, sidecar_b)
+    assert sidecar_a.stat().st_ino == shared_inode
+
+    # The recovery copy was cleaned up once the caption was back in place.
+    assert sorted(entry.name for entry in path_a.parent.iterdir()) == [
+        "dup.png",
+        "dup.txt",
+    ]
 
 
 def test_beside_image_unique_preexisting_sidecar_is_skipped(test_client, test_db, tmp_path: Path):
