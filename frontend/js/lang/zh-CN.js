@@ -4854,4 +4854,27 @@ window.I18nLang_zhCN = {
     'tagInfo.scopeNote': '这些是词表与图库的事实。Danbooru 数量说明的是 booru 用户给它打过多少次标签，并不代表任何模型的训练内容。',
     'tagInfo.dialectNote': '本项目的目标模型使用自然语言，因此 Booru 标签惯例并不适用于它的 caption。标签仍然适合图库检索与审核。',
 
+    // 共用 AI 运行时（GET /api/system/ai-jobs）与它的 409 拒绝。同一时刻只有一个
+    // AI 任务能占用运行时，所以这个徽标回答的是「是不是已经有东西在跑」；而被拒绝
+    // 时必须说清是三种情形里的哪一种，因为处理方式完全不同：独立进程要在图库的
+    // 打标条上停止，服务器内的任务跑完会自己释放，而持有者已消失的锁只能重启清除。
+    // 这些文案都不能让人误以为模型缺失或没配置好。
+    'aiBusy.seconds': '{n} 秒',
+    'aiBusy.minutes': '{n} 分钟',
+    'aiBusy.chipBusy': '{label} 进行中 · {elapsed}',
+    'aiBusy.chipBusyNoTime': '{label} 进行中',
+    'aiBusy.chipStuck': '{label} 卡住 · {elapsed}',
+    'aiBusy.chipMore': '（+{count}）',
+    'aiBusy.tooltipHead': '正在占用 AI 运行时：',
+    'aiBusy.tooltipJob': '{label} — 已运行 {elapsed}',
+    'aiBusy.tooltipStuck': '它运行的时间已经长到程序判定为卡住。如果确实没有任何进展，请重启程序。',
+    'aiBusy.toastIdle': 'AI 运行时当前空闲。',
+    'aiBusy.busyFact': '{label} 正在占用 AI 运行时（已运行 {elapsed}）。',
+    'aiBusy.busyFactNoTime': '{label} 正在占用 AI 运行时。',
+    'aiBusy.busyProcess': '它是一个独立进程，可以在图库的打标条上停止它，或等它跑完。',
+    'aiBusy.busyThread': '它在程序内部运行，跑完会自动释放运行时；也可以回到启动它的地方取消。',
+    'aiBusy.busyUnnamed': '另一个进程正在占用 AI 运行时，但它没有说明自己是什么。同一时刻只能跑一个 AI 任务，等它结束后再试。',
+    'aiBusy.stale': 'AI 运行时仍被一个已经不在运行的任务锁着。重启程序即可清除这个锁。',
+    'aiBusy.staleNamed': 'AI 运行时仍被锁着，但当初占用它的 {label} 已经不在运行。重启程序即可清除这个锁。',
+
 };

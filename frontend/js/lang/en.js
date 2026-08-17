@@ -4865,4 +4865,29 @@ window.I18nLang_en = {
     'tagInfo.scopeNote': 'Vocabulary and library facts. Danbooru counts describe how often booru users tagged something; they do not say what any model was trained on.',
     'tagInfo.dialectNote': 'This project targets a natural-language model, so Booru tag conventions do not apply to its captions. Tags stay useful for library search and review.',
 
+    // The shared AI runtime (GET /api/system/ai-jobs) and its 409 refusals.
+    // Only one AI job holds the runtime at a time, so the badge answers "is
+    // something already running", and a refusal must say which of three
+    // different situations it is, because the remedy differs: a separate
+    // process is stopped from the Gallery's tagging bar, an in-server job
+    // frees itself, and a lock whose owner is gone needs a restart. None of
+    // these strings may imply a model is missing or not set up.
+    'aiBusy.seconds': '{n}s',
+    'aiBusy.minutes': '{n}m',
+    'aiBusy.chipBusy': '{label} busy · {elapsed}',
+    'aiBusy.chipBusyNoTime': '{label} busy',
+    'aiBusy.chipStuck': '{label} stuck · {elapsed}',
+    'aiBusy.chipMore': ' (+{count})',
+    'aiBusy.tooltipHead': 'Using the AI runtime right now:',
+    'aiBusy.tooltipJob': '{label} — running {elapsed}',
+    'aiBusy.tooltipStuck': 'This has run long enough that the app treats it as stuck. If nothing is progressing, restart the app.',
+    'aiBusy.toastIdle': 'The AI runtime is free.',
+    'aiBusy.busyFact': '{label} is using the AI runtime (running {elapsed}).',
+    'aiBusy.busyFactNoTime': '{label} is using the AI runtime.',
+    'aiBusy.busyProcess': 'It runs as a separate process, so stop it from the tagging bar in the Gallery, or wait for it.',
+    'aiBusy.busyThread': 'It runs inside the app and releases the runtime when it finishes; you can also cancel it where you started it.',
+    'aiBusy.busyUnnamed': 'Another process is using the AI runtime, and it did not say what it is. Only one AI job can run at a time, so try again once it finishes.',
+    'aiBusy.stale': 'The AI runtime is still locked by a job that is no longer running. Restart the app to clear the lock.',
+    'aiBusy.staleNamed': 'The AI runtime is still locked, but {label}, which claimed it, is no longer running. Restart the app to clear the lock.',
+
 };

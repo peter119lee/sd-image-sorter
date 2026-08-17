@@ -1,0 +1,42 @@
+/* SD Image Sorter — shared AI runtime status chip (GET /api/system/ai-jobs).
+   Lives in the nav's status group next to the colour-analysis chip and follows
+   the same rule: present only while there is something to report. */
+
+/* Reuses the icon-only nav button as a base, like the colour-analysis chip
+   next to it. That base is capped at 42px wide, which is why the cap has to be
+   lifted here: the job name and its elapsed time are the whole message, and a
+   clipped "WD14 tagg…" would report less than nothing. The ceiling below keeps
+   a long job label from pushing the nav's real buttons around at 1366px. */
+.nav-bar .nav-actions .nav-ai-busy-chip,
+.nav-actions .nav-ai-busy-chip,
+.nav-ai-busy-chip {
+    min-width: auto;
+    max-width: 220px;
+    padding-right: 10px;
+    gap: 5px;
+    cursor: pointer;
+}
+
+.nav-ai-busy-chip[hidden] { display: none !important; }
+
+.nav-ai-busy-chip .nav-ai-busy-label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--accent, #C8873C);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.nav-ai-busy-chip .icon {
+    color: var(--accent, #C8873C);
+}
+
+/* Long enough that the guard itself calls the lease abnormal — a different
+   fact from "busy", so it does not borrow the working state's colour. */
+.nav-ai-busy-chip.is-stuck .nav-ai-busy-label,
+.nav-ai-busy-chip.is-stuck .icon {
+    color: var(--warning, #DFB750);
+}

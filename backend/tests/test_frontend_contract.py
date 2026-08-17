@@ -2971,3 +2971,120 @@ def test_the_dialect_note_is_limited_to_the_projects_own_captions():
         "the dialect note must require both the project surface and a "
         "natural-language target"
     )
+
+
+def _ai_busy_source(repo_root: Path) -> str:
+    return (repo_root / "frontend" / "js" / "modules" / "ai-busy.js").read_text(
+        encoding="utf-8"
+    )
+
+
+def test_the_busy_badge_reads_the_fields_the_ai_jobs_endpoint_publishes():
+    """``GET /api/system/ai-jobs`` was published and then read by nothing.
+
+    The snapshot exists so a user can see that one shared, exclusive runtime is
+    already taken. Three of its per-job fields carry that answer - which job,
+    how long, and whether the guard itself considers the lease abnormal - and a
+    badge that drops ``stuck`` would report a wedged lease as ordinary work.
+    """
+    repo_root = Path(__file__).resolve().parents[2]
+    badge = _ai_busy_source(repo_root)
+    router = (repo_root / "backend" / "routers" / "sorting.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert '"/system/ai-jobs"' in router, (
+        "the endpoint the badge polls moved; update both sides together"
+    )
+    assert "/api/system/ai-jobs" in badge, "the badge no longer polls the registry"
+    for field in ("jobs", "label", "elapsed_seconds", "stuck"):
+        assert field in badge, (
+            f"the badge ignores {field}, which the snapshot computes for it"
+        )
+
+
+def test_every_refusal_the_runtime_guard_can_raise_has_its_own_explanation():
+    """A 409 carries the one distinction that changes what the user should do.
+
+    ``ai_runtime_guard`` refuses in three shapes: a ``process``-scope holder
+    (the Gallery's spawned tag job, stopped from the tagging bar), a
+    ``thread``-scope holder (a job inside this server, which frees itself), and
+    ``stale_lock_holder_gone``, where the owner is verifiably dead and only a
+    restart helps. Collapsing them would hand two thirds of users advice that
+    cannot work, so pin the frontend's branches to the guard's own constants.
+    """
+    repo_root = Path(__file__).resolve().parents[2]
+    badge = _ai_busy_source(repo_root)
+    guard = (repo_root / "backend" / "ai_runtime_guard.py").read_text(encoding="utf-8")
+
+    from ai_runtime_guard import REASON_BUSY, REASON_STALE_LOCK
+
+    assert f"'{REASON_STALE_LOCK}'" in badge, (
+        f"the frontend has no branch for reason {REASON_STALE_LOCK!r}"
+    )
+    assert REASON_BUSY in guard  # the ordinary case, handled as the fallthrough
+
+    scopes = set(re.findall(r'"scope":\s*"(\w+)"', guard))
+    assert scopes == {"thread", "process"}, (
+        f"the guard reports blocker scopes {scopes}; the frontend only knows "
+        "thread and process"
+    )
+    assert "scope === 'process'" in badge, (
+        "the child-process holder must be told apart from an in-server one"
+    )
+
+
+def test_a_busy_runtime_is_never_explained_as_a_missing_model():
+    """The old path turned "WD14 is busy" into "WD14 is not ready".
+
+    ``formatUserError``'s pattern list matches on model NAMES, so a refusal
+    reading "WD14 tagging is using the AI runtime" hit the WD14/ONNX rule and
+    came back as "not ready yet - open Model setup". Both halves are false: the
+    model is loaded and working, and Model setup fixes nothing here. The
+    structured refusal must therefore be answered before that list runs.
+    """
+    repo_root = Path(__file__).resolve().parents[2]
+    errors = (
+        repo_root / "frontend" / "js" / "modules" / "utils" / "errors.js"
+    ).read_text(encoding="utf-8")
+
+    guard_at = errors.find("window.AiBusy?.isBusyError")
+    assert guard_at != -1, "errors.js no longer defers a busy runtime to AiBusy"
+    patterns_at = errors.find("for (const [pattern")
+    assert patterns_at == -1 or guard_at < patterns_at, (
+        "the busy-runtime check must run before the model-name patterns, or "
+        "'busy' will be rewritten into 'not ready' again"
+    )
+
+    for pack_name, source in _locale_pack_sources(repo_root).items():
+        values = re.findall(
+            r"^\s*'aiBusy\.[A-Za-z0-9_]+'\s*:\s*'(?P<value>[^']*)'",
+            source,
+            re.MULTILINE,
+        )
+        assert values, f"{pack_name} declares no aiBusy.* strings"
+        for value in values:
+            for phrase in ("not ready", "Model setup", "模型设置", "未就绪"):
+                assert phrase not in value, (
+                    f"{pack_name} explains a busy runtime as a setup problem: "
+                    f"{value!r}"
+                )
+
+
+def test_the_busy_badge_loads_before_the_helper_that_asks_it_for_wording():
+    """``formatApiError`` calls ``window.AiBusy.explain`` on the first refusal.
+
+    These are classic scripts in one shared scope; if the badge is appended
+    after ``app/api.js`` a refusal that arrives early gets the generic 409
+    sentence instead, which is exactly the wording this slice replaces.
+    """
+    repo_root = Path(__file__).resolve().parents[2]
+    index_html = (repo_root / "frontend" / "index.html").read_text(encoding="utf-8")
+
+    badge_at = index_html.find("js/modules/ai-busy.js")
+    api_at = index_html.find("js/app/api.js")
+    assert badge_at != -1, "ai-busy.js is not loaded by index.html"
+    assert api_at == -1 or badge_at < api_at, (
+        "ai-busy.js must be loaded before app/api.js, which calls explain()"
+    )
+    assert 'id="nav-ai-busy"' in index_html, "the badge element is gone"

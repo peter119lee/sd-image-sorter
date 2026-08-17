@@ -106,6 +106,16 @@ function formatUserError(error, context = '') {
         return `${context}${isZhCn() ? '：' : ': '}${msg}`;
     };
 
+    // A busy AI runtime is answered from its own structured 409 payload, before
+    // the pattern list can reach it. Those patterns match on model NAMES, so
+    // "WD14 tagging is using the AI runtime" hit the /WD14|ONNX/ rule and came
+    // out as "WD14 tagging is not ready yet - open Model setup": false, since
+    // the model is loaded and working, and pointing at the wrong screen.
+    if (window.AiBusy?.isBusyError?.(error)) {
+        const explained = window.AiBusy.explain(error.apiData);
+        if (explained) return withContext(explained);
+    }
+
     // Check for exact match first
     if (errorMessageMap[errorMsg]) {
         return withContext(errorMessageMap[errorMsg]);

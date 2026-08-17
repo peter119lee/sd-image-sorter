@@ -27,6 +27,7 @@
     <link rel="stylesheet" href="/static/css/dup-cleaner.css">
     <link rel="stylesheet" href="/static/css/publish-set.css">
     <link rel="stylesheet" href="/static/css/entry.css">
+    <link rel="stylesheet" href="/static/css/ai-busy.css">
     <!-- tokens.css must stay the LAST stylesheet: it owns the Aurora palette
          and remaps every legacy token defined by the sheets above. -->
     <link rel="stylesheet" href="/static/css/tokens.css">
@@ -681,6 +682,10 @@
                 </button>
                 <span class="nav-actions-divider" aria-hidden="true"></span>
                 <!-- Group 3: Help + status (status hidden when idle) -->
+                <button id="nav-ai-busy" class="btn btn-ghost btn-icon-only nav-ai-busy-chip" type="button" hidden aria-live="polite">
+                    <span aria-hidden="true"><svg class="icon" aria-hidden="true"><use href="#i-cpu"/></svg></span>
+                    <span class="nav-ai-busy-label" id="nav-ai-busy-label"></span>
+                </button>
                 <button id="nav-color-progress" class="btn btn-ghost btn-icon-only nav-color-chip" type="button" hidden title="Color analysis progress" aria-label="Color analysis progress" data-i18n-title="color.progressTooltip">
                     <span aria-hidden="true"><svg class="icon" aria-hidden="true"><use href="#i-palette"/></svg></span>
                     <span class="nav-color-chip-label" id="nav-color-progress-label">0%</span>
@@ -7674,6 +7679,10 @@
     <script src="/static/js/modules/utils/errors.js"></script>
     <script src="/static/js/modules/utils/filters.js"></script>
     <script src="/static/js/modules/utils/popup-position.js"></script>
+    <!-- Reads GET /api/system/ai-jobs for the shared-runtime badge, and turns a
+         409 lease refusal into an explanation. Loaded before errors.js's first
+         possible use, and before app/api.js, which calls AiBusy.explain. -->
+    <script src="/static/js/modules/ai-busy.js"></script>
     <!-- Component modules (non-conflicting with app.js) -->
     <script src="/static/js/modules/caption-core.js"></script>
     <script src="/static/js/modules/components/skeleton.js"></script>

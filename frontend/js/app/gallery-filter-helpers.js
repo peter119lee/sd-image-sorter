@@ -294,6 +294,18 @@ function supportsCursorPagination(sortBy = AppState.filters.sortBy) {
  * @returns {string} User-friendly error message
  */
 function formatApiError(status, errorData = {}) {
+    // A refused AI-runtime lease is the one 409 that carries a structured
+    // blocker (scope / label / elapsed seconds). Every verb in API funnels
+    // through here, so explaining it once covers censor detect, similarity,
+    // aesthetic scoring, artist identification and POST /api/tag/single
+    // together - the same single point the backend maps the exception at.
+    if (status === 409 && errorData && errorData.type === 'AiRuntimeBusyError') {
+        // The refusal is fresher than any poll: let the status badge re-read.
+        document.dispatchEvent(new CustomEvent('ai-runtime-busy', { detail: errorData }));
+        const explained = window.AiBusy?.explain?.(errorData);
+        if (explained) return explained;
+    }
+
     // Use error detail if provided
     if (errorData.detail) return errorData.detail;
     if (errorData.error) return errorData.error;
