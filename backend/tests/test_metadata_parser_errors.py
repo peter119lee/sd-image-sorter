@@ -591,3 +591,73 @@ class TestReturnStructure:
         assert result["generator"] == "unknown"
         assert result["file_size"] > 0 or result["file_size"] == 0
         assert result["width"] is not None or result["width"] == 0
+
+
+def _png_with_prompt_chunk(tmp_path: Path, name: str, payload: str) -> str:
+    from PIL import Image
+    from PIL.PngImagePlugin import PngInfo
+
+    info = PngInfo()
+    info.add_text("prompt", payload)
+    path = tmp_path / name
+    Image.new("RGB", (32, 32), color="white").save(path, pnginfo=info)
+    return str(path)
+
+
+class TestDamagedComfyUIPromptChunk:
+    """A damaged ComfyUI `prompt` chunk must not become the image's prompt.
+
+    An interrupted save or a tool that rewrote the PNG leaves a `prompt`
+    chunk holding structured data the parser cannot use. It used to fall
+    through to the Reader's plain-text handler, which accepts any string, so
+    a wall of raw workflow JSON was stored as the prompt with no error
+    recorded — searchable, exportable into dataset captions, and invisible
+    to the re-parse job. The sibling `workflow` chunk path already declines
+    to invent a prompt in exactly this situation.
+    """
+
+    @pytest.mark.parametrize(
+        "label,payload",
+        [
+            (
+                "truncated",
+                '{"3": {"class_type": "KSampler", "inputs": {"seed": 12345, "ste',
+            ),
+            ("empty-object", "{}"),
+            ("array", "[1,2,3]"),
+            ("bracket-storm", "[" * 300 + "]" * 300),
+        ],
+    )
+    def test_unusable_prompt_chunk_is_reported_not_stored(
+        self, tmp_path: Path, label: str, payload: str
+    ):
+        result = parse_image(
+            _png_with_prompt_chunk(tmp_path, f"comfy-{label}.png", payload)
+        )
+
+        assert not (result["prompt"] or "").strip(), (
+            f"{label}: raw chunk text leaked into the prompt: {result['prompt']!r}"
+        )
+        assert result["metadata_error"], (
+            f"{label}: an unusable metadata chunk reported no error at all"
+        )
+        assert result["generator"] == "comfyui"
+        # An empty prompt puts the row back inside the re-parse job's scope,
+        # and the original chunk is retained so a better parser can replay it.
+        assert result.get("raw_metadata_text")
+
+    def test_reader_written_wildcard_prompt_is_still_a_prompt(self, tmp_path: Path):
+        """Guard against over-triggering.
+
+        A1111 dynamic-prompt syntax starts with '{' and is not JSON, but it
+        is a real prompt the Reader can save. Rejecting it would trade one
+        data-loss bug for another.
+        """
+        payload = "{1girl|1boy}, solo, masterpiece, best quality"
+
+        result = parse_image(
+            _png_with_prompt_chunk(tmp_path, "reader-wildcard.png", payload)
+        )
+
+        assert result["prompt"] == payload
+        assert result["metadata_error"] is None

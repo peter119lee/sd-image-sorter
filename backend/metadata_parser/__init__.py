@@ -26,6 +26,7 @@ Supports:
 import json
 import logging
 import os
+import re
 import sys
 from collections.abc import Mapping
 from pathlib import Path
@@ -91,6 +92,26 @@ def _sidecar_candidates(image_path: str) -> list[Path]:
         seen.add(candidate_key)
         unique_candidates.append(candidate)
     return unique_candidates
+
+
+# A JSON object key: a double-quoted token immediately followed by a colon.
+# Present in any truncated ComfyUI chunk, absent from A1111 dynamic-prompt
+# syntax like ``{1girl|1boy}, solo`` which also opens with a brace.
+_JSON_OBJECT_KEY_RE = re.compile(r'"[^"]*"\s*:')
+
+
+def _looks_like_damaged_json_document(value: object) -> bool:
+    """True when a string was clearly meant to be JSON but will not parse.
+
+    Used to tell a corrupt ComfyUI ``prompt`` chunk apart from a plain-text
+    prompt the Reader saved into the same chunk name.
+    """
+    if not isinstance(value, str):
+        return False
+    text = value.strip()
+    if not text.startswith(("{", "[")):
+        return False
+    return bool(_JSON_OBJECT_KEY_RE.search(text))
 
 
 def _is_material_sidecar_field(field: str, value: object) -> bool:
@@ -371,6 +392,11 @@ class MetadataParser(
             result["negative_prompt"] = parsed["negative_prompt"]
             result["checkpoint"] = parsed["checkpoint"]
             result["loras"] = parsed["loras"]
+            # A metadata chunk the generator detector could not use is a
+            # non-fatal failure: the image is fine, its embedded data is not.
+            # Keep a container-level error first — that one is more severe.
+            if not result["metadata_error"] and parsed.get("metadata_error"):
+                result["metadata_error"] = parsed["metadata_error"]
 
             # Add civitai_resources to top-level result if present
             if "civitai_resources" in parsed:
@@ -731,6 +757,7 @@ class MetadataParser(
 
         # === Check for ComfyUI 'prompt' key with JSON workflow ===
         if "prompt" in metadata:
+            damaged_prompt_chunk: Optional[str] = None
             try:
                 prompt_data = metadata["prompt"]
                 workflow_data = metadata.get("workflow")
@@ -787,8 +814,31 @@ class MetadataParser(
                             base,
                             source_keys,
                         )
+                if isinstance(prompt_data, (dict, list)):
+                    damaged_prompt_chunk = (
+                        "ComfyUI 'prompt' chunk holds structured data with no "
+                        "usable nodes"
+                    )
             except (json.JSONDecodeError, TypeError, ValueError) as e:
                 logger.debug("Failed to parse JSON: %s", e)
+                if _looks_like_damaged_json_document(metadata["prompt"]):
+                    damaged_prompt_chunk = f"ComfyUI 'prompt' chunk is not valid JSON: {e}"
+
+            if damaged_prompt_chunk:
+                # Mirror the 'workflow' chunk path below: name the generator,
+                # decline to invent a prompt out of the damaged bytes, and
+                # record the failure. Falling through instead reaches the
+                # Reader's plain-text handler, which accepts ANY string, so the
+                # raw chunk used to be stored as the image's prompt with no
+                # error at all. An empty prompt keeps the row inside the
+                # re-parse job's scope and triggers raw-chunk retention.
+                logger.debug("%s", damaged_prompt_chunk)
+                base["generator"] = "comfyui"
+                base["metadata_error"] = damaged_prompt_chunk
+                return _with_sidecar_field_source_keys(
+                    base,
+                    {field: "prompt" for field in _SIDECAR_FALLBACK_FIELDS},
+                )
 
         # === Check for ComfyUI workflow key without prompt data ===
         if "workflow" in metadata:
