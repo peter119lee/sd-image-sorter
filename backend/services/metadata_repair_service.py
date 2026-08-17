@@ -43,17 +43,20 @@ logger = logging.getLogger(__name__)
 # cancellation responsive.
 REPARSE_CHUNK_SIZE = 100
 
-# Missing-prompt rows must still be readable to be worth retrying; unreadable
-# rows are the scanner's problem, not the parser's. COALESCE matches the guard
-# used everywhere else: is_readable was added later and NULL means "never
-# assessed", not "unreadable" (see migrations/003_legacy_backfills.py). A bare
-# ``is_readable = 1`` silently drops those rows from the repair job.
-#
-# This is deliberately the WIDER set: the job walks every promptless row because
-# a parser upgrade may yet find a prompt in one. What a run can still *change* is
-# the ``MISSING_TEXT_SQL`` subset, and that is the number any UI may report as
-# work outstanding (db_facets.get_library_health_report reads the same constant).
-_MISSING_PROMPT_WHERE = f"{NO_PROMPT_SQL} AND COALESCE(is_readable, 1) = 1"
+# The one population this module speaks about. Unreadable rows are the
+# scanner's problem, not the parser's: the job cannot open the file, cannot
+# replay anything into it, and cannot change a single counter about it. COALESCE
+# matches the guard used everywhere else: is_readable was added later and NULL
+# means "never assessed", not "unreadable" (see migrations/003_legacy_backfills.py).
+# A bare ``is_readable = 1`` silently drops those rows from the repair job.
+_READABLE_WHERE = "COALESCE(is_readable, 1) = 1"
+
+# Deliberately the WIDER set within that population: the job walks every
+# promptless row because a parser upgrade may yet find a prompt in one. What a
+# run can still *change* is the ``MISSING_TEXT_SQL`` subset, and that is the
+# number any UI may report as work outstanding
+# (db_facets.get_library_health_report reads the same constant).
+_MISSING_PROMPT_WHERE = f"{NO_PROMPT_SQL} AND {_READABLE_WHERE}"
 
 _active_lock = threading.Lock()
 _active_job_id: Optional[str] = None
@@ -98,7 +101,25 @@ def snapshot_missing_prompt_ids() -> List[int]:
 
 
 def get_metadata_health() -> Dict[str, Any]:
-    """Per-generator parse-coverage counts for the settings health row."""
+    """Per-generator parse-coverage counts for the settings health row.
+
+    Every counter here describes **readable images** — the same population the
+    recovery job walks — because these numbers sit next to the button that runs
+    it. ``missing_text`` is what the button advertises, so it has to equal what
+    a run can still change; guarding only that column would have left it
+    disagreeing with the ``total`` printed beside it, so the whole payload took
+    one population instead.
+
+    Field by field, all within that scope: ``total`` is the readable images
+    recorded for the generator; ``missing_prompt`` is exactly the rows
+    :func:`snapshot_missing_prompt_ids` retries; ``missing_text`` is the subset
+    of those a run can still turn from "no text" into "has text"; ``with_raw``
+    is the rows whose stored envelope can be replayed without the file.
+    ``scope`` names the population and ``excluded_unreadable`` accounts for the
+    indexed rows left out, so the difference from the library total stays
+    visible rather than silently missing. Whole-library composition, including
+    unreadable rows, is what ``GET /api/library-health`` reports.
+    """
     with get_db() as conn:
         rows = conn.execute(
             f"""
@@ -108,10 +129,14 @@ def get_metadata_health() -> Dict[str, Any]:
                    SUM(CASE WHEN {MISSING_TEXT_SQL} THEN 1 ELSE 0 END) AS missing_text,
                    SUM(CASE WHEN raw_metadata_gz IS NOT NULL THEN 1 ELSE 0 END) AS with_raw
             FROM images
+            WHERE {_READABLE_WHERE}
             GROUP BY COALESCE(generator, 'unknown')
             ORDER BY total DESC
             """
         ).fetchall()
+        excluded_row = conn.execute(
+            f"SELECT COUNT(*) AS excluded FROM images WHERE NOT ({_READABLE_WHERE})"
+        ).fetchone()
     generators = [
         {
             "generator": row["generator"],
@@ -128,7 +153,12 @@ def get_metadata_health() -> Dict[str, Any]:
         "missing_text": sum(item["missing_text"] for item in generators),
         "with_raw": sum(item["with_raw"] for item in generators),
     }
-    return {"generators": generators, "totals": totals}
+    return {
+        "generators": generators,
+        "totals": totals,
+        "scope": "readable_images",
+        "excluded_unreadable": int(excluded_row["excluded"] or 0) if excluded_row else 0,
+    }
 
 
 def _decode_raw_envelope(raw_gz: Any) -> Optional[Dict[str, Any]]:
