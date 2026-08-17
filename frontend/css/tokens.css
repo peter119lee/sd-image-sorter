@@ -2389,6 +2389,189 @@ li > .icon {
     transform: none;
 }
 
+/* --- Artist confidence tiers + vocabulary lookup -------------------------- */
+/* The score ranks correct answers above wrong ones (AUC 0.946) but the two
+   distributions overlap almost end to end, so the UI TIERS the answer instead
+   of asserting one. These surfaces exist to keep an unconfirmed guess visually
+   separate from a recorded identification. Rule 5 applies: the status colour is
+   data, and it is always paired with a word, never carried by colour alone. */
+
+.artist-vocabulary-row-input {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.artist-vocabulary-row-input .input-field {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.artist-vocabulary-row-input .btn {
+    flex: 0 0 auto;
+}
+
+.artist-vocabulary-result:empty {
+    display: none;
+}
+
+.artist-vocabulary-result {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 8px 10px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-card);
+}
+
+.artist-vocabulary-size,
+.artist-vocabulary-hint,
+.artist-vocabulary-row {
+    margin: 0;
+    font-size: var(--fs-footnote);
+    line-height: var(--lh-body);
+    color: var(--text-2);
+    overflow-wrap: anywhere;
+}
+
+.artist-vocabulary-row.is-known {
+    color: var(--success);
+}
+
+.artist-vocabulary-row.is-unknown {
+    color: var(--warning);
+}
+
+.artist-vocabulary-row.is-known::before {
+    content: "\2713\00a0";
+}
+
+.artist-vocabulary-row.is-unknown::before {
+    content: "\2715\00a0";
+}
+
+.artist-low-confidence {
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+}
+
+.artist-low-confidence[hidden] {
+    display: none;
+}
+
+.artist-low-confidence-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 4px;
+    font-size: var(--fs-section);
+    font-weight: 600;
+    color: var(--text-2);
+}
+
+.artist-low-confidence-title .icon {
+    flex: 0 0 auto;
+    color: var(--warning);
+}
+
+.artist-low-confidence-help {
+    margin: 0 0 10px;
+    font-size: var(--fs-footnote);
+    line-height: var(--lh-body);
+    color: var(--muted);
+}
+
+.artist-low-confidence-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.artist-candidate-chip {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 6px;
+    padding: 4px 9px;
+    background: var(--surface-2);
+    border: 1px dashed var(--border-strong);
+    border-radius: var(--r-ctl);
+    color: var(--text-2);
+    font-size: var(--fs-label);
+    cursor: pointer;
+    transition: background var(--duration-fast) var(--ease-out),
+        border-color var(--duration-fast) var(--ease-out);
+}
+
+.artist-candidate-chip:hover,
+.artist-candidate-chip:focus-visible {
+    background: var(--surface-3);
+    border-color: var(--warning);
+    color: var(--text);
+}
+
+.artist-candidate-count {
+    font-family: var(--font-mono);
+    font-size: var(--fs-footnote);
+    color: var(--muted);
+}
+
+.artist-image-tier,
+.artist-tier-badge {
+    display: inline-block;
+    padding: 1px 5px;
+    border: 1px solid currentColor;
+    border-radius: var(--r-tile);
+    font-size: var(--fs-footnote);
+    font-weight: 600;
+    line-height: 1.4;
+    white-space: nowrap;
+}
+
+.artist-image-tier-low,
+.artist-tier-badge-low {
+    color: var(--warning);
+}
+
+.artist-image-tier-none {
+    color: var(--muted);
+}
+
+.artist-detail-advisory {
+    margin: 8px 0 0;
+    padding: 8px 10px;
+    background: rgba(var(--warning-rgb), 0.07);
+    border: 1px solid rgba(var(--warning-rgb), 0.32);
+    border-radius: var(--r-card);
+    font-size: var(--fs-footnote);
+    line-height: var(--lh-body);
+    color: var(--text-2);
+}
+
+/* [hidden] guard (the documented .btn trap): .btn's own display rule outranks
+   the UA [hidden]{display:none}, so `button.hidden = true` in library-health.js
+   was silently ignored and the recovery control stayed on screen even with
+   nothing left to recover. Same guard as .similar-embed-row / .gallery-action-bar. */
+#btn-metadata-reparse[hidden] {
+    display: none;
+}
+
+/* --- Sidecar caption: adjacent to the prompt, never mistaken for one ------- */
+
+.modal-sidecar-caption-help {
+    margin: 6px 0 0;
+    font-size: var(--fs-footnote);
+    line-height: var(--lh-body);
+    color: var(--muted);
+}
+
+#modal-sidecar-caption-text {
+    border-left: 2px solid var(--border-strong);
+    padding-left: 10px;
+}
+
 /* --- Motion: functional only --------------------------------------------- */
 
 @media (prefers-reduced-motion: reduce) {

@@ -2283,3 +2283,249 @@ def test_icon_bearing_headings_are_translated_through_their_label_span():
         assert f"'{selector}'" not in ui_refresh, (
             f"ui-refresh still writes textContent to {selector}, which holds a sprite icon"
         )
+
+
+def _locale_pack_sources(repo_root: Path) -> dict[str, str]:
+    return {
+        name: (repo_root / "frontend" / "js" / "lang" / name).read_text(encoding="utf-8")
+        for name in ("en.js", "zh-CN.js")
+    }
+
+
+def test_small_tomato_download_note_is_translated_in_both_locales():
+    """image-obfuscate.js references the key, so a missing entry ships English to zh.
+
+    Two earlier attempts skipped this because a careless insert trips
+    ``test_language_packs_have_unique_matching_keys``; the key still has to
+    exist exactly once in each pack.
+    """
+    repo_root = Path(__file__).resolve().parents[2]
+    key = "tools.smallTomatoMetadataDownloadNote"
+
+    obfuscate = (repo_root / "frontend" / "js" / "image-obfuscate.js").read_text(
+        encoding="utf-8"
+    )
+    assert f"'{key}'" in obfuscate
+
+    for name, source in _locale_pack_sources(repo_root).items():
+        occurrences = len(re.findall(rf"^\s*'{re.escape(key)}'\s*:", source, re.MULTILINE))
+        assert occurrences == 1, f"{name} declares {key} {occurrences} times, expected 1"
+
+
+def test_image_obfuscate_chrome_carries_no_emoji():
+    """Graphite bans emoji in application chrome; the sprite sheet replaces them."""
+    repo_root = Path(__file__).resolve().parents[2]
+    source = (repo_root / "frontend" / "js" / "image-obfuscate.js").read_text(
+        encoding="utf-8"
+    )
+    emoji_re = re.compile(
+        "["
+        "\U0001f000-\U0001faff"
+        "\u2600-\u27bf"
+        "\u2b05-\u2b07\u2b1b\u2b1c\u2b50\u2b55"
+        "\u2139\u2194-\u21aa\u2328\u23e9-\u23fa"
+        "\u25aa\u25ab\u25b6\u25c0\u25fb-\u25fe"
+        "\ufe0f"
+        "]"
+    )
+    offenders = [
+        f"{number}: {line.strip()}"
+        for number, line in enumerate(source.splitlines(), start=1)
+        if emoji_re.search(line)
+    ]
+    assert offenders == [], "emoji left in image-obfuscate.js: " + "; ".join(offenders)
+
+
+def test_text_recovery_button_is_gated_on_missing_text_not_missing_prompt():
+    """``missing_prompt`` never reaches zero for non-SD images.
+
+    Gating the button on it leaves a permanently visible control that recovers
+    nothing; ``missing_text`` is the counter the job actually moves.
+    """
+    repo_root = Path(__file__).resolve().parents[2]
+    health = (repo_root / "frontend" / "js" / "library-health.js").read_text(
+        encoding="utf-8"
+    )
+
+    visibility = re.search(
+        r"function updateReparseVisibility\(\)\s*\{(?P<body>.*?)\n    \}",
+        health,
+        re.DOTALL,
+    )
+    assert visibility is not None
+    assert "missing_text" in visibility.group("body")
+    assert "missing_prompt" not in visibility.group("body")
+
+    finish = re.search(
+        r"function finishReparse\(job\)\s*\{(?P<body>.*?)\n    \}", health, re.DOTALL
+    )
+    assert finish is not None
+    assert "captions_recovered" in finish.group("body"), (
+        "a run that recovers thousands of captions must not report them as zero"
+    )
+
+
+def test_text_recovery_control_is_labelled_for_text_not_only_prompts():
+    repo_root = Path(__file__).resolve().parents[2]
+    html = (repo_root / "frontend" / "index.html").read_text(encoding="utf-8")
+    packs = _locale_pack_sources(repo_root)
+
+    assert 'id="metadata-reparse-label" data-i18n="health.reparse">Recover Missing Text<' in html
+
+    english = re.search(r"^\s*'health\.reparse'\s*:\s*'(?P<value>[^']*)'", packs["en.js"], re.MULTILINE)
+    assert english is not None
+    assert english.group("value") == "Recover Missing Text"
+
+    done = re.search(r"^\s*'health\.reparseDone'\s*:\s*'(?P<value>[^']*)'", packs["en.js"], re.MULTILINE)
+    assert done is not None
+    assert "{captions}" in done.group("value"), (
+        "the completion toast must report recovered sidecar captions, not only prompts"
+    )
+
+
+def test_modal_shows_a_recovered_sidecar_caption_apart_from_the_generation_prompt():
+    repo_root = Path(__file__).resolve().parents[2]
+    html = (repo_root / "frontend" / "index.html").read_text(encoding="utf-8")
+    sections = (repo_root / "frontend" / "js" / "gallery" / "modal-sections.js").read_text(
+        encoding="utf-8"
+    )
+
+    assert 'id="modal-sidecar-caption-section"' in html
+    assert 'id="modal-sidecar-caption-text"' in html
+    assert 'data-i18n="modal.sidecarCaption"' in html
+
+    prompt_view = re.search(
+        r"_applyModalPromptView\(promptView\)\s*\{(?P<body>.*?)\n    \},",
+        sections,
+        re.DOTALL,
+    )
+    assert prompt_view is not None
+    assert "_applyModalSidecarCaption" in prompt_view.group("body"), (
+        "the recovered caption has to render next to the prompt block"
+    )
+
+    renderer = re.search(
+        r"_applyModalSidecarCaption\(image\)\s*\{(?P<body>.*?)\n    \},",
+        sections,
+        re.DOTALL,
+    )
+    assert renderer is not None
+    assert "sidecar_caption" in renderer.group("body")
+    assert "modal-sidecar-caption-section" in renderer.group("body")
+
+    for pack_name, source in _locale_pack_sources(repo_root).items():
+        for key in ("modal.sidecarCaption", "modal.sidecarCaptionHelp"):
+            assert re.search(rf"^\s*'{re.escape(key)}'\s*:", source, re.MULTILINE), (
+                f"{pack_name} is missing {key}"
+            )
+
+
+def _artist_family_source(repo_root: Path) -> str:
+    artist_dir = repo_root / "frontend" / "js" / "artist"
+    return "\n".join(
+        path.read_text(encoding="utf-8") for path in sorted(artist_dir.glob("*.js"))
+    )
+
+
+def test_artist_ui_consumes_the_tiered_confidence_contract():
+    """`artist` is "undefined" unless the tier is high; the UI must read the tier.
+
+    Reading only ``artist`` is exactly the bug that puts the literal string
+    "undefined" on screen for the two lower tiers.
+    """
+    repo_root = Path(__file__).resolve().parents[2]
+    family = _artist_family_source(repo_root)
+
+    for field in (
+        "confidence_level",
+        "candidate_artist",
+        "advisory",
+        "out_of_vocabulary_likely",
+        "low_confidence_artist_counts",
+        "confident_count",
+        "low_confidence_count",
+    ):
+        assert field in family, f"no artist module reads {field}"
+
+    assert "describeArtistResult" in family, (
+        "the three tiers need one shared formatter so every caller agrees"
+    )
+
+
+def test_single_image_identify_toast_routes_through_the_tier_formatter():
+    """The modal button is the other caller of POST /api/artists/identify."""
+    repo_root = Path(__file__).resolve().parents[2]
+    analysis = (
+        repo_root / "frontend" / "js" / "gallery" / "modal-analysis.js"
+    ).read_text(encoding="utf-8")
+
+    assert "'/api/artists/identify'" in analysis
+    assert "describeArtistResult" in analysis
+    assert "|| 'undefined'" not in analysis, (
+        "the modal toast must not fall back to the backend's undefined sentinel"
+    )
+
+
+def test_artist_view_offers_a_vocabulary_lookup_and_an_honest_threshold_label():
+    repo_root = Path(__file__).resolve().parents[2]
+    html = (repo_root / "frontend" / "index.html").read_text(encoding="utf-8")
+    family = _artist_family_source(repo_root)
+    packs = _locale_pack_sources(repo_root)
+
+    # "Is my artist supported?" — only 37% of this owner's artists exist in the
+    # model's vocabulary and nothing in the product said so.
+    assert 'id="artist-vocabulary-input"' in html
+    assert 'id="btn-artist-vocabulary-check"' in html
+    assert 'id="artist-vocabulary-result"' in html
+    assert "/api/artists/vocabulary" in family
+
+    # The slider can only tighten now, so the old "below this = undefined"
+    # helper describes behaviour the backend no longer has.
+    helper = re.search(
+        r"^\s*'artist\.belowThreshold'\s*:\s*'(?P<value>[^']*)'", packs["en.js"], re.MULTILINE
+    )
+    assert helper is not None
+    assert "undefined" not in helper.group("value").lower()
+    assert "0.20" in helper.group("value"), (
+        "the helper must name the confident threshold the backend actually uses"
+    )
+
+    # Confident / unconfirmed / no-match are three separate buckets.
+    for key in (
+        "artist.confidentMatches",
+        "artist.unconfirmed",
+        "artist.noMatch",
+        "artist.vocabularyTitle",
+        "artist.vocabularyCheck",
+        "artist.candidateBadge",
+    ):
+        for pack_name, source in packs.items():
+            assert re.search(rf"^\s*'{re.escape(key)}'\s*:", source, re.MULTILINE), (
+                f"{pack_name} is missing {key}"
+            )
+
+
+def test_artist_copy_no_longer_tells_users_to_lower_the_threshold():
+    """Lowering the slider stopped producing names when tiering landed.
+
+    Advice that cannot work is worse than none: it sends the owner back through
+    an 80k-image run for a result the backend will still refuse to assert.
+    """
+    repo_root = Path(__file__).resolve().parents[2]
+    packs = _locale_pack_sources(repo_root)
+    family = _artist_family_source(repo_root)
+
+    assert "suggestedLow" not in family, (
+        "the suggested 0.02-0.08 band was advice for the pre-tiering pipeline"
+    )
+    assert "Lower the threshold" not in family
+
+    for pack_name, source in packs.items():
+        for key in ("artist.startStep2Title", "artist.startStep2Text"):
+            match = re.search(
+                rf"^\s*'{re.escape(key)}'\s*:\s*'(?P<value>[^']*)'", source, re.MULTILINE
+            )
+            assert match is not None, f"{pack_name} is missing {key}"
+            assert "0.02" not in match.group("value"), (
+                f"{pack_name}:{key} still recommends the obsolete low-threshold band"
+            )

@@ -36,6 +36,7 @@ Object.assign(window.ArtistIdent, {
         this.refreshAvailabilityState();
         this.loadDiagnostics();
         this.loadStats();
+        this.refreshVocabularyState();
         this.resumeBatchProgress();
         this.showFirstUseGuide();
     },
@@ -71,12 +72,22 @@ Object.assign(window.ArtistIdent, {
             }
         });
 
+        document.addEventListener('keydown', (event) => {
+            if (event.target?.id === 'artist-vocabulary-input' && event.key === 'Enter') {
+                event.preventDefault();
+                this.checkArtistVocabulary();
+            }
+        });
+
         document.addEventListener('click', (event) => {
             const actionButton = event.target?.closest?.(
-                '#btn-identify-all, #btn-identify-selected, #btn-refresh-artist-stats, #btn-clear-artist-data, #btn-artist-load-more'
+                '#btn-identify-all, #btn-identify-selected, #btn-refresh-artist-stats, #btn-clear-artist-data, #btn-artist-load-more, #btn-artist-vocabulary-check'
             );
             const id = actionButton?.id;
             switch (id) {
+                case 'btn-artist-vocabulary-check':
+                    this.checkArtistVocabulary();
+                    return;
                 case 'btn-identify-all':
                     this.identifyAll();
                     return;

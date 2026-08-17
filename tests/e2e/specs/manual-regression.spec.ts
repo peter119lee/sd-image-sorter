@@ -1620,7 +1620,9 @@ test('artist identify selected should work on a real image', async ({ page, requ
   expect(finalProgress?.results?.[0]?.artist).toBeTruthy()
   expect(finalProgress?.results?.[0]?.artist).not.toBe('undefined')
   await expect(page.locator('#artist-results-grid')).toContainText(formatArtistNameForUi(artist), { timeout: 15000 })
-  await expect(page.locator('#artist-stats')).toContainText('Identified')
+  // The stats row splits into three disjoint confidence buckets since 2c15c9e;
+  // the fixture identifier answers at 0.97, so it lands in the confident one.
+  await expect(page.locator('#artist-stats')).toContainText('Confident Matches')
 })
 
 test('auto-separate should honor search and move the matching files', async ({ page, request }) => {

@@ -186,14 +186,16 @@ Object.assign(window.Gallery, {
             if (action === 'artist') {
                 const result = await api.post('/api/artists/identify', this._getArtistSinglePayload(id));
                 await window.ArtistIdent?.loadStats?.();
-                const artistName = result?.artist || 'undefined';
-                const confidence = Number(result?.confidence);
-                const confidenceText = Number.isFinite(confidence) ? `${Math.round(confidence * 100)}%` : '-';
+                // `artist` is the sentinel "undefined" unless confidence_level
+                // is "high", so the toast is built from the shared tier
+                // formatter instead of the raw field. Reading the field was
+                // what put the literal word "undefined" on screen.
+                const described = window.ArtistIdent.describeArtistResult(result);
                 showToast?.(
-                    this._t('modal.artistThisDone', { artist: artistName, confidence: confidenceText }, 'Artist: {artist} ({confidence})')
-                        .replace('{artist}', artistName)
-                        .replace('{confidence}', confidenceText),
-                    'success'
+                    described.level === 'high'
+                        ? described.headline
+                        : `${described.headline} — ${described.advisory}`,
+                    described.level === 'high' ? 'success' : 'info'
                 );
                 return;
             }

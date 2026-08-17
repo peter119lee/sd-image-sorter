@@ -39,8 +39,13 @@ Object.assign(window.ArtistIdent, {
         detailContent.innerHTML = `<p class="loading">Loading images for ${escapeHtml(this.formatArtistName(safeArtist))}...</p>`;
 
         try {
-            // Get count from stats
-            const count = this.stats.artist_counts?.[safeArtist] || 0;
+            // Get count from stats. artist_counts is confident-only since
+            // 2c15c9e, so an unconfirmed candidate opened from the low-
+            // confidence list would otherwise report "0 images".
+            const confidentCount = Number(this.stats.artist_counts?.[safeArtist] || 0);
+            const candidateCount = Number(this.stats.low_confidence_artist_counts?.[safeArtist] || 0);
+            const count = confidentCount || candidateCount;
+            const isCandidateOnly = confidentCount === 0 && candidateCount > 0;
             const stat = this.getArtistStat(safeArtist);
             const artistLabel = escapeHtml(this.formatArtistName(safeArtist));
             const countLabel = escapeHtml(String(count));
@@ -58,10 +63,19 @@ Object.assign(window.ArtistIdent, {
             this.selectedArtistOffset = requestOffset + pageImages.length;
             this.selectedArtistHasMore = Boolean(detailResponse.has_more);
 
-            const previewCards = this.selectedArtistImages.map((image) => `
+            const previewCards = this.selectedArtistImages.map((image) => {
+                // Rows below the confident threshold keep the artist's name in
+                // the database (nothing was rewritten), so without a badge an
+                // unconfirmed row is indistinguishable from a confident one.
+                const level = String(image.confidence_level || '').toLowerCase();
+                const tierBadge = level === 'high'
+                    ? ''
+                    : `<span class="artist-image-tier artist-image-tier-${level === 'low' ? 'low' : 'none'}">${escapeHtml(this.confidenceTierLabel(level === 'low' ? 'low' : 'none'))}</span>`;
+                return `
                 <button class="artist-image-card" data-image-id="${image.image_id}" data-filename="${escapeHtml(image.filename)}" type="button" title="${escapeHtml(image.filename)}">
                     <img src="${window.App.API.getThumbnailUrl(image.image_id, 256)}" alt="${escapeHtml(image.filename)}" loading="lazy">
                     <span class="artist-image-confidence">${escapeHtml(String(image.confidence_percent))}%</span>
+                    ${tierBadge}
                     <span class="artist-image-name">${escapeHtml(image.filename)}</span>
                     <span class="artist-image-actions">
                         <span class="artist-image-action" data-action="preview">${escapeHtml(this.tText('Preview', '预览'))}</span>
@@ -70,13 +84,24 @@ Object.assign(window.ArtistIdent, {
                         <span class="artist-image-action" data-action="build">${escapeHtml(this.tText('Build', 'Build'))}</span>
                     </span>
                 </button>
-            `).join('');
+            `;
+            }).join('');
+
+            const candidateNotice = isCandidateOnly
+                ? `<p class="artist-detail-advisory">${escapeHtml(this._fallbackAdvisory('low', this.vocabulary?.size))}</p>`
+                : '';
+            const candidateBadge = isCandidateOnly
+                ? ` <span class="artist-tier-badge artist-tier-badge-low">${escapeHtml(this.tKey('artist.candidateBadge', 'Unconfirmed', '未确认'))}</span>`
+                : '';
 
             detailContent.innerHTML = `
-                <h4>${artistLabel}</h4>
-                <p class="artist-stats-detail">${countLabel} ${escapeHtml(this.tText('images identified', '张图匹配到该画师'))}</p>
-                <p class="artist-stats-detail">${escapeHtml(this.tText('Average confidence', '平均置信度'))} ${avgConfidence}</p>
-                <p class="artist-stats-detail">${escapeHtml(this.tText('Peak confidence', '最高置信度'))} ${maxConfidence}</p>
+                <h4>${artistLabel}${candidateBadge}</h4>
+                <p class="artist-stats-detail">${countLabel} ${escapeHtml(isCandidateOnly
+                    ? this.tKey('artist.candidateImagesLabel', 'images suggested for this name', '张图被猜成这个名字')
+                    : this.tKey('artist.confidentImagesLabel', 'images identified', '张图匹配到该画师'))}</p>
+                <p class="artist-stats-detail">${escapeHtml(this.tKey('artist.avgConfidence', 'Average confidence', '平均置信度'))} ${avgConfidence}</p>
+                <p class="artist-stats-detail">${escapeHtml(this.tKey('artist.peakConfidence', 'Peak confidence', '最高置信度'))} ${maxConfidence}</p>
+                ${candidateNotice}
             `;
 
             // Show action button

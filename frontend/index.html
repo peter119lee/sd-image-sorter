@@ -3429,7 +3429,7 @@
                         <div class="workspace-start-copy">
                             <span class="workspace-start-eyebrow" data-i18n="artist.startEyebrow">Start Here</span>
                             <h3 data-i18n="artist.startTitle">Find repeated artist or style patterns in your library</h3>
-                            <p class="workspace-start-description" data-i18n="artist.startDescription">Set a confidence threshold, run identification, then jump back to Gallery with that artist filter applied.</p>
+                            <p class="workspace-start-description" data-i18n="artist.startDescription">Check whether your artist is in the model's vocabulary, run identification, then jump back to Gallery with that artist filter applied.</p>
                         </div>
                         <ol class="workspace-start-steps">
                             <li>
@@ -3437,8 +3437,8 @@
                                 <span data-i18n="artist.startStep1Text">If setup is not ready yet, fix that first instead of starting a batch that cannot run.</span>
                             </li>
                             <li>
-                                <strong data-i18n="artist.startStep2Title">2. Start with a low threshold</strong>
-                                <span data-i18n="artist.startStep2Text">Kaloscope usually works better around 0.02-0.08 than with an aggressive threshold.</span>
+                                <strong data-i18n="artist.startStep2Title">2. Check the vocabulary</strong>
+                                <span data-i18n="artist.startStep2Text">An artist the model was never trained on can never be predicted, so it will always be named as somebody else.</span>
                             </li>
                             <li>
                                 <strong data-i18n="artist.startStep3Title">3. Review then jump to Gallery</strong>
@@ -3451,6 +3451,10 @@
                     </div>
                     <div class="model-health-banner" id="artist-model-health"></div>
                     <!-- Stats Header -->
+                    <!-- Three disjoint confidence buckets, never one merged
+                         "identified" number: artist_counts is confident-only
+                         since the tiering landed, so folding the unconfirmed
+                         bucket back in would present a guess as a fact. -->
                     <div class="artist-stats" id="artist-stats">
                         <div class="stat-card">
                             <span class="stat-number">0</span>
@@ -3458,11 +3462,15 @@
                         </div>
                         <div class="stat-card">
                             <span class="stat-number">0</span>
-                            <span class="stat-label" data-i18n="artist.identified">Identified</span>
+                            <span class="stat-label" data-i18n="artist.confidentMatches">Confident Matches</span>
                         </div>
                         <div class="stat-card">
                             <span class="stat-number">0</span>
-                            <span class="stat-label" data-i18n="artist.undefined">Undefined</span>
+                            <span class="stat-label" data-i18n="artist.unconfirmed">Unconfirmed</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-number">0</span>
+                            <span class="stat-label" data-i18n="artist.noMatch">No match</span>
                         </div>
                         <div class="stat-card">
                             <span class="stat-number">0</span>
@@ -3490,10 +3498,14 @@
                                         placeholder="path/to/best_checkpoint.pth">
                                 </div>
                                 <div class="form-group">
-                                    <label class="artist-threshold-label"><span data-i18n="artist.confidenceThreshold">Confidence Threshold</span>: <span id="artist-threshold-value" class="artist-threshold-value">0.03</span></label>
+                                    <!-- The slider can only TIGHTEN. A name is written to the
+                                         library at 0.20 and above; nothing below that is ever
+                                         asserted, so the old "lower it to get more names"
+                                         reading of this control is no longer true. -->
+                                    <label class="artist-threshold-label"><span data-i18n="artist.confidenceThreshold">Discard results below</span>: <span id="artist-threshold-value" class="artist-threshold-value">0.03</span></label>
                                     <input type="range" id="artist-threshold" class="slider" min="0.00" max="0.25"
                                         step="0.01" value="0.03">
-                                    <small class="helper-text" data-i18n="artist.belowThreshold">Below this = "undefined"</small>
+                                    <small class="helper-text" data-i18n="artist.belowThreshold">This filter can only tighten the result. A name is recorded only at 0.20 and above; between this value and 0.20 you get an unconfirmed candidate, and anything below it is dropped.</small>
                                 </div>
                                 <div class="form-group">
                                     <label class="checkbox-label">
@@ -3502,6 +3514,25 @@
                                     </label>
                                     <small class="helper-text" data-i18n="artist.useGpuHelp">Turn off to run on CPU (~2x slower but stable). Try this if your GPU driver freezes the desktop while identifying.</small>
                                 </div>
+                            </div>
+
+                            <!-- Placed BEFORE the run buttons on purpose: a name that is
+                                 not in the model's vocabulary can never be predicted, so
+                                 this answers whether starting a run on those images can
+                                 produce anything at all. Only 37% of a sampled set of this
+                                 library's artists were in the 39,261-name vocabulary. -->
+                            <div class="control-section" id="artist-vocabulary-section">
+                                <h3><svg class="icon" aria-hidden="true"><use href="#i-book"/></svg> <span data-i18n="artist.vocabularyTitle">Is my artist supported?</span></h3>
+                                <p class="helper-text" data-i18n="artist.vocabularyHelp">The model can only answer with a name it was trained on. Check before running, so a wrong name is not mistaken for a wrong image.</p>
+                                <div class="artist-vocabulary-row-input">
+                                    <input type="text" id="artist-vocabulary-input" class="input-field"
+                                        placeholder="wlop, greg_rutkowski" data-i18n-placeholder="artist.vocabularyPlaceholder"
+                                        aria-label="Artist names to check" data-i18n-aria="artist.vocabularyInputLabel">
+                                    <button class="btn btn-secondary btn-small" id="btn-artist-vocabulary-check" type="button">
+                                        <svg class="icon" aria-hidden="true"><use href="#i-search"/></svg> <span data-i18n="artist.vocabularyCheck">Check</span>
+                                    </button>
+                                </div>
+                                <div class="artist-vocabulary-result" id="artist-vocabulary-result" role="status" aria-live="polite"></div>
                             </div>
 
                             <div class="control-section">
@@ -3543,10 +3574,14 @@
                             <div class="artist-grid" id="artist-results-grid">
                                 <div class="empty-state">
                                     <div class="empty-icon"><svg class="icon" aria-hidden="true"><use href="#i-palette"/></svg></div>
-                                    <p>No artists identified yet.</p>
+                                    <p data-i18n="artist.emptyNoRunTitle">No artists identified yet.</p>
                                     <p class="empty-hint" data-i18n="artist.noArtistsHint">Click "Identify All" to start.</p>
                                 </div>
                             </div>
+                            <!-- The 0.03-0.20 bucket, kept out of Top Artists: 28% precision
+                                 and 65% out-of-vocabulary, so it is a suggestion list, not
+                                 a result list. -->
+                            <div class="artist-low-confidence" id="artist-low-confidence" hidden></div>
                         </div>
 
                         <!-- Right Panel: Artist Details -->
@@ -5349,9 +5384,10 @@
                             </div>
                             <div class="health-hero-actions">
                                 <!-- Metadata L3: replays raw envelopes stored at scan time
-                                     (plus the files themselves) through the current parser.
-                                     Hidden until the health endpoint reports missing prompts. -->
-                                <button class="btn btn-ghost btn-small" id="btn-metadata-reparse" type="button" hidden><svg class="icon" aria-hidden="true"><use href="#i-settings"/></svg> <span id="metadata-reparse-label" data-i18n="health.reparse">Re-parse Missing Prompts</span></button>
+                                     (plus the files and their .txt/.json sidecars) through
+                                     the current parser. Hidden until the health endpoint
+                                     reports images with no text at all (missing_text). -->
+                                <button class="btn btn-ghost btn-small" id="btn-metadata-reparse" type="button" hidden><svg class="icon" aria-hidden="true"><use href="#i-settings"/></svg> <span id="metadata-reparse-label" data-i18n="health.reparse">Recover Missing Text</span></button>
                                 <button class="btn btn-primary btn-small" id="btn-health-refresh">↻ <span data-i18n="health.refresh">Refresh Audit</span></button>
                             </div>
                         </header>
@@ -5556,6 +5592,17 @@
                     <div class="modal-prompt modal-section">
                         <h4 class="section-toggle" data-target="modal-prompt-text" data-collapse-key="prompt"><span class="section-toggle-label" data-i18n="modal.prompt">Prompt</span> <span class="collapse-icon">▼</span></h4>
                         <p id="modal-prompt-text">-</p>
+                    </div>
+
+                    <!-- Text lifted from a .txt/.json sidecar (migration 042). Kept out
+                         of the prompt block on purpose: it is not a generation prompt,
+                         and merging the two is what polluted ~930 stored prompts. -->
+                    <div class="modal-section modal-sidecar-caption" id="modal-sidecar-caption-section" style="display:none">
+                        <h4 class="section-toggle" data-target="modal-sidecar-caption-body" data-collapse-key="sidecarCaption"><span class="section-toggle-label" data-i18n="modal.sidecarCaption">Sidecar Caption</span> <span class="collapse-icon">▼</span></h4>
+                        <div id="modal-sidecar-caption-body">
+                            <p id="modal-sidecar-caption-text">-</p>
+                            <p class="modal-sidecar-caption-help" data-i18n="modal.sidecarCaptionHelp">Read from a .txt/.json file next to the image. This is not a Stable Diffusion generation prompt.</p>
+                        </div>
                     </div>
 
                     <div class="modal-section" id="modal-negative-section" style="display:none">
@@ -7885,8 +7932,9 @@
          AFTER the utils/app families (window.App, escapeHtml,
          formatUserError, Logger), exactly where the single artist-ident.js
          tag sat. -->
-    <script src="/static/js/artist/core.js"></script>
-    <script src="/static/js/artist/preferences.js"></script>
+<script src="/static/js/artist/core.js"></script>
+<script src="/static/js/artist/vocabulary.js"></script>
+<script src="/static/js/artist/preferences.js"></script>
     <script src="/static/js/artist/diagnostics.js"></script>
     <script src="/static/js/artist/stats-grid.js"></script>
     <script src="/static/js/artist/detail.js"></script>

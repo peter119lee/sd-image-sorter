@@ -334,7 +334,10 @@
         },
 
         _translateArtist: function () {
-            this._setTextAll('#artist-stats .stat-label', ['artist.totalImages', 'artist.identified', 'artist.undefined', 'artist.artistsFound']);
+            // Five disjoint buckets, in DOM order. loadStats() rebuilds these
+            // cards from the same keys, so this re-apply must stay in step or
+            // the observer relabels the wrong bucket a frame later.
+            this._setTextAll('#artist-stats .stat-label', ['artist.totalImages', 'artist.confidentMatches', 'artist.unconfirmed', 'artist.noMatch', 'artist.artistsFound']);
             // The section headings are NOT set here. Each <h3> holds a sprite icon
             // plus its own `data-i18n` label span, so applyToDOM already
             // translates them; writing the heading's textContent would delete

@@ -43,7 +43,10 @@ Object.assign(window.ArtistIdent, {
     _buildCompletionToast(progress, requestedCount = 0) {
         const results = Array.isArray(progress?.results) ? progress.results : [];
         const errors = Number(progress?.errors || 0);
-        const allUndefined = results.length > 0 && results.every(result => String(result?.artist || '').toLowerCase() === 'undefined');
+        const tiers = results.map((result) => this.describeArtistResult(result).level);
+        const confident = tiers.filter((level) => level === 'high').length;
+        const unconfirmed = tiers.filter((level) => level === 'low').length;
+        const noMatch = tiers.filter((level) => level === 'none').length;
         const targetCount = requestedCount || Number(progress?.total || 0) || results.length;
 
         // Whole-batch crash: the backend reports step='error' + message
@@ -67,12 +70,30 @@ Object.assign(window.ArtistIdent, {
             };
         }
 
-        if (allUndefined) {
+        // No confident match in the whole run is worth flagging, but the cause
+        // is almost never the slider: 97% of the bottom tier is an artist the
+        // model simply cannot name. Telling the user to lower the threshold and
+        // rerun (the pre-tiering advice) costs another full pass for nothing.
+        if (results.length > 0 && confident === 0) {
             return {
                 level: 'warning',
-                message: this.tText(
-                    `The run completed, but the current threshold turned all ${results.length} result(s) into "undefined". Try ${this.thresholdDefaults.suggestedLow.toFixed(2)}-${this.thresholdDefaults.suggestedHigh.toFixed(2)}.`,
-                    `这轮识别完成了，但当前阈值把 ${results.length} 个结果全压成了“未定义”。建议改成 ${this.thresholdDefaults.suggestedLow.toFixed(2)}-${this.thresholdDefaults.suggestedHigh.toFixed(2)} 再试。`
+                message: this.tKey(
+                    'artist.completionNoConfident',
+                    'Finished {count} image(s) with no confident match: {unconfirmed} unconfirmed candidate(s), {none} with no match. Those artists are probably not in this model\u2019s vocabulary.',
+                    '已完成 {count} 张，但没有高置信度匹配：{unconfirmed} 个低置信度候选，{none} 个没有匹配。这些画师大概率不在此模型的词表里。',
+                    { count: results.length, unconfirmed, none: noMatch }
+                ),
+            };
+        }
+
+        if (results.length > 0) {
+            return {
+                level: 'success',
+                message: this.tKey(
+                    'artist.completionTiered',
+                    'Identified {count} image(s): {confident} confident, {unconfirmed} unconfirmed, {none} no match.',
+                    '已完成 {count} 张：{confident} 个高置信度，{unconfirmed} 个低置信度候选，{none} 个没有匹配。',
+                    { count: results.length, confident, unconfirmed, none: noMatch }
                 ),
             };
         }
@@ -80,9 +101,11 @@ Object.assign(window.ArtistIdent, {
         if (targetCount > 0) {
             return {
                 level: 'success',
-                message: this.tText(
-                    `Identified ${targetCount} image(s).`,
-                    `已完成 ${targetCount} 张图片的画师识别。`
+                message: this.tKey(
+                    'artist.completionCounted',
+                    'Identified {count} image(s).',
+                    '已完成 {count} 张图片的画师识别。',
+                    { count: targetCount }
                 ),
             };
         }

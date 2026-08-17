@@ -116,12 +116,18 @@ test('window.ArtistIdent is an unsealed object literal exposing the load-bearing
       '_buildCompletionToast', '_escapeHtml', '_decodeArtistValue',
       'localizeDiagnosticsMessage', 'dismissFirstUseCard', 'refreshFirstUseCard',
       'showFirstUseGuide', '_syncControls', 'tText', 'tKey',
+      // Confidence tiering (2c15c9e): describeArtistResult is the single
+      // formatter every caller — including gallery/modal-analysis.js — must use
+      // instead of reading `artist`, which is the "undefined" sentinel below the
+      // high tier.
+      'describeArtistResult', 'confidenceTierLabel', 'renderLowConfidenceArtists',
+      'refreshVocabularyState', 'checkArtistVocabulary',
     ]
     const requiredProps = [
       'isIdentifying', 'selectedArtist', 'selectedArtistPageSize',
       'selectedArtistOffset', 'selectedArtistHasMore', 'selectedArtistImages',
       'artistRequestToken', 'statsRequestToken', 'viewMode', 'stats', 'diagnostics', 'eventsBound',
-      'progressTracker', 'thresholdDefaults',
+      'progressTracker', 'thresholdDefaults', 'vocabulary',
     ]
     return {
       isObject: A !== null && typeof A === 'object',
@@ -158,7 +164,11 @@ test('window.ArtistIdent is an unsealed object literal exposing the load-bearing
   expect(probe.statsToken).toBe(0)
   expect(probe.selectedArtist).toBeNull()
   expect(probe.diagnostics).toBeNull()
-  expect(probe.thresholdDefaults).toEqual({ value: 0.03, suggestedLow: 0.02, suggestedHigh: 0.08 })
+  // `suggestedLow`/`suggestedHigh` (0.02-0.08) were the pre-tiering "try a
+  // lower threshold" band. Since 2c15c9e a score under ARTIST_CONFIDENT_THRESHOLD
+  // can no longer have a name written, so lowering the slider cannot produce the
+  // result that advice promised; `confident` pins the value that actually gates it.
+  expect(probe.thresholdDefaults).toEqual({ value: 0.03, confident: 0.20 })
 })
 
 // ---------------------------------------------------------------------------
@@ -298,6 +308,7 @@ test('capturePreferences reads the control DOM and applySavedPreferences writes 
 // ---------------------------------------------------------------------------
 
 test('name + confidence formatters handle multi-word, single-word, empty and "undefined" sentinels', async ({ page }) => {
+  await page.evaluate(() => (window as any).I18n.setLang('en'))
   const probe = await page.evaluate(() => {
     const A = (window as any).ArtistIdent
     return {
@@ -321,8 +332,12 @@ test('name + confidence formatters handle multi-word, single-word, empty and "un
   expect(probe.initialsEmpty).toBe('?')
   expect(probe.initialsUndef).toBe('?')
   expect(probe.nameMulti).toBe('Greg Rutkowski')
-  expect(probe.nameEmpty).toBe('Undefined')
-  expect(probe.nameUndef).toBe('Undefined')
+  // "undefined" is the backend's refusal-to-answer sentinel. Rendering it (even
+  // title-cased as the old pin required) is the refusal reading as an answer, so
+  // the sentinel now formats as the localized no-match label instead.
+  expect(probe.nameEmpty).toBe('No match')
+  expect(probe.nameUndef).toBe('No match')
+  expect(probe.nameUndef.toLowerCase()).not.toContain('undefined')
   expect(probe.pct).toBe('85.6%')
   expect(probe.pctZero).toBe('0.0%')
   expect(probe.pctNull).toBe('0.0%')
@@ -333,18 +348,29 @@ test('name + confidence formatters handle multi-word, single-word, empty and "un
 // ---------------------------------------------------------------------------
 
 test('_buildCompletionToast picks error/warning/success by branch and the whole-batch crash (step:error) wins over the count paths', async ({ page }) => {
+  await page.evaluate(() => (window as any).I18n.setLang('en'))
   const probe = await page.evaluate(() => {
     const A = (window as any).ArtistIdent
+    // Batch results carry confidence_level since 2c15c9e; a bare `{artist}` is
+    // the pre-tiering shape the backend no longer emits.
+    const high = { artist: 'greg', confidence: 0.71, confidence_level: 'high' }
     return {
       // step:'error' returns the raw backend message even though results exist and
       // errors===0 (the documented crash-before-count ordering).
-      crash: A._buildCompletionToast({ step: 'error', message: 'kaboom', results: [{ artist: 'greg' }], errors: 0 }, 5),
+      crash: A._buildCompletionToast({ step: 'error', message: 'kaboom', results: [high], errors: 0 }, 5),
       // per-image errors -> warning.
-      withErrors: A._buildCompletionToast({ results: [{ artist: 'greg' }], errors: 2, total: 3 }, 3),
-      // every result "undefined" -> warning (threshold too high).
-      allUndefined: A._buildCompletionToast({ results: [{ artist: 'undefined' }, { artist: 'Undefined' }], errors: 0 }, 0),
-      // a real target count -> success.
-      counted: A._buildCompletionToast({ results: [{ artist: 'greg' }], errors: 0, total: 1 }, 3),
+      withErrors: A._buildCompletionToast({ results: [high], errors: 2, total: 3 }, 3),
+      // nothing reached the confident tier -> warning, and the message must not
+      // send the user back to the slider: that cannot change the outcome.
+      noConfident: A._buildCompletionToast({
+        results: [
+          { artist: 'undefined', candidate_artist: 'greg', confidence: 0.07, confidence_level: 'low' },
+          { artist: 'undefined', confidence: 0.004, confidence_level: 'none' },
+        ],
+        errors: 0,
+      }, 0),
+      // at least one confident match -> success, with the tier breakdown.
+      counted: A._buildCompletionToast({ results: [high], errors: 0, total: 1 }, 3),
       // nothing to report -> generic success.
       generic: A._buildCompletionToast({ results: [], errors: 0, total: 0 }, 0),
     }
@@ -353,9 +379,16 @@ test('_buildCompletionToast picks error/warning/success by branch and the whole-
   expect(probe.crash.level).toBe('error')
   expect(probe.crash.message).toBe('kaboom')
   expect(probe.withErrors.level).toBe('warning')
-  expect(probe.allUndefined.level).toBe('warning')
+  expect(probe.noConfident.level).toBe('warning')
+  expect(probe.noConfident.message).toContain('1 unconfirmed candidate')
+  expect(probe.noConfident.message.toLowerCase()).not.toContain('threshold')
   expect(probe.counted.level).toBe('success')
+  expect(probe.counted.message).toContain('1 confident')
   expect(probe.generic.level).toBe('success')
+
+  for (const built of Object.values(probe)) {
+    expect((built as { message: string }).message.toLowerCase()).not.toContain('undefined')
+  }
 })
 
 // ---------------------------------------------------------------------------
@@ -840,7 +873,16 @@ test('identifyAll collects image ids, posts the identify-batch payload, polls to
     route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ running: false, total: 2, processed: 2, errors: 0, results: [{ artist: 'greg' }, { artist: 'greg' }] }),
+      body: JSON.stringify({
+        running: false,
+        total: 2,
+        processed: 2,
+        errors: 0,
+        results: [
+          { artist: 'greg', confidence: 0.64, confidence_level: 'high' },
+          { artist: 'greg', confidence: 0.52, confidence_level: 'high' },
+        ],
+      }),
     }))
   await page.route(/\/api\/artists\/stats/, (route) =>
     route.fulfill({
@@ -1100,4 +1142,287 @@ test('after init the delegated click handlers route the action buttons exactly o
   expect(probe.loadStatsCalls).toBe(1)
   expect(probe.clearAllDataCalls).toBe(1)
   expect(probe.listMode).toBe(true)
+})
+
+// ---------------------------------------------------------------------------
+// 15. Confidence tiering (2c15c9e) — `artist` is the "undefined" sentinel below
+//     the high tier, so a low/none result must never render as "the artist".
+// ---------------------------------------------------------------------------
+
+test('a low-confidence result is shown as an unconfirmed candidate, never as the artist, and "undefined" never reaches the screen', async ({ page }) => {
+  await page.evaluate(() => (window as any).I18n.setLang('en'))
+  const probe = await page.evaluate(() => {
+    const A = (window as any).ArtistIdent
+    return {
+      high: A.describeArtistResult({
+        artist: 'greg_rutkowski',
+        candidate_artist: 'greg_rutkowski',
+        confidence: 0.71,
+        confidence_level: 'high',
+        vocabulary_size: 39261,
+        advisory: 'Confident match. / 高置信度匹配。',
+      }),
+      low: A.describeArtistResult({
+        artist: 'undefined',
+        candidate_artist: 'wlop',
+        confidence: 0.084,
+        confidence_level: 'low',
+        out_of_vocabulary_likely: true,
+        vocabulary_size: 39261,
+        advisory: 'Unconfirmed suggestion, not an identification. / 这只是低置信度候选，不是识别结果。',
+      }),
+      none: A.describeArtistResult({
+        artist: 'undefined',
+        candidate_artist: null,
+        confidence: 0.004,
+        confidence_level: 'none',
+        out_of_vocabulary_likely: true,
+        vocabulary_size: 39261,
+        advisory: 'No match. / 没有匹配。',
+      }),
+    }
+  })
+
+  // high: a real name plus the score.
+  expect(probe.high.level).toBe('high')
+  expect(probe.high.artistName).toBe('Greg Rutkowski')
+  expect(probe.high.headline).toContain('Greg Rutkowski')
+  expect(probe.high.headline).toContain('71.0%')
+
+  // low: the candidate is offered, but never as `artistName`.
+  expect(probe.low.level).toBe('low')
+  expect(probe.low.artistName).toBeNull()
+  expect(probe.low.candidateName).toBe('Wlop')
+  expect(probe.low.headline).toContain('Unconfirmed candidate')
+  expect(probe.low.headline).toContain('Wlop')
+  expect(probe.low.headline).toContain('8.4%')
+  expect(probe.low.advisory).toContain('Unconfirmed suggestion')
+  // The bilingual "EN / ZH" advisory is split, so an English UI never shows both.
+  expect(probe.low.advisory).not.toContain('这只是')
+
+  // none: no name at all, only the advisory.
+  expect(probe.none.level).toBe('none')
+  expect(probe.none.artistName).toBeNull()
+  expect(probe.none.candidateName).toBeNull()
+  expect(probe.none.displayName).toBeNull()
+  expect(probe.none.advisory).toContain('No match')
+
+  for (const described of Object.values(probe)) {
+    const tier = described as { headline: string; advisory: string; tierLabel: string }
+    expect(tier.headline.toLowerCase()).not.toContain('undefined')
+    expect(tier.advisory.toLowerCase()).not.toContain('undefined')
+    expect(tier.tierLabel.toLowerCase()).not.toContain('undefined')
+  }
+})
+
+test('the single-image modal toast reports the tier instead of the raw artist field', async ({ page }) => {
+  await page.evaluate(() => (window as any).I18n.setLang('en'))
+  let identifyBody: Record<string, unknown> | null = null
+  let identifyResponse: Record<string, unknown> = {}
+  await page.route('**/api/artists/identify', (route) => {
+    identifyBody = JSON.parse(route.request().postData() || '{}')
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(identifyResponse) })
+  })
+  await page.route('**/api/artists/stats', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ total_images: 1, identified_images: 1, undefined_count: 1, confident_count: 0, low_confidence_count: 0, artist_counts: {}, artist_stats: {}, low_confidence_artist_counts: {} }),
+  }))
+
+  await page.evaluate(() => {
+    const w = window as any
+    w.__artistToasts = []
+    w.App.showToast = (message: string, level: string) => { w.__artistToasts.push({ message, level }) }
+  })
+
+  identifyResponse = {
+    image_id: 7,
+    artist: 'undefined',
+    candidate_artist: 'wlop',
+    confidence: 0.09,
+    confidence_level: 'low',
+    out_of_vocabulary_likely: true,
+    vocabulary_size: 39261,
+    advisory: 'Unconfirmed suggestion, not an identification. / 这只是低置信度候选，不是识别结果。',
+    top_predictions: [],
+    model_loaded: true,
+  }
+  const lowToast = await page.evaluate(async () => {
+    const G = (window as any).Gallery
+    G._currentPreviewId = 7
+    G._modalAnalysisRunning = new Set()
+    await G._handleModalAnalysis('artist')
+    return (window as any).__artistToasts.slice(-1)[0]
+  })
+
+  expect(identifyBody).not.toBeNull()
+  expect((identifyBody as any).image_id).toBe(7)
+  expect(lowToast.level).toBe('info')
+  expect(lowToast.message).toContain('Unconfirmed candidate')
+  expect(lowToast.message).toContain('Wlop')
+  expect(lowToast.message.toLowerCase()).not.toContain('undefined')
+
+  identifyResponse = {
+    image_id: 7,
+    artist: 'greg_rutkowski',
+    candidate_artist: 'greg_rutkowski',
+    confidence: 0.55,
+    confidence_level: 'high',
+    vocabulary_size: 39261,
+    advisory: 'Confident match. / 高置信度匹配。',
+    top_predictions: [],
+    model_loaded: true,
+  }
+  const highToast = await page.evaluate(async () => {
+    const G = (window as any).Gallery
+    G._currentPreviewId = 7
+    G._modalAnalysisRunning = new Set()
+    await G._handleModalAnalysis('artist')
+    return (window as any).__artistToasts.slice(-1)[0]
+  })
+  expect(highToast.level).toBe('success')
+  expect(highToast.message).toContain('Greg Rutkowski')
+  expect(highToast.message.toLowerCase()).not.toContain('undefined')
+})
+
+test('the unconfirmed bucket renders apart from Top Artists and per-image rows below the confident tier are badged', async ({ page }) => {
+  await page.evaluate(() => (window as any).I18n.setLang('en'))
+  await page.route('**/api/artists/stats', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({
+      total_images: 30,
+      identified_images: 30,
+      undefined_count: 18,
+      confident_count: 4,
+      low_confidence_count: 8,
+      confident_threshold: 0.2,
+      artist_counts: { greg_rutkowski: 4 },
+      artist_stats: { greg_rutkowski: { count: 4, avg_confidence: 0.44, max_confidence: 0.71 } },
+      low_confidence_artist_counts: { wlop: 5, sakimichan: 3 },
+    }),
+  }))
+  await page.route('**/api/artists/images/**', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({
+      images: [
+        { image_id: 1, filename: 'sure.png', confidence_percent: 71, confidence_level: 'high' },
+        { image_id: 2, filename: 'maybe.png', confidence_percent: 9, confidence_level: 'low' },
+      ],
+      has_more: false,
+    }),
+  }))
+
+  await page.evaluate(() => (window as any).ArtistIdent.loadStats())
+
+  // Confident-only grid, unconfirmed bucket kept separate and clearly labelled.
+  await expect(page.locator('#artist-results-grid .artist-card')).toHaveCount(1)
+  await expect(page.locator('#artist-results-grid')).toContainText('Greg Rutkowski')
+  const bucket = page.locator('#artist-low-confidence')
+  await expect(bucket).toBeVisible()
+  await expect(bucket).toContainText('Unconfirmed candidates (8)')
+  await expect(bucket.locator('.artist-candidate-chip')).toHaveCount(2)
+  await expect(page.locator('#artist-results-grid')).not.toContainText('Wlop')
+
+  // Five disjoint buckets, no merged "Identified" number.
+  const stats = page.locator('#artist-stats')
+  await expect(stats).toContainText('Confident Matches')
+  await expect(stats).toContainText('Unconfirmed')
+  await expect(stats).toContainText('No match')
+  await expect(stats.locator('.stat-card')).toHaveCount(5)
+
+  // Opening a confident artist still lists its sub-threshold rows — badged.
+  await page.locator('#artist-results-grid .artist-card').first().click()
+  const preview = page.locator('#artist-images-preview')
+  await expect(preview.locator('.artist-image-card')).toHaveCount(2)
+  await expect(preview.locator('.artist-image-card[data-image-id="1"] .artist-image-tier')).toHaveCount(0)
+  await expect(preview.locator('.artist-image-card[data-image-id="2"] .artist-image-tier')).toHaveText('Unconfirmed')
+
+  // Opening an unconfirmed candidate says so instead of reporting "0 images".
+  await bucket.locator('.artist-candidate-chip').first().click()
+  const detail = page.locator('#artist-detail-content')
+  await expect(detail.locator('.artist-tier-badge')).toHaveText('Unconfirmed')
+  await expect(detail).toContainText('5 images suggested for this name')
+  await expect(detail.locator('.artist-detail-advisory')).toBeVisible()
+  await expect(detail).not.toContainText('undefined')
+})
+
+test('the vocabulary lookup answers "is my artist supported?" before a run is started', async ({ page }) => {
+  await page.evaluate(() => (window as any).I18n.setLang('en'))
+  const lookupUrls: string[] = []
+  await page.route('**/api/artists/vocabulary**', (route) => {
+    const url = route.request().url()
+    lookupUrls.push(url)
+    const names = new URL(url).searchParams.getAll('name')
+    const known: Record<string, boolean> = {}
+    names.forEach((name) => { known[name] = name === 'wlop' })
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ vocabulary_size: 39261, vocabulary_loaded: true, known }),
+    })
+  })
+
+  // Real view activation (not the inline-style reveal gotoArtist does): the
+  // lookup is driven by the delegated handlers bindEvents() installs, and a
+  // real click needs the other views genuinely out of the way.
+  await page.evaluate(() => {
+    localStorage.setItem('artist-guide-seen', 'true')
+    document.querySelectorAll<HTMLElement>('.view').forEach((view) => { view.style.removeProperty('display') })
+    ;(window as any).App.switchView('artist')
+  })
+  await expect(page.locator('#view-artist')).toHaveClass(/\bactive\b/)
+  await expect(page.locator('#view-gallery')).toBeHidden()
+
+  const result = page.locator('#artist-vocabulary-result')
+  await expect(result).toContainText('39,261')
+
+  await page.locator('#artist-vocabulary-input').fill('wlop, not_a_real_artist')
+  await page.locator('#btn-artist-vocabulary-check').click()
+
+  await expect(result.locator('.artist-vocabulary-row.is-known')).toHaveText(/wlop/)
+  const unknown = result.locator('.artist-vocabulary-row.is-unknown')
+  await expect(unknown).toHaveCount(1)
+  await expect(unknown).toContainText('not_a_real_artist')
+  await expect(unknown).toContainText('can never be predicted')
+
+  const lastUrl = new URL(lookupUrls[lookupUrls.length - 1])
+  expect(lastUrl.searchParams.getAll('name')).toEqual(['wlop', 'not_a_real_artist'])
+
+  // It sits above the run buttons: the answer decides whether a run is worth it.
+  const order = await page.evaluate(() => {
+    const section = document.getElementById('artist-vocabulary-section')
+    const runButton = document.getElementById('btn-identify-all')
+    if (!section || !runButton) return -1
+    return section.compareDocumentPosition(runButton) & Node.DOCUMENT_POSITION_FOLLOWING ? 1 : 0
+  })
+  expect(order).toBe(1)
+
+  for (const viewport of [
+    { width: 1366, height: 768 },
+    { width: 1920, height: 1080 },
+    { width: 2560, height: 1440 },
+  ]) {
+    await page.setViewportSize(viewport)
+    const geometry = await page.evaluate(() => {
+      const section = document.getElementById('artist-vocabulary-section')
+      const input = document.getElementById('artist-vocabulary-input')
+      const button = document.getElementById('btn-artist-vocabulary-check')
+      const inputRect = input?.getBoundingClientRect()
+      const buttonRect = button?.getBoundingClientRect()
+      return {
+        sectionVisible: !!section && section.getBoundingClientRect().height > 0,
+        inputWidth: inputRect?.width ?? 0,
+        buttonWidth: buttonRect?.width ?? 0,
+        overlaps: !!(inputRect && buttonRect && inputRect.right > buttonRect.left + 1),
+        pageOverflowX: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      }
+    })
+    expect(geometry.sectionVisible, `${viewport.width}x${viewport.height}`).toBe(true)
+    expect(geometry.inputWidth).toBeGreaterThan(0)
+    expect(geometry.buttonWidth).toBeGreaterThan(0)
+    expect(geometry.overlaps).toBe(false)
+    expect(geometry.pageOverflowX).toBe(0)
+  }
 })

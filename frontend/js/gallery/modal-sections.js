@@ -183,6 +183,7 @@ Object.assign(window.Gallery, {
         if (negSection) {
             negSection.style.display = promptView.negativeText ? '' : 'none';
         }
+        this._applyModalSidecarCaption(this._lastModalImage);
         if (promptHeader) {
             const fallbackLabel = promptView.targetFormat === 'original'
                 ? 'Prompt (Original format)'
@@ -211,6 +212,25 @@ Object.assign(window.Gallery, {
             toggleBtn.setAttribute('aria-label', toggleBtn.textContent);
         }
         this._modalPromptView = promptView;
+    },
+
+    /**
+     * Show text recovered from a .txt/.json sidecar beside the prompt block.
+     *
+     * `sidecar_caption` (migration 042) exists precisely so this text stops
+     * masquerading as an SD prompt, so it gets its own labelled section rather
+     * than being appended to one the user reads as generation parameters. The
+     * gallery-grid column list deliberately omits the field to keep list rows
+     * small, so the modal is the only place it can be read.
+     */
+    _applyModalSidecarCaption(image) {
+        const section = document.querySelector('#modal-sidecar-caption-section');
+        const text = document.querySelector('#modal-sidecar-caption-text');
+        if (!section || !text) return;
+
+        const caption = String(image?.sidecar_caption || '').trim();
+        text.textContent = caption || '-';
+        section.style.display = caption ? '' : 'none';
     },
 
     _togglePromptFormat() {
