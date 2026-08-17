@@ -106,14 +106,37 @@ def _apply_exclude_loras_filter(conditions: List[str], params: List[Any],
     return conditions, params
 
 
+# Whole-comma-segment view of the sidecar caption, for the exclude filter's
+# exact mode. The include side can afford a broad LIKE because
+# _matches_exact_post_filters re-checks tokens in Python; excludes have no
+# post-pass, so the token boundary has to live in the SQL (see the v3.4.0 note
+# below). Wrapping the text in commas and collapsing the spaces around each
+# separator makes "%,term,%" match exactly one comma-delimited segment, which
+# is the same split extract_prompt_tokens performs. There is no equivalent of
+# image_prompt_tokens for captions — indexing them was rejected deliberately
+# (see update_reparsed_sidecar_caption), so the boundary is expressed inline.
+_SIDECAR_CAPTION_SEGMENTS_SQL = (
+    "',' || REPLACE(REPLACE(TRIM("
+    "LOWER(REPLACE(COALESCE(i.sidecar_caption, ''), '_', ' '))"
+    "), ' ,', ','), ', ', ',') || ','"
+)
+
+
 def _apply_exclude_prompts_filter(conditions: List[str], params: List[Any],
                                   exclude_prompts: Optional[List[str]],
                                   prompt_match_mode: str = PROMPT_MATCH_MODE_EXACT) -> tuple:
-    """Exclude images whose prompt matches ANY of the specified terms.
+    """Exclude images whose text matches ANY of the specified terms.
 
-    v3.3.0 FEAT-EXCLUDE-EXTRA: the negation of _apply_prompt_terms_filter.
-    'contains' mode does a normalized substring NOT LIKE on the raw prompt;
-    'exact' mode excludes any image with a matching prompt token.
+    v3.3.0 FEAT-EXCLUDE-EXTRA: the negation of _apply_prompt_terms_filter, and
+    it has to stay the exact negation. That filter reads ``prompt`` and
+    ``sidecar_caption`` (migration 042); if this one read only ``prompt`` the
+    pair would contradict itself — the same row could satisfy "contains X" and
+    "excludes X" at once — and the contradiction resolves in the dangerous
+    direction, letting a batch move carry off a file the user explicitly ruled
+    out.
+
+    'contains' mode does a normalized substring NOT LIKE over both columns;
+    'exact' mode excludes any image with a matching whole token in either.
     """
     if not exclude_prompts:
         return conditions, params
@@ -124,9 +147,13 @@ def _apply_exclude_prompts_filter(conditions: List[str], params: List[Any],
             continue
         if match_mode == PROMPT_MATCH_MODE_CONTAINS:
             conditions.append(
-                "LOWER(REPLACE(COALESCE(i.prompt, ''), '_', ' ')) NOT LIKE ? ESCAPE '\\'"
+                "(LOWER(REPLACE(COALESCE(i.prompt, ''), '_', ' ')) NOT LIKE ? ESCAPE '\\'"
+                " AND LOWER(REPLACE(COALESCE(i.sidecar_caption, ''), '_', ' ')) "
+                "NOT LIKE ? ESCAPE '\\')"
             )
-            params.append(f"%{escape_like_pattern(normalized_term)}%")
+            like_pattern = f"%{escape_like_pattern(normalized_term)}%"
+            params.append(like_pattern)
+            params.append(like_pattern)
         else:
             # v3.4.0 FIX: exact mode must compare whole normalized tokens.
             # The include filter uses a broad LIKE pre-filter because it is
@@ -134,12 +161,19 @@ def _apply_exclude_prompts_filter(conditions: List[str], params: List[Any],
             # so a LIKE here permanently over-excluded (excluding "cat" also
             # hid "catgirl"/"scattered"). image_prompt_tokens stores tokens
             # already normalized via normalize_prompt_token, matching
-            # normalized_term above.
+            # normalized_term above; the caption arm reproduces that boundary
+            # with the comma-wrapped segment view.
             conditions.append(
-                "NOT EXISTS (SELECT 1 FROM image_prompt_tokens ipt "
+                "(NOT EXISTS (SELECT 1 FROM image_prompt_tokens ipt "
                 "WHERE ipt.image_id = i.id AND ipt.token = ?)"
+                f" AND {_SIDECAR_CAPTION_SEGMENTS_SQL} NOT LIKE ? ESCAPE '\\')"
             )
+            # The term is collapsed the same way the column expression is, so a
+            # multi-word term ("looking at viewer") still lines up with one
+            # segment of the wrapped text.
+            segment_term = normalized_term.replace(" ,", ",").replace(", ", ",")
             params.append(normalized_term)
+            params.append(f"%,{escape_like_pattern(segment_term)},%")
     return conditions, params
 
 

@@ -192,6 +192,24 @@ def _apply_lora_filter(conditions: List[str], params: List[Any],
     return conditions, params
 
 
+# The two columns that hold "the words describing this image", normalized the
+# same way (lowercase, underscore folded to space) so a Danbooru-style
+# ``silver_hair`` and a typed ``silver hair`` are the same term.
+#
+# Migration 042 split them by PROVENANCE — ``prompt`` is what an SD generator
+# was given, ``sidecar_caption`` is what somebody else wrote in a ``.txt``
+# beside the file — not by meaning. Every text filter therefore has to look at
+# both or it silently answers a narrower question than the user asked. They are
+# named constants because ``21fd5e8`` extended one caller (the search box) and
+# missed the other (prompt terms, which is what Auto-Separate moves on); a
+# shared expression makes the next such divergence a compile-time-visible edit
+# rather than a silent behavioral one.
+_PROMPT_NORMALIZED_SQL = "LOWER(REPLACE(COALESCE(i.prompt, ''), '_', ' '))"
+_SIDECAR_CAPTION_NORMALIZED_SQL = (
+    "LOWER(REPLACE(COALESCE(i.sidecar_caption, ''), '_', ' '))"
+)
+
+
 def _apply_search_filter(conditions: List[str], params: List[Any],
                          search_query: Optional[str]) -> tuple:
     """Apply free-text search over filename, checkpoint, prompt and caption.
@@ -241,10 +259,7 @@ def _apply_search_filter(conditions: List[str], params: List[Any],
     caption_clause = ""
     caption_params: List[Any] = []
     if normalized_search:
-        caption_clause = (
-            " OR LOWER(REPLACE(COALESCE(i.sidecar_caption, ''), '_', ' ')) "
-            "LIKE ? ESCAPE '\\'"
-        )
+        caption_clause = f" OR {_SIDECAR_CAPTION_NORMALIZED_SQL} LIKE ? ESCAPE '\\'"
         caption_params.append(f"%{escape_like_pattern(normalized_search)}%")
 
     conditions.append(
@@ -298,14 +313,46 @@ def _apply_folder_filter(conditions: List[str], params: List[Any],
 def _apply_prompt_terms_filter(conditions: List[str], params: List[Any],
                                prompt_terms: Optional[List[str]],
                                prompt_match_mode: str = PROMPT_MATCH_MODE_EXACT) -> tuple:
-    """Apply multi-prompt filter (AND logic - prompt must contain ALL terms).
+    """Apply multi-prompt filter (AND logic - image text must contain ALL terms).
 
-    Uses substring matching (LIKE %term%) with normalization.
+    Each term must appear in the image's ``prompt`` OR in its
+    ``sidecar_caption`` (migration 042). The two columns are split by who wrote
+    the text, not by what it means, and this filter is a question about
+    meaning: a rule written as "prompt contains silver_hair" is the user asking
+    for images of silver hair, and the same image answers that question whether
+    its tags arrived embedded in the PNG or in a ``.txt`` next to it.
+
+    Matching both is also the only reading that keeps existing rules stable.
+    The scan upsert writes ``prompt = ?`` unconditionally, so a rescan
+    relocates sidecar-derived text out of ``prompt``; a prompt-only filter
+    would then move strictly fewer files than the same saved Auto-Separate rule
+    moved yesterday, with nothing telling the user it had narrowed. This is the
+    selection criterion for batch move, so that is a wrong file set, not just a
+    shorter list.
+
+    Mode semantics are unchanged and apply identically to both columns:
+
+    * ``contains`` — normalized substring, resolved entirely in SQL.
+    * ``exact`` — whole comma-delimited token. The SQL below is only a
+      deliberately BROAD pre-filter for this mode (a token-index ``LIKE`` for
+      the prompt, a substring ``LIKE`` for the caption);
+      ``_matches_exact_post_filters`` then re-checks both columns with
+      ``extract_prompt_tokens`` and is what actually decides. A pre-filter may
+      over-match, never under-match, or rows vanish before the post-filter can
+      rescue them.
+
+    ``sidecar_caption_format`` is deliberately NOT consulted. Exact mode
+    already self-selects tag-shaped text (a prose caption has no comma-split
+    tokens to match) and contains mode is a substring search where finding
+    words inside prose is the point — so a format gate would add no precision,
+    while making results depend on a column that is NULL for every row written
+    before migration 044.
 
     Args:
         conditions: Current WHERE conditions list
         params: Current parameter list
         prompt_terms: List of prompt terms to filter by
+        prompt_match_mode: ``exact`` (whole token) or ``contains`` (substring)
 
     Returns:
         Tuple of (modified conditions, modified params)
@@ -318,15 +365,20 @@ def _apply_prompt_terms_filter(conditions: List[str], params: List[Any],
         normalized_term = normalize_prompt_token(term)
         if not normalized_term:
             continue
+        like_pattern = f"%{escape_like_pattern(normalized_term)}%"
         if match_mode == PROMPT_MATCH_MODE_CONTAINS:
-            conditions.append("LOWER(REPLACE(COALESCE(i.prompt, ''), '_', ' ')) LIKE ? ESCAPE '\\'")
-            params.append(f"%{escape_like_pattern(normalized_term)}%")
+            conditions.append(
+                f"({_PROMPT_NORMALIZED_SQL} LIKE ? ESCAPE '\\'"
+                f" OR {_SIDECAR_CAPTION_NORMALIZED_SQL} LIKE ? ESCAPE '\\')"
+            )
         else:
             conditions.append(
-                "EXISTS (SELECT 1 FROM image_prompt_tokens ipt "
+                "(EXISTS (SELECT 1 FROM image_prompt_tokens ipt "
                 "WHERE ipt.image_id = i.id AND ipt.token LIKE ? ESCAPE '\\')"
+                f" OR {_SIDECAR_CAPTION_NORMALIZED_SQL} LIKE ? ESCAPE '\\')"
             )
-            params.append(f"%{escape_like_pattern(normalized_term)}%")
+        params.append(like_pattern)
+        params.append(like_pattern)
 
     return conditions, params
 

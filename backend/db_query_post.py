@@ -122,12 +122,16 @@ def _fetch_post_filtered_ids(
             break
 
         for row in rows:
+            # base_query must select i.sidecar_caption alongside i.prompt; a
+            # missing column raises here rather than silently dropping every
+            # caption-only row from a "move all matching" set.
             if _matches_exact_post_filters(
                 row["prompt"],
                 row["loras"],
                 normalized_prompt_terms,
                 normalized_loras,
                 prompt_match_mode=prompt_match_mode,
+                sidecar_caption=row["sidecar_caption"],
             ):
                 matched_ids.append(int(row["id"]))
                 if target_count is not None and len(matched_ids) >= target_count:
@@ -149,15 +153,36 @@ def _matches_exact_post_filters(
     normalized_loras: List[str],
     *,
     prompt_match_mode: str = PROMPT_MATCH_MODE_EXACT,
+    sidecar_caption: Optional[str] = None,
 ) -> bool:
-    """Apply the exact prompt/LORA matching semantics used by post-filter paths."""
+    """Apply the exact prompt/LORA matching semantics used by post-filter paths.
+
+    This is the half of the prompt-terms filter that actually decides in
+    ``exact`` mode — the SQL clause built by ``_apply_prompt_terms_filter`` is
+    only a broad pre-filter. It therefore has to read the same two text columns
+    that filter does: a term is satisfied by the ``prompt`` OR by the
+    ``sidecar_caption`` (migration 042). Leaving the caption out here would
+    reject every row whose text a rescan relocated, no matter what the SQL
+    matched, and the batch-move snapshot runs through this function.
+
+    ``sidecar_caption`` is keyword-only with a ``None`` default so a caller
+    that legitimately has no caption to offer reads as prompt-only rather than
+    accidentally positional.
+    """
     if normalized_prompt_terms:
         if normalize_prompt_match_mode(prompt_match_mode) == PROMPT_MATCH_MODE_CONTAINS:
-            normalized_prompt = normalize_prompt_token(prompt or "")
-            if not all(term in normalized_prompt for term in normalized_prompt_terms):
+            searchable = (
+                normalize_prompt_token(prompt or ""),
+                normalize_prompt_token(sidecar_caption or ""),
+            )
+            if not all(
+                any(term in text for text in searchable)
+                for term in normalized_prompt_terms
+            ):
                 return False
         else:
             image_tokens = extract_prompt_tokens(prompt or "")
+            image_tokens |= extract_prompt_tokens(sidecar_caption or "")
             if not all(term in image_tokens for term in normalized_prompt_terms):
                 return False
 
@@ -192,6 +217,7 @@ def _post_filter_results(results: List[Dict[str, Any]],
             normalized_prompt_terms,
             normalized_loras,
             prompt_match_mode=prompt_match_mode,
+            sidecar_caption=img.get("sidecar_caption"),
         ):
             filtered_results.append(img)
 

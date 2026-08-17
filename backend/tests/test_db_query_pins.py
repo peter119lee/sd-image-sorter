@@ -628,22 +628,35 @@ class TestColorFilters:
 
 
 class TestExcludeFilters:
+    # Both exclude-prompt pins gained a sidecar_caption arm: migration 042 moved
+    # .txt text into that column and _apply_prompt_terms_filter matches it, so
+    # the negation has to reject it or the same row satisfies "contains X" and
+    # "excludes X" at once. Behavioural coverage of the resulting file set lives
+    # in test_prompt_filter_sidecar_caption.py; these two stay because they pin
+    # the whole-token boundary, which SQL alone enforces on the exclude side.
     def test_exclude_prompts_exact_is_token_level_not_like(self):
         c, p = _apply_exclude_prompts_filter([], [], ["cat"], PROMPT_MATCH_MODE_EXACT)
-        assert c == [
+        assert len(c) == 1
+        # The prompt arm still compares whole index tokens with `=`, never LIKE.
+        assert (
             "NOT EXISTS (SELECT 1 FROM image_prompt_tokens ipt "
             "WHERE ipt.image_id = i.id AND ipt.token = ?)"
-        ]
-        assert p == ["cat"]
+        ) in c[0]
+        # The caption arm carries the same boundary by wrapping the comma-split
+        # segments, so "cat" cannot reach "catgirl".
+        assert "i.sidecar_caption" in c[0]
+        assert p == ["cat", "%,cat,%"]
 
     def test_exclude_prompts_contains_uses_normalized_not_like(self):
         c, p = _apply_exclude_prompts_filter(
             [], [], ["cat"], PROMPT_MATCH_MODE_CONTAINS
         )
         assert c == [
-            "LOWER(REPLACE(COALESCE(i.prompt, ''), '_', ' ')) NOT LIKE ? ESCAPE '\\'"
+            "(LOWER(REPLACE(COALESCE(i.prompt, ''), '_', ' ')) NOT LIKE ? ESCAPE '\\'"
+            " AND LOWER(REPLACE(COALESCE(i.sidecar_caption, ''), '_', ' ')) "
+            "NOT LIKE ? ESCAPE '\\')"
         ]
-        assert p == ["%cat%"]
+        assert p == ["%cat%", "%cat%"]
 
     def test_exclude_ratings_keeps_unrated_via_is_null_arm(self):
         c, p = _apply_exclude_ratings_filter([], [], ["Explicit"])
