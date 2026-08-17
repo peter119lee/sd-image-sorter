@@ -3580,6 +3580,23 @@ textarea:focus,
     margin-top: 4px;
 }
 
+/* The caption card states where its number came from, or why there is no
+   number yet, so it needs room for a sentence rather than a word. */
+.promptlab-stat-card-wide {
+    max-width: 320px;
+}
+
+.promptlab-stat-note {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 6px;
+    line-height: 1.5;
+}
+
+.promptlab-stat-note:empty {
+    display: none;
+}
+
 .promptlab-stats-columns {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -3752,6 +3769,11 @@ textarea:focus,
     flex: 1 1 auto;
     min-height: 136px;
     display: flex;
+    /* Column so an empty panel that carries both a fact and a conditional
+       offer reads as two sentences instead of one run-on line. A note holding
+       only a text node centres identically either way. */
+    flex-direction: column;
+    gap: 8px;
     align-items: center;
     justify-content: center;
     padding: 18px;
@@ -3761,6 +3783,18 @@ textarea:focus,
     color: var(--text-secondary);
     text-align: center;
     line-height: 1.6;
+}
+
+.promptlab-empty-fact {
+    max-width: 44ch;
+}
+
+/* Visibly secondary to the fact: it is an offer, not a diagnosis, and it is
+   only present when the backend confirmed the action can actually help. */
+.promptlab-empty-offer {
+    max-width: 48ch;
+    font-size: 12px;
+    color: var(--text-muted);
 }
 
 .promptlab-action-card {

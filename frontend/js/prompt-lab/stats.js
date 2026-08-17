@@ -23,6 +23,7 @@ Object.assign(window.PromptLab, {
             document.getElementById('pl-total-images').textContent = stats.total_images || 0;
             document.getElementById('pl-scored-images').textContent = stats.scored_images || 0;
             document.getElementById('pl-avg-prompt-len').textContent = stats.prompt_length?.avg || 0;
+            this._renderCaptionStat(stats.caption_length);
 
             const topTagsEl = document.getElementById('pl-top-tags');
             if (topTagsEl && stats.top_tags) {
@@ -72,7 +73,7 @@ Object.assign(window.PromptLab, {
                         const name = c.name.replace(/\\/g, '/').split('/').pop()?.replace(/\.(safetensors|ckpt)$/i, '') || c.name;
                         return `<div class="promptlab-tag-item"><span class="tag-name"><svg class="icon" aria-hidden="true"><use href="#i-cpu"/></svg> ${escapeHtml(name)}</span><span class="tag-count">${c.count}</span></div>`;
                     }).join('')
-                    : this._renderStatsEmpty(this._t('promptlab.noCheckpointsYet', 'Checkpoint patterns will appear here after you import more prompt metadata.'));
+                    : this._renderCheckpointEmpty(stats, 'top_checkpoints_empty_reason');
             }
 
             const bestCheckpointEl = document.getElementById('pl-best-checkpoints');
@@ -97,7 +98,7 @@ Object.assign(window.PromptLab, {
                             </div>
                         </div>`;
                     }).join('')
-                    : this._renderStatsEmpty(this._t('promptlab.notEnoughScoredData', 'Not enough scored data yet'));
+                    : this._renderCheckpointEmpty(stats, 'checkpoint_score_leaders_empty_reason');
             }
 
             const topScoredEl = document.getElementById('pl-top-scored-images');
@@ -148,7 +149,7 @@ Object.assign(window.PromptLab, {
                             </div>
                         </div>`;
                     }).join('')
-                    : this._renderStatsEmpty(this._t('promptlab.noRecipeSuggestions', 'No recipe suggestions yet'));
+                    : this._renderCheckpointEmpty(stats, 'checkpoint_recipes_empty_reason');
             }
 
             this._syncStatsLoadMore('pl-top-tags-more', stats.top_tags_total ?? stats.top_tags?.length ?? 0, this.statsVisibleCounts.topTags);
@@ -171,6 +172,90 @@ Object.assign(window.PromptLab, {
                 toast(typeof formatUserError === 'function' ? formatUserError(e, failMsg) : failMsg, 'error');
             }
         }
+    },
+
+    /**
+     * The plain fact behind an empty checkpoint panel, from the reason the
+     * backend measured. Returns null for a reason this build does not know, so
+     * the caller can fall back rather than invent one.
+     */
+    _checkpointEmptyFact(reason, coverage) {
+        switch (reason) {
+            case 'no_checkpoint_metadata':
+                return this._t('promptlab.emptyNoCheckpointMetadata',
+                    'No image in this library records which checkpoint made it.');
+            case 'checkpoint_metadata_only_on_missing_files':
+                return this._t('promptlab.emptyCheckpointOnlyMissingFiles',
+                    'The only images recording a checkpoint are missing from disk, so they are left out here.',
+                    { count: Number(coverage.images_with_checkpoint_any || 0) });
+            case 'no_scored_images':
+                return this._t('promptlab.emptyNoScoredImages',
+                    'Checkpoints are ranked by aesthetic score, and nothing here has been scored yet.');
+            case 'not_enough_scored_images_per_checkpoint':
+                return this._t('promptlab.emptyNotEnoughScoredPerCheckpoint',
+                    'No checkpoint has reached the minimum number of scored images yet.',
+                    {
+                        min: Number(coverage.min_scored_images_per_checkpoint || 0),
+                        scored: Number(coverage.scored_usable_images || 0),
+                    });
+            default:
+                return null;
+        }
+    },
+
+    /**
+     * An empty checkpoint panel: the fact first and alone, then an offer only
+     * when the backend established that one exists.
+     *
+     * `checkpoint_empty_action` is a separate answer to a separate question, and
+     * a null there is a finding, not a gap: the same reason can arrive with the
+     * scan offer (the user's generations are simply not indexed here) or without
+     * it (they ARE indexed and recorded no model name, so scanning again is a
+     * long operation that cannot change the answer). Inventing an offer for the
+     * second case is the mistake the old single "import more prompt metadata"
+     * line made for every case.
+     */
+    _renderCheckpointEmpty(stats, reasonField) {
+        const coverage = stats?.checkpoint_coverage || {};
+        const known = this._checkpointEmptyFact(stats?.[reasonField] || null, coverage);
+        const fact = known || this._t('promptlab.noCheckpointDataYet', 'No checkpoint data to show yet.');
+        // The offer rides on a fact we could state. Attaching it to the vague
+        // fallback would suggest the scan addresses something we did not
+        // establish, which is the same overreach in a quieter form.
+        const offer = known && stats?.checkpoint_empty_action === 'scan_generated_images_folder'
+            ? this._t('promptlab.emptyScanGeneratedImages',
+                'If you do have a folder of your own generations, scanning it — or adding it as a separate library — is what fills these panels.')
+            : '';
+        return `<div class="promptlab-empty-note">
+            <span class="promptlab-empty-fact">${escapeHtml(fact)}</span>
+            ${offer ? `<span class="promptlab-empty-offer">${escapeHtml(offer)}</span>` : ''}
+        </div>`;
+    },
+
+    /**
+     * The caption statistic. `sample: 0` with the column present means no
+     * caption has been recorded yet — not that none exists: the sidecars sit
+     * next to the images and a rescan reads them, which is a real remedy that
+     * happens to live outside the database. Printing 0 as the headline average
+     * would state a measurement that was never taken, so the number is withheld
+     * and the note carries the state instead.
+     */
+    _renderCaptionStat(caption) {
+        const numberEl = document.getElementById('pl-avg-caption-len');
+        const noteEl = document.getElementById('pl-avg-caption-note');
+        if (!numberEl || !noteEl) return;
+        const sample = Number(caption?.sample || 0);
+        if (caption?.available === true && sample > 0) {
+            numberEl.textContent = String(caption.avg ?? 0);
+            noteEl.textContent = this._t('promptlab.captionFromSidecars',
+                'from {sample} images with a .txt sidecar', { sample });
+            return;
+        }
+        numberEl.textContent = '—';
+        noteEl.textContent = caption?.available === true
+            ? this._t('promptlab.captionNoneYet',
+                'No captions recorded yet. A rescan reads the .txt files sitting next to your images.')
+            : this._t('promptlab.captionNotTracked', 'This library has not recorded captions yet.');
     },
 
     _syncStatsLoadMore(buttonId, totalCount, visibleCount) {

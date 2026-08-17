@@ -4809,4 +4809,36 @@ window.I18nLang_en = {
     'a11y.browseSlotD': 'Browse for the D slot folder',
     'a11y.browseModelFile': 'Browse for a YOLO model file',
 
+    // TIPO prompt expansion card. The backend already picks which of these four
+    // states is true (model_service_inventory.py) and passes the joined lists as
+    // {deps} / {variants}; without these keys the card fell back to the raw
+    // English backend string in both languages. The pip command and the restart
+    // step are rendered separately from the card's setup steps, so these say
+    // what the state IS and leave the instructions to those.
+    'models.tipo.ready': 'TIPO prompt expansion is ready.',
+    'models.tipo.broken': 'TIPO weight files are present but unreadable (not valid GGUF): {variants}. Delete them from the path below and run it again; the next run re-downloads them.',
+    'models.tipo.missingDeps': 'TIPO runtime packages are missing: {deps}. Install them into the backend environment and restart the app.',
+    'models.tipo.missing': 'TIPO weights are not downloaded yet. They download on first use into the path below (about 100-250 MB); nothing is fetched until you run "Suggest missing tags".',
+
+    // Prompt Lab's empty checkpoint panels. The backend decides WHY a panel is
+    // empty and, separately, whether any action can help (prompt_service.py's
+    // *_empty_reason / checkpoint_empty_action). These render the reason as the
+    // fact, and the offer only arrives when the backend says one exists — the
+    // old line told everyone to "import more prompt metadata", which for a
+    // library of images that were never generated locally can never succeed.
+    'promptlab.emptyNoCheckpointMetadata': 'No image in this library records which checkpoint made it.',
+    'promptlab.emptyCheckpointOnlyMissingFiles': 'The only images recording a checkpoint ({count}) are missing from disk, so they are left out here.',
+    'promptlab.emptyNoScoredImages': 'Checkpoints are ranked by aesthetic score, and nothing here has been scored yet.',
+    'promptlab.emptyNotEnoughScoredPerCheckpoint': 'No checkpoint has reached {min} scored images yet ({scored} scored in total).',
+    'promptlab.emptyScanGeneratedImages': 'If you do have a folder of your own generations, scanning it — or adding it as a separate library — is what fills these panels.',
+    'promptlab.noCheckpointDataYet': 'No checkpoint data to show yet.',
+
+    // The caption statistic. An empty one is not a dead end: the sidecars live
+    // next to the images, so a rescan is a real remedy that happens to run
+    // outside the database.
+    'promptlab.avgCaptionLen': 'Avg Caption Len',
+    'promptlab.captionFromSidecars': 'from {sample} images with a .txt sidecar',
+    'promptlab.captionNoneYet': 'No captions recorded yet. A rescan reads the .txt files sitting next to your images.',
+    'promptlab.captionNotTracked': 'This library has not recorded captions yet.',
+
 };

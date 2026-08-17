@@ -2639,3 +2639,159 @@ def test_autosep_error_panel_uses_the_shared_error_formatter():
     assert "formatUserError(error)" in formatter.group("body"), (
         "the Auto-Separate error panel must route through the shared formatter"
     )
+
+
+def _prompt_lab_stats_source(repo_root: Path) -> str:
+    return (repo_root / "frontend" / "js" / "prompt-lab" / "stats.js").read_text(
+        encoding="utf-8"
+    )
+
+
+def test_prompt_lab_renders_every_empty_reason_the_backend_can_send():
+    """A reason the renderer does not know degrades to "no data yet".
+
+    That is honest but useless, and it happens silently - so the vocabulary the
+    two sides share is pinned here rather than left to a rename to break. The
+    values come from ``prompt_service.py``'s own constants, so renaming one
+    without teaching the renderer fails this test instead of the user's panel.
+    """
+    repo_root = Path(__file__).resolve().parents[2]
+    service = (repo_root / "backend" / "services" / "prompt_service.py").read_text(
+        encoding="utf-8"
+    )
+    stats = _prompt_lab_stats_source(repo_root)
+
+    reasons = re.findall(r'^REASON_[A-Z_]+ = "([a-z_]+)"', service, re.MULTILINE)
+    actions = re.findall(r'^ACTION_[A-Z_]+ = "([a-z_]+)"', service, re.MULTILINE)
+    assert len(reasons) == 4, f"expected four empty reasons, found {reasons}"
+    assert actions == ["scan_generated_images_folder"], actions
+
+    for value in reasons + actions:
+        assert f"'{value}'" in stats, f"prompt-lab/stats.js cannot render {value!r}"
+
+    for field in (
+        "top_checkpoints_empty_reason",
+        "checkpoint_score_leaders_empty_reason",
+        "checkpoint_recipes_empty_reason",
+        "checkpoint_empty_action",
+        "checkpoint_coverage",
+    ):
+        assert field in stats, f"prompt-lab/stats.js ignores {field}"
+
+
+def test_prompt_lab_no_longer_advises_importing_prompt_metadata():
+    """The old empty-panel line was advice, and for some libraries a dead end.
+
+    "Checkpoint patterns will appear here after you import more prompt metadata"
+    cannot succeed when the images never carried metadata to import. The key
+    stays in the packs (they are append-only); what must not come back is the
+    renderer reaching for it.
+    """
+    repo_root = Path(__file__).resolve().parents[2]
+    stats = _prompt_lab_stats_source(repo_root)
+    assert "promptlab.noCheckpointsYet" not in stats, (
+        "the empty checkpoint panel must render the backend's reason, not the "
+        "old blanket advice"
+    )
+
+
+def test_prompt_lab_empty_reason_strings_exist_with_their_placeholders():
+    """Two of the four facts are only useful with the numbers behind them."""
+    repo_root = Path(__file__).resolve().parents[2]
+    packs = _locale_pack_sources(repo_root)
+    required = {
+        "promptlab.emptyNoCheckpointMetadata": (),
+        "promptlab.emptyCheckpointOnlyMissingFiles": ("{count}",),
+        "promptlab.emptyNoScoredImages": (),
+        "promptlab.emptyNotEnoughScoredPerCheckpoint": ("{min}", "{scored}"),
+        "promptlab.emptyScanGeneratedImages": (),
+        "promptlab.noCheckpointDataYet": (),
+        "promptlab.avgCaptionLen": (),
+        "promptlab.captionFromSidecars": ("{sample}",),
+        "promptlab.captionNoneYet": (),
+        "promptlab.captionNotTracked": (),
+    }
+    for pack_name, source in packs.items():
+        for key, placeholders in required.items():
+            match = re.search(
+                rf"^\s*'{re.escape(key)}'\s*:\s*'(?P<value>[^']*)'",
+                source,
+                re.MULTILINE,
+            )
+            assert match is not None, f"{pack_name} is missing {key}"
+            for placeholder in placeholders:
+                assert placeholder in match.group("value"), (
+                    f"{pack_name}:{key} drops {placeholder}"
+                )
+
+
+def test_the_caption_statistic_note_is_not_reset_by_the_i18n_pass():
+    """``i18n.applyToDOM`` rewrites every ``[data-i18n]`` element's text.
+
+    The caption note is written by ``loadStats`` from the payload, so carrying a
+    static key would mean the language pass silently replaced the measured state
+    with a fixed sentence - the class of defect the ``i18nLocked`` flag exists
+    for. Keeping the attribute off the element is the simpler guarantee.
+    """
+    repo_root = Path(__file__).resolve().parents[2]
+    markup = (repo_root / "frontend" / "index.html").read_text(encoding="utf-8")
+    match = re.search(r"<[^>]*id=\"pl-avg-caption-note\"[^>]*>", markup)
+    assert match is not None, "the caption note element is missing"
+    assert "data-i18n" not in match.group(0), (
+        "pl-avg-caption-note is written from the payload; a data-i18n key would "
+        "be re-applied over it on the next language pass"
+    )
+
+
+def test_every_model_card_message_key_is_translated_in_both_locales():
+    """A model card's status line is the only place these states are ever said.
+
+    ``model-manager-render.js`` renders ``appT(message_key, message)``, so a key
+    the packs do not define silently falls back to the backend's raw English
+    string - in the Chinese UI too. The four ``models.tipo.*`` keys shipped that
+    way: the card chose between "ready", "unreadable GGUF", "runtime packages
+    missing" and "not downloaded yet", and every one of them printed English.
+    """
+    repo_root = Path(__file__).resolve().parents[2]
+    inventory = (
+        repo_root / "backend" / "services" / "model_service_inventory.py"
+    ).read_text(encoding="utf-8")
+    packs = _locale_pack_sources(repo_root)
+    pack_keys = {
+        name: set(_language_pack_keys(source)) for name, source in packs.items()
+    }
+
+    emitted = sorted(set(re.findall(r'"(models\.[A-Za-z0-9_]+\.[A-Za-z0-9_]+)"', inventory)))
+    assert emitted, "no model card message keys found - has the inventory moved?"
+
+    missing = {
+        name: sorted(key for key in emitted if key not in keys)
+        for name, keys in pack_keys.items()
+    }
+    assert not any(missing.values()), f"untranslated model card message keys: {missing}"
+
+
+def test_tipo_card_states_keep_the_lists_the_backend_passes():
+    """The broken and missing-runtime states are only useful with their lists.
+
+    ``message_params`` carries the joined broken variants and missing packages;
+    a translation that drops the placeholder turns "delete these two files"
+    into an instruction with nothing to act on.
+    """
+    repo_root = Path(__file__).resolve().parents[2]
+    packs = _locale_pack_sources(repo_root)
+    required = {
+        "models.tipo.broken": "{variants}",
+        "models.tipo.missingDeps": "{deps}",
+    }
+    for pack_name, source in packs.items():
+        for key, placeholder in required.items():
+            match = re.search(
+                rf"^\s*'{re.escape(key)}'\s*:\s*'(?P<value>[^']*)'",
+                source,
+                re.MULTILINE,
+            )
+            assert match is not None, f"{pack_name} is missing {key}"
+            assert placeholder in match.group("value"), (
+                f"{pack_name}:{key} drops the {placeholder} the backend passes"
+            )

@@ -3154,6 +3154,14 @@
                                     <div class="promptlab-stat-number" id="pl-avg-prompt-len">-</div>
                                     <div class="promptlab-stat-label" data-i18n="promptlab.avgPromptLen">Avg Prompt Len</div>
                                 </div>
+                                <!-- The note under this one is written by loadStats and must
+                                     carry no data-i18n: i18n.applyToDOM would reset it to a
+                                     static key on the next language pass. -->
+                                <div class="promptlab-stat-card promptlab-stat-card-wide">
+                                    <div class="promptlab-stat-number" id="pl-avg-caption-len">-</div>
+                                    <div class="promptlab-stat-label" data-i18n="promptlab.avgCaptionLen">Avg Caption Len</div>
+                                    <div class="promptlab-stat-note" id="pl-avg-caption-note"></div>
+                                </div>
                             </div>
                             <aside class="promptlab-summary-card">
                                 <span class="workspace-start-eyebrow" data-i18n="promptlab.summaryEyebrow">What Next</span>

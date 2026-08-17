@@ -4805,4 +4805,31 @@ window.I18nLang_zhCN = {
     'a11y.browseSlotD': '为 D 槽位选择文件夹',
     'a11y.browseModelFile': '选择 YOLO 模型文件',
 
+    // TIPO 提示词扩写卡片。四种状态由后端判定（model_service_inventory.py），
+    // 并把拼好的列表作为 {deps} / {variants} 传来；缺少这几个键时，卡片在两种
+    // 语言下都会退回后端的英文原文。pip 命令和重启步骤由卡片的安装步骤单独
+    // 渲染，所以这里只说明当前状态，不重复那些指引。
+    'models.tipo.ready': 'TIPO 提示词扩写已就绪。',
+    'models.tipo.broken': 'TIPO 权重文件存在但无法读取（不是有效的 GGUF）：{variants}。请到下方路径删除它们后重新运行，下次运行会重新下载。',
+    'models.tipo.missingDeps': '缺少 TIPO 运行时依赖包：{deps}。请将它们安装到后端环境，然后重启程序。',
+    'models.tipo.missing': 'TIPO 权重还没下载。首次使用时会下载到下方路径（约 100-250 MB）；在你点击「建议缺漏标签」之前不会下载任何文件。',
+
+    // Prompt Helper 空面板。为什么空、以及是否真的有办法可做，都由后端分别判定
+    //（prompt_service.py 的 *_empty_reason / checkpoint_empty_action）。这里先把
+    // 原因当成事实陈述，只有后端确认存在可行动作时才追加建议——旧文案让所有人去
+    //「导入更多提示词信息」，但对于本来就不是本地生成的图库，这永远不可能成功。
+    'promptlab.emptyNoCheckpointMetadata': '这个图库里没有任何图片记录了它是用哪个模型生成的。',
+    'promptlab.emptyCheckpointOnlyMissingFiles': '唯一记录了模型的那些图片（{count} 张）已经不在磁盘上，所以这里不会统计它们。',
+    'promptlab.emptyNoScoredImages': '模型排名依据的是美学评分，而这里还没有任何图片被评分。',
+    'promptlab.emptyNotEnoughScoredPerCheckpoint': '还没有任何模型累积到 {min} 张已评分图片（目前共 {scored} 张已评分）。',
+    'promptlab.emptyScanGeneratedImages': '如果你确实有一个存放自己生成结果的文件夹，扫描它——或者把它作为独立图库加入——才能填满这些面板。',
+    'promptlab.noCheckpointDataYet': '暂时没有可展示的模型数据。',
+
+    // Caption 统计。空的 caption 不是死路：sidecar 就在图片旁边，重新扫描是真实
+    // 可行的办法，只是这件事发生在数据库之外。
+    'promptlab.avgCaptionLen': 'Caption 平均长度',
+    'promptlab.captionFromSidecars': '来自 {sample} 张带 .txt sidecar 的图片',
+    'promptlab.captionNoneYet': '还没有记录任何 caption。重新扫描会读取图片旁边的 .txt 文件。',
+    'promptlab.captionNotTracked': '这个图库还没有记录 caption。',
+
 };
