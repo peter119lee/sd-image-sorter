@@ -184,6 +184,12 @@ class ScanProgressResponse(BaseModel):
     metadata_total: int
     metadata_total_final: bool
     metadata_pending: int
+    # Prompt coverage for the scanned scope, filled in when the scan finishes.
+    # ``None`` means "not measured yet" and must stay distinguishable from a
+    # measured zero, so a scan that could not check coverage never reads as a
+    # scan that found nothing missing.
+    metadata_prompt_total: Optional[int] = None
+    metadata_missing_prompt: Optional[int] = None
     message: str
     current_item: Optional[str]
     started_at: Optional[float]

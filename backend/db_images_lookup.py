@@ -60,6 +60,46 @@ def get_images_in_folder_scope(folder_path: str, recursive: bool = True) -> List
     ]
 
 
+def count_prompt_coverage_in_folder_scope(
+    folder_path: str, recursive: bool = True
+) -> Dict[str, int]:
+    """Count indexed images under a scan root and how many stored no prompt.
+
+    Lets a finished scan report the shortfall with its denominator instead of
+    only "N images indexed". Uses the same ``COALESCE(is_readable, 1)`` guard
+    as the rest of the codebase so legacy rows are not silently excluded, and
+    the same missing-prompt predicate as the metadata re-parse job so the two
+    figures cannot disagree.
+    """
+    clause, params = _folder_scope_query_match_clause(folder_path)
+    if not clause:
+        return {"total": 0, "missing_prompt": 0}
+
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            f"""
+            SELECT path,
+                   CASE WHEN prompt IS NULL OR TRIM(prompt) = '' THEN 1 ELSE 0 END
+            FROM images
+            WHERE {clause} AND COALESCE(is_readable, 1) = 1
+            """,
+            params,
+        )
+        rows = cursor.fetchall()
+
+    if not recursive:
+        rows = [
+            row for row in rows
+            if is_indexed_image_path_in_folder_scope(row[0], folder_path, recursive=False)
+        ]
+
+    return {
+        "total": len(rows),
+        "missing_prompt": sum(int(row[1] or 0) for row in rows),
+    }
+
+
 def get_library_folders() -> List[str]:
     """Return the distinct directories that contain (readable) indexed images.
 

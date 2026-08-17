@@ -38,6 +38,32 @@ from utils.path_validation import (
 logger = logging.getLogger("services.sorting_service")
 
 
+# Any real folder holds some images that legitimately carry no prompt
+# (screenshots, hand-drawn art, photos). Only call the shortfall out in the
+# summary once it is a large enough share of the folder that the user should
+# suspect a metadata problem rather than a mixed folder.
+SCAN_MISSING_PROMPT_NOTICE_RATIO = 0.10
+
+
+def _prompt_coverage_for_scope(folder_path: str, recursive: bool) -> dict:
+    """How many indexed images in this scan's scope ended up with no prompt.
+
+    Advisory only: a failure here must not turn an otherwise-successful scan
+    into an error, but it must not be reported as "zero missing" either — the
+    counters come back ``None`` so an unknown coverage stays distinguishable
+    from a clean one.
+    """
+    try:
+        counts = db.count_prompt_coverage_in_folder_scope(folder_path, recursive)
+        return {
+            "total": int(counts.get("total") or 0),
+            "missing_prompt": int(counts.get("missing_prompt") or 0),
+        }
+    except (sqlite3.Error, RuntimeError, ValueError) as exc:
+        logger.warning("Could not measure prompt coverage for %s: %s", folder_path, exc)
+        return {"total": None, "missing_prompt": None}
+
+
 def _svc():
     """Resolve UNSAFE monkeypatch seams through the facade at call time.
 
@@ -198,6 +224,8 @@ class ScanMixin:
                 "metadata_total": 0,
                 "metadata_total_final": False,
                 "metadata_pending": 0,
+                "metadata_prompt_total": None,
+                "metadata_missing_prompt": None,
                 "message": "正在同步文件夹索引 / Syncing folder index..." if request.cleanup_missing else "导入前统计图片数量 / Counting images before import...",
                 "current_item": None,
                 "recent_errors": [],
@@ -386,6 +414,11 @@ class ScanMixin:
                 new_count = result.get("new", 0)
                 updated_count = result.get("updated", 0)
                 removed_count = result.get("removed", 0)
+                prompt_coverage = _prompt_coverage_for_scope(
+                    normalized_folder_path, request.recursive
+                )
+                prompt_total = prompt_coverage["total"]
+                missing_prompt = prompt_coverage["missing_prompt"]
                 summary = f"完成！已索引 {new_count} 张图片 / Done! {new_count} images indexed."
                 if updated_count:
                     summary += f" 更新 {updated_count} 张 / {updated_count} updated."
@@ -393,6 +426,19 @@ class ScanMixin:
                     summary += f" 移除 {removed_count} 条失效记录 / {removed_count} missing removed."
                 if errors:
                     summary += f" {errors} 个问题 / {errors} scan issue(s)."
+                # "Done! N indexed." on its own reads as a clean success even
+                # when most of those rows stored no prompt at all.
+                if (
+                    prompt_total
+                    and missing_prompt
+                    and missing_prompt >= prompt_total * SCAN_MISSING_PROMPT_NOTICE_RATIO
+                ):
+                    summary += (
+                        f" {missing_prompt}/{prompt_total} 张没有提示词，"
+                        "可在设置中运行「重新解析缺失提示词」/ "
+                        f"{missing_prompt} of {prompt_total} images have no prompt "
+                        "stored — run Re-parse Missing Prompts in Settings."
+                    )
                 recent_errors = result.get("recent_errors") or []
                 if recent_errors:
                     filenames = ", ".join(item.get("filename", "unknown") for item in recent_errors[-3:])
@@ -429,7 +475,7 @@ class ScanMixin:
                             ) from exc
 
                 logger.info(
-                    "Scan completed: folder=%s files=%s indexed_new=%s unchanged_or_updated=%s removed=%s metadata=%s/%s errors=%s duration=%.1fs",
+                    "Scan completed: folder=%s files=%s indexed_new=%s unchanged_or_updated=%s removed=%s metadata=%s/%s missing_prompt=%s/%s errors=%s duration=%.1fs",
                     normalized_folder_path,
                     result.get("total", 0),
                     new_count,
@@ -437,6 +483,8 @@ class ScanMixin:
                     removed_count,
                     metadata_processed,
                     metadata_total,
+                    missing_prompt,
+                    prompt_total,
                     errors,
                     duration_seconds,
                 )
@@ -479,6 +527,8 @@ class ScanMixin:
                         "metadata_total": result.get("metadata_total", 0),
                         "metadata_total_final": result.get("metadata_total_final", True),
                         "metadata_pending": 0,
+                        "metadata_prompt_total": prompt_total,
+                        "metadata_missing_prompt": missing_prompt,
                         "message": summary,
                         "current_item": None,
                         "started_at": self._scan_progress.get("started_at"),
@@ -521,6 +571,8 @@ class ScanMixin:
                             "metadata_total": current_state.get("metadata_total", 0),
                             "metadata_total_final": current_state.get("metadata_total_final", False),
                             "metadata_pending": current_state.get("metadata_pending", 0),
+                            "metadata_prompt_total": current_state.get("metadata_prompt_total"),
+                            "metadata_missing_prompt": current_state.get("metadata_missing_prompt"),
                             "message": (
                                 f"扫描已取消（{current_state.get('processed', current_state.get('current', 0))}/{current_state.get('total', 0)}）/ Scan cancelled at {current_state.get('processed', current_state.get('current', 0))}/{current_state.get('total', 0)}."
                                 if current_state.get("total_final", False) and current_state.get("total", 0)
@@ -569,6 +621,8 @@ class ScanMixin:
                             "metadata_total": current_state.get("metadata_total", 0),
                             "metadata_total_final": current_state.get("metadata_total_final", False),
                             "metadata_pending": current_state.get("metadata_pending", 0),
+                            "metadata_prompt_total": current_state.get("metadata_prompt_total"),
+                            "metadata_missing_prompt": current_state.get("metadata_missing_prompt"),
                             "message": failure_message,
                             "current_item": current_state.get("current_item"),
                             "recent_errors": current_state.get("recent_errors", []),

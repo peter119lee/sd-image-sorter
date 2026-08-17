@@ -156,33 +156,41 @@ class TestPureHelpers:
             is None
         )
 
-    def test_needs_metadata_parser_upgrade_covers_jpeg_and_png(self):
-        jpeg_old = json.dumps({"_parsed": {"version": 6}})
-        jpeg_current = json.dumps({"_parsed": {"version": 7}})
-        png_old = json.dumps({"_parsed": {"version": PARSED_METADATA_VERSION - 1}})
-        cur = json.dumps({"_parsed": {"version": PARSED_METADATA_VERSION}})
-        # JPEG parsed by an older parser -> upgrade
+    def test_needs_metadata_parser_upgrade_revisits_every_indexed_format(self):
+        """Any indexed format parsed below the current version must be revisited.
+
+        Regression: the required-version map pinned JPEG at a literal 7 and
+        listed no other extension, so once PARSED_METADATA_VERSION reached 8
+        a JPEG or WebP row indexed by the v7 parser became permanently
+        unreachable — every later parser improvement, including the
+        format-independent caption-sidecar fallback that makes those files'
+        prompts readable, could never be applied to it. 2,682 rows in the
+        owner's library were frozen promptless this way.
+        """
+        stale = json.dumps({"_parsed": {"version": PARSED_METADATA_VERSION - 1}})
+        current = json.dumps({"_parsed": {"version": PARSED_METADATA_VERSION}})
+        for ext in (".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".tif", ".tiff"):
+            assert (
+                _needs_metadata_parser_upgrade(
+                    {"path": f"a{ext}", "metadata_json": stale}
+                )
+                is True
+            ), f"{ext} parsed by an older parser must be re-parsed"
+            assert (
+                _needs_metadata_parser_upgrade(
+                    {"path": f"a{ext}", "metadata_json": current}
+                )
+                is False
+            ), f"{ext} already at the current parser version must not churn"
+
+        # A row with no recorded parser version predates the stamp -> upgrade.
         assert (
-            _needs_metadata_parser_upgrade({"path": "a.jpg", "metadata_json": jpeg_old})
+            _needs_metadata_parser_upgrade({"path": "a.jpg", "metadata_json": "{}"})
             is True
         )
-        # JPEG already has its format-specific parser version -> no upgrade
+        # Files the scanner never indexes stay exempt.
         assert (
-            _needs_metadata_parser_upgrade({"path": "a.jpeg", "metadata_json": jpeg_current})
-            is False
-        )
-        # PNG parsed by an older parser -> upgrade for hidden carrier recovery
-        assert (
-            _needs_metadata_parser_upgrade({"path": "a.png", "metadata_json": png_old})
-            is True
-        )
-        assert (
-            _needs_metadata_parser_upgrade({"path": "a.png", "metadata_json": cur})
-            is False
-        )
-        # Other formats remain exempt regardless of stored version
-        assert (
-            _needs_metadata_parser_upgrade({"path": "a.webp", "metadata_json": png_old})
+            _needs_metadata_parser_upgrade({"path": "a.txt", "metadata_json": stale})
             is False
         )
 

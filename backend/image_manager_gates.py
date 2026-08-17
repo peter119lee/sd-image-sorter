@@ -13,6 +13,7 @@ import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from config import ALLOWED_IMAGE_EXTENSIONS as IMAGE_EXTENSIONS
 from metadata_parser import PARSED_METADATA_VERSION
 
 
@@ -118,18 +119,24 @@ def _stored_parsed_metadata_version(existing: Optional[Dict[str, Any]]) -> Optio
 
 
 def _needs_metadata_parser_upgrade(existing: Optional[Dict[str, Any]]) -> bool:
-    """Return True when an unchanged JPEG or PNG row used an older parser."""
+    """Return True when an unchanged indexed row was parsed by an older parser.
+
+    Every format the scanner indexes is gated on PARSED_METADATA_VERSION.
+    This used to be a per-format map that pinned JPEG at a literal 7 and
+    omitted every extension except PNG, so once the parser reached 8 a JPEG
+    or WebP row indexed by the v7 parser could never be revisited: its
+    fingerprint still matched, its status was already ``complete``, and the
+    version gate said it was current. Parser improvements are not
+    format-specific — the caption-sidecar fallback that recovers these files'
+    prompts applies to all of them — so a per-format literal cannot be kept
+    correct, and going stale silently freezes real user data.
+    """
     source_path = str((existing or {}).get("path") or (existing or {}).get("filename") or "")
-    required_version = {
-        ".jpg": 7,
-        ".jpeg": 7,
-        ".png": PARSED_METADATA_VERSION,
-    }.get(Path(source_path).suffix.lower())
-    if required_version is None:
+    if Path(source_path).suffix.lower() not in IMAGE_EXTENSIONS:
         return False
 
     stored_version = _stored_parsed_metadata_version(existing)
-    return stored_version is None or stored_version < required_version
+    return stored_version is None or stored_version < PARSED_METADATA_VERSION
 
 
 def _should_compute_content_fingerprint(existing: Optional[Dict[str, Any]]) -> bool:

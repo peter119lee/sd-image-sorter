@@ -18,6 +18,7 @@ by tests/test_db_images_read_pins.py (TestReExportContract).
 from db_core import get_db
 from db_images_lookup import (
     get_images_in_folder_scope,
+    count_prompt_coverage_in_folder_scope,
     get_library_folders,
     get_missing_image_reconnect_candidates,
     get_image_by_id,
