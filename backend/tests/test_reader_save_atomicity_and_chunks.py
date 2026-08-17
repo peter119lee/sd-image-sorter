@@ -9,6 +9,10 @@ R1 (P0) ``services/image/serving.py`` ``_write_edited_image`` handed the final
     user-file writer here stages a temp sibling and publishes with
     ``os.replace`` (``dataset_export.engine._write_pillow_image_atomic``).
 
+R2 (P0) ``services/image_metadata_writer.build_pnginfo`` built a fresh
+    ``PngInfo`` from the edited fields only, so editing one field destroyed the
+    ComfyUI workflow, the NovelAI ``Comment`` block and every third-party chunk.
+
 Fault-injection note: patch the ``Image.SAVE`` / ``Image.SAVE_ALL`` **registry
 entry**, never ``PngImagePlugin._save``. The registries captured the original
 function object at import, so a module-attribute patch injects nothing and the
@@ -289,3 +293,271 @@ class TestStagingCannotHangOnAnUnwritableFolder:
             f"the save took {elapsed:.0f}s to reject an unwritable folder; "
             "staging is retrying instead of reporting the error"
         )
+
+
+# ---------------------------------------------------------------------------
+# R2 — embedded chunks the user did not edit must survive
+# ---------------------------------------------------------------------------
+
+class TestEmbeddedChunkPreservation:
+    def test_comfyui_workflow_survives_an_edit_to_an_unrelated_field(
+        self, test_client, tmp_path
+    ):
+        source = _write_png(
+            tmp_path / "comfy.png",
+            {
+                "prompt": json.dumps(COMFY_API_GRAPH),
+                "workflow": json.dumps(COMFY_UI_GRAPH),
+            },
+        )
+        output = tmp_path / "comfy-edited.png"
+
+        response = _post_save(
+            test_client, source, output, "png", {"seed": "999"}, overwrite=False
+        )
+        assert response.status_code == 200, response.text
+
+        saved_chunks = _text_chunks(output)
+        assert "prompt" in saved_chunks, "the ComfyUI API workflow was destroyed"
+        assert "workflow" in saved_chunks, "the ComfyUI UI workflow was destroyed"
+        assert json.loads(saved_chunks["prompt"]) == COMFY_API_GRAPH
+        assert json.loads(saved_chunks["workflow"]) == COMFY_UI_GRAPH
+
+        # The surviving graph is still readable BY THE APP, not merely present.
+        recovered = _reparse_chunk_through_app_parser(
+            tmp_path, "probe-comfy.png", {"prompt": saved_chunks["prompt"]}
+        )
+        assert recovered["generator"] == "comfyui"
+        assert recovered["prompt"] == "ORIGINAL comfy positive"
+        assert recovered["checkpoint"] == "anima_v3.safetensors"
+
+        # ...and the user is told the kept record still holds the old values.
+        assert any("workflow" in warning for warning in response.json()["warnings"]), (
+            "preserving a stale generation record must be disclosed, not silent"
+        )
+
+    def test_novelai_comment_and_third_party_chunks_survive(self, test_client, tmp_path):
+        source = _write_png(
+            tmp_path / "nai.png",
+            {
+                "Comment": json.dumps(NAI_COMMENT),
+                "Software": "NovelAI",
+                "MyCustomChunk": "third-party payload",
+                "Description": "a description someone wrote",
+            },
+        )
+        output = tmp_path / "nai-edited.png"
+
+        response = _post_save(
+            test_client, source, output, "png", {"prompt": "edited prompt", "steps": 28},
+            overwrite=False,
+        )
+        assert response.status_code == 200, response.text
+
+        saved_chunks = _text_chunks(output)
+        assert "Comment" in saved_chunks, "the NovelAI generation record was destroyed"
+        assert saved_chunks["MyCustomChunk"] == "third-party payload"
+        assert saved_chunks["Description"] == "a description someone wrote"
+
+        recovered = _reparse_chunk_through_app_parser(
+            tmp_path,
+            "probe-nai.png",
+            {"Comment": saved_chunks["Comment"], "Software": "NovelAI"},
+        )
+        assert recovered["generator"] == "nai"
+        assert recovered["prompt"] == "ORIGINAL nai positive"
+
+    def test_the_edit_still_wins_when_a_generation_record_is_preserved(
+        self, test_client, tmp_path
+    ):
+        """Preserving must not hide the user's edit behind the old record."""
+        source = _write_png(
+            tmp_path / "both.png",
+            {"prompt": json.dumps(COMFY_API_GRAPH), "workflow": json.dumps(COMFY_UI_GRAPH)},
+        )
+        output = tmp_path / "both-edited.png"
+
+        response = _post_save(
+            test_client,
+            source,
+            output,
+            "png",
+            {"prompt": "EDITED prompt", "negative_prompt": "EDITED negative", "steps": 20,
+             "sampler": "Euler a"},
+            overwrite=False,
+        )
+        assert response.status_code == 200, response.text
+
+        reparsed = metadata_parser.parse_image(str(output))
+        assert reparsed["prompt"] == "EDITED prompt"
+        assert reparsed["negative_prompt"] == "EDITED negative"
+
+    def test_a_cleared_field_is_not_resurrected_from_the_source(self, test_client, tmp_path):
+        """A stale plain-text chunk must lose to the editor, unlike a workflow."""
+        source = _write_png(
+            tmp_path / "stale.png",
+            {"parameters": WEBUI_PARAMETERS, "prompt": "STALE plain prompt text"},
+        )
+        output = tmp_path / "stale-edited.png"
+
+        response = _post_save(
+            test_client, source, output, "png",
+            {"negative_prompt": "only a negative now", "steps": 20, "sampler": "Euler a"},
+            overwrite=False,
+        )
+        assert response.status_code == 200, response.text
+
+        saved_chunks = _text_chunks(output)
+        assert saved_chunks.get("prompt") != "STALE plain prompt text", (
+            "a cleared prompt was resurrected from the source's stale prompt chunk"
+        )
+        assert "STALE plain prompt text" not in (
+            metadata_parser.parse_image(str(output)).get("prompt") or ""
+        )
+
+    def test_in_place_overwrite_also_preserves_chunks(self, test_client, tmp_path):
+        source = _write_png(
+            tmp_path / "inplace.png",
+            {"parameters": WEBUI_PARAMETERS, "workflow": json.dumps(COMFY_UI_GRAPH)},
+        )
+
+        response = _post_save(
+            test_client, source, source, "png", {"prompt": "edited", "steps": 20},
+            overwrite=True,
+        )
+        assert response.status_code == 200, response.text
+        assert json.loads(_text_chunks(source)["workflow"]) == COMFY_UI_GRAPH
+
+    def test_saving_to_jpeg_names_the_chunks_it_cannot_carry(self, test_client, tmp_path):
+        source = _write_png(
+            tmp_path / "rich.png",
+            {
+                "prompt": json.dumps(COMFY_API_GRAPH),
+                "workflow": json.dumps(COMFY_UI_GRAPH),
+                "MyCustomChunk": "third-party payload",
+            },
+        )
+        output = tmp_path / "rich.jpg"
+
+        response = _post_save(
+            test_client, source, output, "jpg", {"prompt": "edited"}, overwrite=False
+        )
+        assert response.status_code == 200, response.text
+
+        warnings = " ".join(response.json()["warnings"])
+        assert "workflow" in warnings, (
+            "JPEG cannot carry the workflow and the user must be told which blocks were lost"
+        )
+        assert "MyCustomChunk" in warnings
+
+    def test_a_source_without_extra_chunks_still_warns_about_nothing(
+        self, test_client, tmp_path
+    ):
+        """No preserved record, no invented warning (the existing PNG contract)."""
+        source = tmp_path / "plain.png"
+        Image.new("RGB", (16, 16), "white").save(source)
+        output = tmp_path / "plain-edited.png"
+
+        response = _post_save(
+            test_client, source, output, "png", {"prompt": "cat"}, overwrite=False
+        )
+        assert response.status_code == 200, response.text
+        assert response.json()["warnings"] == []
+
+    @pytest.mark.parametrize("container,extension", [("WEBP", "webp"), ("JPEG", "jpg")])
+    def test_a_workflow_in_a_non_png_source_survives(
+        self, test_client, tmp_path, container, extension
+    ):
+        """A JPEG/WebP keeps its graph in EXIF, so the harvest must be container-aware.
+
+        Reading only PNG text chunks is how the workflow went missing for these
+        formats; the same re-keying obfuscation does is what recovers it.
+        """
+        source = tmp_path / f"comfy-source.{extension}"
+        image = Image.new("RGB", (32, 32), (4, 5, 6))
+        exif = image.getexif()
+        exif.get_ifd(0x8769)[0x9286] = b"UNICODE\x00" + json.dumps(
+            COMFY_API_GRAPH
+        ).encode("utf-16-le")
+        image.save(source, format=container, exif=exif.tobytes())
+        output = tmp_path / f"comfy-{extension}-edited.png"
+
+        response = _post_save(
+            test_client, source, output, "png",
+            {"prompt": "EDITED prompt", "steps": 20, "sampler": "Euler a"},
+            overwrite=False,
+        )
+        assert response.status_code == 200, response.text
+
+        saved_prompt_chunk = _text_chunks(output).get("prompt", "")
+        assert saved_prompt_chunk.lstrip().startswith("{"), (
+            f"the {container} source's workflow is gone from the saved file; its prompt "
+            f"chunk holds {saved_prompt_chunk[:60]!r} instead of the graph"
+        )
+        assert json.loads(saved_prompt_chunk) == COMFY_API_GRAPH
+
+        recovered = _reparse_chunk_through_app_parser(
+            tmp_path, f"probe-{extension}.png", {"prompt": saved_prompt_chunk}
+        )
+        assert recovered["generator"] == "comfyui"
+        assert recovered["prompt"] == "ORIGINAL comfy positive"
+
+        # The edit itself still governs the saved file.
+        assert metadata_parser.parse_image(str(output))["prompt"] == "EDITED prompt"
+
+    def test_a_non_png_source_saved_as_webp_keeps_its_workflow_and_is_not_warned_about(
+        self, test_client, tmp_path
+    ):
+        """No crying wolf: EXIF survives a WebP re-save, so nothing is 'lost'."""
+        source = tmp_path / "graph-source.webp"
+        image = Image.new("RGB", (32, 32), (4, 5, 6))
+        exif = image.getexif()
+        exif.get_ifd(0x8769)[0x9286] = b"UNICODE\x00" + json.dumps(
+            COMFY_API_GRAPH
+        ).encode("utf-16-le")
+        image.save(source, format="WEBP", exif=exif.tobytes())
+        output = tmp_path / "graph-source-edited.webp"
+
+        response = _post_save(
+            test_client, source, output, "webp",
+            {"prompt": "EDITED prompt", "steps": 20, "sampler": "Euler a"},
+            overwrite=False,
+        )
+        assert response.status_code == 200, response.text
+
+        with Image.open(output) as saved:
+            carried = saved.getexif().get_ifd(0x8769).get(0x9286)
+        assert carried is not None, "the workflow really was dropped"
+
+        warnings = " ".join(response.json()["warnings"])
+        assert "cannot store" not in warnings, (
+            f"warned about a loss that did not happen: {warnings!r}"
+        )
+
+    def test_settings_the_editor_cannot_rebuild_are_reported_not_dropped_silently(
+        self, test_client, tmp_path
+    ):
+        """The editor owns ``parameters``; what it cannot carry must be named."""
+        rich_parameters = (
+            "a prompt\nNegative prompt: a negative\n"
+            "Steps: 20, Sampler: Euler a, CFG scale: 7, Seed: 42, Size: 32x32, "
+            "Model: anima_v3, Model hash: abc123, Clip skip: 2"
+        )
+        source = _write_png(tmp_path / "rich-params.png", {"parameters": rich_parameters})
+        output = tmp_path / "rich-params-edited.png"
+
+        response = _post_save(
+            test_client, source, output, "png",
+            {"prompt": "EDITED", "negative_prompt": "a negative", "steps": 20,
+             "sampler": "Euler a", "cfg_scale": 7, "seed": 42, "size": "32x32",
+             "model": "anima_v3"},
+            overwrite=False,
+        )
+        assert response.status_code == 200, response.text
+
+        warnings = " ".join(response.json()["warnings"])
+        assert "Model hash" in warnings and "Clip skip" in warnings, (
+            "settings the rebuilt parameter block loses must be named, not dropped silently"
+        )
+        # ...and only the genuinely missing ones are named.
+        assert "Sampler" not in warnings

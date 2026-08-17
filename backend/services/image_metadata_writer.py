@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from PIL import Image, PngImagePlugin
 
@@ -12,6 +12,49 @@ from PIL import Image, PngImagePlugin
 JPEG_LIMITATION_WARNING = "JPEG metadata support is limited; use PNG for the most reliable SD prompt preservation."
 WEBP_LIMITATION_WARNING = "WebP metadata support depends on the viewer; use PNG if another tool fails to read the saved prompt."
 JPEG_ALPHA_WARNING = "JPEG does not support transparency; transparent pixels were flattened onto a white background."
+
+# Editing one field used to rebuild the text chunks from scratch, so a save
+# destroyed the ComfyUI workflow, the NovelAI Comment block and every
+# third-party chunk. The blocks that survive are now reported when they can no
+# longer agree with the edit, and named explicitly when the chosen container
+# cannot hold them at all.
+PRESERVED_GENERATION_RECORD_WARNING = (
+    "Kept the original embedded generation record ({keys}) so it is not lost. "
+    "It still describes the original generation, so your edits are not reflected inside it."
+)
+UNCARRIED_CHUNKS_WARNING = (
+    "{label} cannot store these embedded metadata blocks, so they were not carried over: "
+    "{keys}. Save as PNG to keep them."
+)
+
+DROPPED_PARAMETER_SETTINGS_WARNING = (
+    "The editor rebuilds the parameter block from the fields it shows, so these "
+    "settings from the original are not in the saved file: {keys}."
+)
+
+
+FORMAT_LABELS = {"PNG": "PNG", "WEBP": "WebP", "JPEG": "JPEG"}
+
+
+# Ceiling on a single carried text chunk, matching obfuscation's own limit for
+# harvested EXIF/XMP text: a real parameter block or workflow is a few kB to a
+# few hundred kB, and anything larger is a broken or hostile file.
+MAX_CARRIED_CHUNK_BYTES = 1024 * 1024
+
+# ``Image.info`` mixes text chunks with decoder state. These keys are never
+# user metadata, and writing them back as tEXt would corrupt the output (same
+# exclusion list as censor.output_io._copy_png_text_metadata).
+NON_TEXT_IMAGE_INFO_KEYS = frozenset({
+    "exif", "icc_profile", "dpi", "interlace", "gamma", "chromaticity",
+    "transparency", "palette", "xmp", "photoshop", "adobe", "adobe_transform",
+    "jfif", "jfif_version", "jfif_unit", "jfif_density", "progression",
+    "progressive", "aspect", "background", "loop", "duration", "bits",
+    "compression", "extrasamples", "resolution", "srgb", "chromatic",
+})
+
+# Chunk names the editor itself always rewrites, so a source copy of them is
+# stale by definition and must never be carried forward.
+EDITOR_OWNED_CHUNK_KEYS = frozenset({"parameters", "Software"})
 
 # How many staging names to try before giving up. Only an abandoned staging file
 # from a killed save needs stepping over, so the search stays short — see
@@ -45,6 +88,22 @@ PARAMETER_EXPORT_ORDER = [
     ("schedule_type", "Schedule type"),
     ("loras", "LoRAs"),
 ]
+
+# Chunk names the editor is entitled to rewrite, derived from the tables above
+# rather than restated, so adding an editable parameter extends this set too.
+#
+# It deliberately does NOT depend on the keys present in one payload: the Reader
+# omits a field the user cleared, so a payload-derived set would carry the
+# source's stale chunk back and silently undo the clear.
+EDITOR_FIELD_CHUNK_KEYS = frozenset(
+    {"prompt", "negative_prompt", "width", "height", "size"}
+    | set(EDITED_METADATA_KEY_ALIASES.values())
+    | {key for key, _label in PARAMETER_EXPORT_ORDER}
+)
+
+# Settings names this module knows how to emit, used to tell an A1111 settings
+# line apart from a prompt line that merely happens to contain a colon.
+KNOWN_PARAMETER_LABELS = frozenset(label for _key, label in PARAMETER_EXPORT_ORDER)
 
 
 def normalize_edited_metadata(metadata: Optional[dict[str, Any]]) -> dict[str, Any]:
@@ -116,19 +175,262 @@ def build_sd_parameters_text(metadata: dict[str, Any]) -> str:
     return "\n".join(lines).strip()
 
 
-def build_pnginfo(metadata: dict[str, Any], parameters_text: str) -> PngImagePlugin.PngInfo:
-    pnginfo = PngImagePlugin.PngInfo()
-    if parameters_text:
-        pnginfo.add_text("parameters", parameters_text)
+def _classify_embedded_text(text: str) -> str:
+    """Name the chunk this text belongs in, reusing obfuscation's classifier.
 
-    pnginfo.add_text("Software", "SD Image Sorter")
+    ``obfuscation._text_chunk_key_for`` (8982d08) already encodes the shape
+    tests for a ComfyUI API graph, a NovelAI ``Comment`` payload and an A1111
+    parameter block, so it is reused rather than restated here. Imported lazily
+    because ``obfuscation`` pulls in ``database`` and the mutation service,
+    which this module must not require at import time.
+    """
+    try:
+        from obfuscation import _text_chunk_key_for
+
+        return _text_chunk_key_for(text)
+    except Exception:
+        return "UserComment"
+
+
+def _harvest_container_text(image: Image.Image) -> List[Tuple[str, str]]:
+    """Collect SD metadata a JPEG/WebP/TIFF source keeps in EXIF or XMP.
+
+    A non-PNG source carries no text chunks, so the prompt lives in EXIF
+    ``UserComment`` / ``ImageDescription`` or in an XMP packet and has to be
+    re-keyed to whatever the PNG reader looks for. Mirrors
+    ``obfuscation._harvest_non_png_text_chunks``, reusing its decoder so the
+    UserComment encodings are not restated.
+    """
+    found: List[Tuple[str, str]] = []
+    try:
+        from obfuscation import _decode_exif_user_comment
+    except Exception:
+        return found
+
+    try:
+        exif = image.getexif()
+    except Exception:
+        exif = None
+
+    if exif:
+        try:
+            user_comment = exif.get_ifd(0x8769).get(0x9286)
+        except Exception:
+            user_comment = None
+        if user_comment:
+            decoded = _decode_exif_user_comment(user_comment)
+            if decoded:
+                found.append((_classify_embedded_text(decoded), decoded))
+
+        try:
+            description = exif.get(0x010E)
+        except Exception:
+            description = None
+        # Same test obfuscation applies: only an actual parameter block is
+        # carried. A camera's caption keyed as an SD chunk would be metadata
+        # this app invented rather than preserved.
+        if isinstance(description, str) and "Steps:" in description and "Sampler:" in description:
+            found.append(("parameters", description))
+
+    xmp = (image.info or {}).get("xmp")
+    if xmp:
+        text = xmp.decode("utf-8", errors="replace") if isinstance(xmp, (bytes, bytearray)) else str(xmp)
+        if "Steps:" in text and "Sampler:" in text:
+            found.append(("parameters", text))
+
+    return found
+
+
+def harvest_source_text_chunks(image: Image.Image) -> Dict[str, str]:
+    """Collect the embedded text a source image carries, whatever its container."""
+    chunks: Dict[str, str] = {}
+
+    def _put(key: str, value: str) -> None:
+        cleaned = str(value or "").strip()
+        if not key or not cleaned:
+            return
+        if len(cleaned.encode("utf-8", errors="ignore")) > MAX_CARRIED_CHUNK_BYTES:
+            return
+        chunks.setdefault(key, cleaned)
+
+    for key, value in (image.info or {}).items():
+        if not isinstance(key, str) or key in NON_TEXT_IMAGE_INFO_KEYS:
+            continue
+        if isinstance(value, str):
+            _put(key, value)
+        elif isinstance(value, (bytes, bytearray)):
+            for encoding in ("utf-8", "latin-1"):
+                try:
+                    _put(key, bytes(value).decode(encoding))
+                    break
+                except (UnicodeDecodeError, AttributeError):
+                    continue
+
+    if str(getattr(image, "format", "") or "").upper() != "PNG":
+        for key, value in _harvest_container_text(image):
+            _put(key, value)
+
+    return chunks
+
+
+def _is_irreplaceable_generation_record(key: str, value: str) -> bool:
+    """Whether this chunk is a full generation record rather than a loose field.
+
+    A ComfyUI graph is the single most valuable thing in a generated PNG and
+    cannot be reconstructed from the editor's flat fields, so it outranks the
+    editor's own redundant copy of the chunk name. A plain string that merely
+    happens to sit under ``prompt`` — what an earlier Reader save left behind —
+    is not a record and loses to the edit.
+    """
+    if key == "workflow":
+        return True
+    return _classify_embedded_text(value) in {"prompt", "Comment", "parameters"}
+
+
+def preservable_source_chunks(
+    source_chunks: Optional[Dict[str, str]],
+) -> Dict[str, str]:
+    """Pick the source chunks that must survive an edit.
+
+    Anything outside the editor's own field names is carried through untouched.
+    A chunk that shares a name with an editable field loses to the edit unless
+    its value is an irreplaceable generation record — otherwise a cleared field
+    would be silently resurrected out of the source's stale chunk.
+    """
+    preserved: Dict[str, str] = {}
+
+    for key, value in (source_chunks or {}).items():
+        if key in EDITOR_OWNED_CHUNK_KEYS:
+            continue
+        if key in EDITOR_FIELD_CHUNK_KEYS and not _is_irreplaceable_generation_record(key, value):
+            continue
+        preserved[key] = value
+
+    return preserved
+
+
+def build_pnginfo(
+    metadata: dict[str, Any],
+    parameters_text: str,
+    *,
+    source_chunks: Optional[Dict[str, str]] = None,
+    warnings: Optional[List[str]] = None,
+) -> PngImagePlugin.PngInfo:
+    """Build the output text chunks: the edit, plus everything it did not touch."""
+    pnginfo = PngImagePlugin.PngInfo()
+    written: set[str] = set()
+
+    def _add(key: str, value: str) -> None:
+        if key in written:
+            return
+        pnginfo.add_text(key, value)
+        written.add(key)
+
+    if parameters_text:
+        _add("parameters", parameters_text)
+
+    _add("Software", "SD Image Sorter")
+
+    preserved = preservable_source_chunks(source_chunks)
 
     for key, value in metadata.items():
         if value is None or value == "":
             continue
-        pnginfo.add_text(str(key), str(value))
+        if str(key) in preserved:
+            continue
+        _add(str(key), str(value))
+
+    for key, value in preserved.items():
+        _add(key, value)
+
+    if warnings is not None and parameters_text:
+        record_keys = sorted(
+            key for key, value in preserved.items()
+            if _is_irreplaceable_generation_record(key, value)
+        )
+        if record_keys:
+            warnings.append(
+                PRESERVED_GENERATION_RECORD_WARNING.format(keys=", ".join(record_keys))
+            )
 
     return pnginfo
+
+
+def _parameter_setting_labels(parameters_text: str) -> set[str]:
+    """Extract the ``Label:`` names from an A1111 settings line.
+
+    Only the final line is read, because that is where both A1111 and
+    ``build_sd_parameters_text`` put the settings — so a colon inside the prompt
+    cannot be mistaken for a setting name. A line that names none of the known
+    settings is treated as prose and yields nothing.
+    """
+    lines = [line for line in str(parameters_text or "").splitlines() if line.strip()]
+    if not lines:
+        return set()
+
+    labels: set[str] = set()
+    for part in lines[-1].split(","):
+        label, separator, _value = part.partition(":")
+        if separator and label.strip():
+            labels.add(label.strip())
+
+    return labels if labels & KNOWN_PARAMETER_LABELS else set()
+
+
+def dropped_parameter_settings_warning(
+    source_chunks: Optional[Dict[str, str]],
+    parameters_text: str,
+) -> Optional[str]:
+    """Name settings the original parameter block had and the rebuilt one lacks.
+
+    The editor owns the ``parameters`` chunk and rebuilds it from the fields it
+    displays, so a setting the Reader does not show (``Model hash``,
+    ``Clip skip``, an extension's own key) disappears on save. Merging unknown
+    A1111 keys back in would mean re-emitting someone else's parameter syntax,
+    which risks corrupting the one block the app itself reads, so the loss is
+    reported instead of guessed at.
+    """
+    source_parameters = (source_chunks or {}).get("parameters")
+    if not source_parameters:
+        return None
+
+    dropped = _parameter_setting_labels(source_parameters) - _parameter_setting_labels(parameters_text)
+    if not dropped:
+        return None
+
+    return DROPPED_PARAMETER_SETTINGS_WARNING.format(keys=", ".join(sorted(dropped)))
+
+
+def uncarried_chunk_warning(
+    source_chunks: Optional[Dict[str, str]],
+    pil_format: str,
+    *,
+    source_format: Optional[str] = None,
+) -> Optional[str]:
+    """Name the embedded blocks the chosen container cannot hold.
+
+    PNG keeps every chunk. JPEG and WebP have one text slot, filled by the
+    edited parameter block, so a PNG source's other chunks are genuinely lost —
+    which the user is told rather than left to discover.
+
+    A non-PNG source is not warned about: its metadata already lives in EXIF,
+    and ``build_exif_bytes`` re-serializes the source EXIF including the sub-IFD
+    that holds ``UserComment``, so those blocks do survive (verified for both
+    JPEG and WebP). Warning there would be crying wolf.
+    """
+    if pil_format == "PNG":
+        return None
+    if str(source_format or "").upper() != "PNG":
+        return None
+
+    lost = sorted(key for key in (source_chunks or {}) if key not in EDITOR_OWNED_CHUNK_KEYS)
+    if not lost:
+        return None
+
+    return UNCARRIED_CHUNKS_WARNING.format(
+        label=FORMAT_LABELS.get(pil_format, pil_format),
+        keys=", ".join(lost),
+    )
 
 
 def build_exif_bytes(image: Image.Image, parameters_text: str) -> Optional[bytes]:
@@ -343,3 +645,4 @@ def write_image_atomically(
     finally:
         if staging is not None:
             _discard_backup(staging)
+

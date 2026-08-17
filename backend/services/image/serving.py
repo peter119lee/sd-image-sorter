@@ -35,8 +35,11 @@ from services.image_metadata_writer import (
     build_exif_bytes,
     build_pnginfo,
     build_sd_parameters_text,
+    dropped_parameter_settings_warning,
+    harvest_source_text_chunks,
     normalize_edited_metadata,
     prepare_image_for_save,
+    uncarried_chunk_warning,
     write_image_atomically,
 )
 from thumbnail_cache import (
@@ -224,19 +227,35 @@ class ServingMixin:
             # os.replace needs FILE_SHARE_DELETE on every open handle — which
             # the Windows CRT does not grant.
             with Image.open(source) as image:
+                source_format = image.format
+                source_chunks = harvest_source_text_chunks(image)
                 save_image = prepare_image_for_save(image, pil_format, warnings)
                 save_kwargs: Dict[str, Any] = {}
                 icc_profile = image.info.get("icc_profile")
                 if icc_profile:
                     save_kwargs["icc_profile"] = icc_profile
 
+                dropped_settings = dropped_parameter_settings_warning(source_chunks, parameters_text)
+                if dropped_settings:
+                    warnings.append(dropped_settings)
+
                 if pil_format == "PNG":
-                    save_kwargs["pnginfo"] = build_pnginfo(normalized_metadata, parameters_text)
+                    save_kwargs["pnginfo"] = build_pnginfo(
+                        normalized_metadata,
+                        parameters_text,
+                        source_chunks=source_chunks,
+                        warnings=warnings,
+                    )
                 else:
                     exif_bytes = build_exif_bytes(image, parameters_text)
                     if exif_bytes:
                         save_kwargs["exif"] = exif_bytes
                     save_kwargs["quality"] = int(quality if quality is not None else (92 if pil_format == "JPEG" else 95))
+                    uncarried = uncarried_chunk_warning(
+                        source_chunks, pil_format, source_format=source_format
+                    )
+                    if uncarried:
+                        warnings.append(uncarried)
 
             try:
                 write_image_atomically(save_image, final_output_path, pil_format, save_kwargs)
