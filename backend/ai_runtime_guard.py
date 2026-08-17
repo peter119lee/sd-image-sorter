@@ -7,13 +7,15 @@ a process-local and cross-process exclusive lease for model load/inference work.
 """
 from __future__ import annotations
 
+import errno
 import heapq
+import json
 import logging
 import os
 import threading
 import time
 from pathlib import Path
-from typing import Any, BinaryIO, Dict, List, Optional
+from typing import Any, BinaryIO, Dict, List, Optional, Tuple
 
 from config import get_temp_dir
 
@@ -62,13 +64,91 @@ _AI_JOB_STUCK_AFTER_SECONDS = max(
     1, int(os.environ.get("SD_IMAGE_SORTER_AI_JOB_STUCK_SECONDS", "180") or 180)
 )
 
+# Why a lease was refused. These are NOT interchangeable: "someone is working"
+# and "the lock is held by something that is not the process that claimed it"
+# need different answers from the user, so callers can branch on them.
+REASON_BUSY = "busy"
+REASON_STALE_LOCK = "stale_lock_holder_gone"
+
 
 class AiRuntimeBusyError(RuntimeError):
-    """Raised when a lease cannot be acquired within its (opt-in) ``timeout``.
+    """Raised when a lease cannot be acquired before its wait bound expires.
 
-    Only raised when a caller passes ``timeout=``; the default ``timeout=None``
-    waits indefinitely, exactly like the previous behavior.
+    Carries enough structure for a caller to name the blocker instead of
+    guessing: ``reason`` (see ``REASON_*``), ``blocker`` (the same
+    ``label`` / ``elapsed_seconds`` vocabulary ``get_ai_jobs_snapshot`` already
+    publishes through ``GET /api/system/ai-jobs``, plus ``pid`` when the holder
+    is another process), and the wait budget that was spent.
     """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        reason: str = REASON_BUSY,
+        blocker: Optional[Dict[str, Any]] = None,
+        waited_seconds: Optional[float] = None,
+        timeout_seconds: Optional[float] = None,
+    ) -> None:
+        super().__init__(message)
+        self.reason = reason
+        self.blocker = blocker or None
+        self.waited_seconds = waited_seconds
+        self.timeout_seconds = timeout_seconds
+
+
+def _default_lock_wait_seconds() -> float:
+    """How long the CROSS-PROCESS file lock may be waited for.
+
+    The gallery AI Tag job runs in a spawned child process, so the in-process
+    priority gate cannot order it against the server at all — only this file
+    lock serializes them, and one batch holds it for a whole chunk (100 images
+    on GPU, 12 on CPU). The bound therefore has to be long enough to cover a
+    chunk or the wait is useless, and short enough that a caller eventually
+    gets an answer instead of hanging forever.
+
+    Default = ``_AI_JOB_STUCK_AFTER_SECONDS``. That constant is this module's
+    own already-published definition of "a lease this old is abnormal" (it
+    drives the ``stuck`` flag in ``GET /api/system/ai-jobs``), so reusing it
+    means we never refuse a holder the app itself still considers to be working
+    normally, and the two numbers cannot drift into contradicting each other.
+    """
+    raw = os.environ.get("SD_IMAGE_SORTER_AI_LOCK_WAIT_SECONDS", "").strip()
+    if raw:
+        try:
+            value = float(raw)
+        except ValueError:
+            logger.debug(
+                "Invalid SD_IMAGE_SORTER_AI_LOCK_WAIT_SECONDS=%r; using default", raw
+            )
+        else:
+            if value > 0:
+                return value
+    return float(_AI_JOB_STUCK_AFTER_SECONDS)
+
+
+_LOCK_WAIT_SECONDS = _default_lock_wait_seconds()
+
+# Poll cadence for the non-blocking lock retry. Starts tight so a short lease
+# hands over promptly, then backs off so a long batch chunk costs few syscalls.
+_LOCK_POLL_MIN_SECONDS = 0.02
+_LOCK_POLL_MAX_SECONDS = 0.25
+
+# Byte 0 is the locked range and never carries information; the holder
+# descriptor starts at byte 1 so a WAITER can still read it. Measured on
+# Windows: a process that does not hold the lock gets EACCES reading byte 0 but
+# reads byte 1 onwards fine, which is the only reason naming the blocker works.
+_LOCK_BYTE_LENGTH = 1
+_LOCK_DESCRIPTOR_MAX_BYTES = 4096
+
+# "The byte range is already locked" as reported by each platform's
+# non-blocking lock call. Measured on Windows: msvcrt LK_NBLCK raises EACCES
+# (not EDEADLK — that one is specific to LK_LOCK giving up after 10 retries,
+# and is kept here only so the legacy blocking mode would still read as
+# contention). Anything outside this set is a real failure and must propagate.
+_LOCK_CONTENTION_ERRNOS = frozenset(
+    {errno.EACCES, errno.EAGAIN, errno.EWOULDBLOCK, errno.EDEADLK}
+)
 
 
 def _default_cpu_pool_size() -> int:
@@ -265,12 +345,15 @@ class AiRuntimeLease:
             self._nested = True
             self._acquired = True
             return self
+        started = time.monotonic()
         if self._timeout is None:
             _cpu_semaphore.acquire()
         elif not _cpu_semaphore.acquire(timeout=self._timeout):
-            raise AiRuntimeBusyError(
+            exc = AiRuntimeBusyError(
                 f"Timed out after {self._timeout:.1f}s waiting for a CPU AI runtime slot"
             )
+            self._enrich_busy_error(exc, TIER_CPU, time.monotonic() - started)
+            raise exc
         _cpu_thread_local.depth = 1
         self._acquired = True
         self._job_id = _register_job(self.label, TIER_CPU, self._priority, self._vram_mb)
@@ -278,9 +361,19 @@ class AiRuntimeLease:
         return self
 
     def _acquire_vram(self) -> "AiRuntimeLease":
+        started = time.monotonic()
+        # An explicit timeout is a budget for the WHOLE admission, so the gate
+        # and the file lock share one deadline rather than each getting a full
+        # timeout and doubling the caller's worst case.
+        deadline = None if self._timeout is None else started + self._timeout
+
         # Win the in-process priority gate first (this is the serialization +
         # priority + timeout seam). Reentrant on the same thread.
-        nested = _vram_gate.acquire(self._priority, self._timeout)
+        try:
+            nested = _vram_gate.acquire(self._priority, self._timeout)
+        except AiRuntimeBusyError as exc:
+            self._enrich_busy_error(exc, TIER_VRAM, time.monotonic() - started)
+            raise
         if nested:
             self._nested = True
             self._acquired = True
@@ -291,22 +384,7 @@ class AiRuntimeLease:
         # so a raise here never wedges every other waiter.
         try:
             if not AI_RUNTIME_LOCK_DISABLED:
-                lock_path = Path(get_temp_dir()) / "ai-runtime.lock"
-                lock_path.parent.mkdir(parents=True, exist_ok=True)
-                handle = lock_path.open("a+b")
-                try:
-                    _lock_file(handle)
-                    handle.seek(0)
-                    handle.truncate()
-                    handle.write(
-                        f"pid={os.getpid()} label={self.label}\n".encode("utf-8", errors="ignore")
-                    )
-                    handle.flush()
-                    os.fsync(handle.fileno())
-                except Exception:
-                    handle.close()
-                    raise
-                self._handle = handle
+                self._acquire_cross_process_lock(started, deadline)
         except BaseException:
             _vram_gate.release()
             raise
@@ -315,6 +393,63 @@ class AiRuntimeLease:
         self._job_id = _register_job(self.label, TIER_VRAM, self._priority, self._vram_mb)
         logger.debug("Acquired AI runtime lease (vram): %s", self.label)
         return self
+
+    def _acquire_cross_process_lock(
+        self, started: float, deadline: Optional[float]
+    ) -> None:
+        """Take ``<temp>/ai-runtime.lock``, waiting a bounded amount of time.
+
+        Without a caller-supplied timeout the wait is bounded by
+        ``_LOCK_WAIT_SECONDS`` rather than being unbounded: the holder is
+        another PROCESS, so unlike the in-process gate we cannot see it make
+        progress, and blocking a request forever is not an answer.
+        """
+        lock_path = Path(get_temp_dir()) / "ai-runtime.lock"
+        lock_path.parent.mkdir(parents=True, exist_ok=True)
+        lock_deadline = (
+            started + _LOCK_WAIT_SECONDS if deadline is None else deadline
+        )
+        handle = lock_path.open("a+b")
+        try:
+            if not _lock_file(handle, lock_deadline):
+                waited = time.monotonic() - started
+                reason, blocker = _describe_cross_process_blocker(lock_path)
+                logger.warning(
+                    "AI runtime lease %r gave up after %.1fs (%s): %s",
+                    self.label,
+                    waited,
+                    reason,
+                    blocker,
+                )
+                raise AiRuntimeBusyError(
+                    _busy_message(reason, blocker, waited),
+                    reason=reason,
+                    blocker=blocker,
+                    waited_seconds=round(waited, 1),
+                    timeout_seconds=lock_deadline - started,
+                )
+            _write_lock_descriptor(handle, self.label)
+        except BaseException:
+            handle.close()
+            raise
+        self._handle = handle
+
+    def _enrich_busy_error(
+        self, exc: AiRuntimeBusyError, tier: str, waited: float
+    ) -> None:
+        """Attach the in-process blocker to a gate/pool timeout.
+
+        Done here rather than inside the gate so the gate never has to reach
+        for the job registry while holding its own condition variable.
+        """
+        if exc.blocker is None:
+            exc.blocker = _describe_local_blocker(tier)
+        if exc.waited_seconds is None:
+            exc.waited_seconds = round(waited, 1)
+        if exc.timeout_seconds is None:
+            exc.timeout_seconds = self._timeout
+        if exc.blocker is not None:
+            exc.args = (_busy_message(exc.reason, exc.blocker, waited),)
 
     def release(self) -> None:
         if not self._acquired:
@@ -407,20 +542,238 @@ def exclusive_ai_runtime(
     )
 
 
-def _lock_file(handle: BinaryIO) -> None:
+def _ensure_lock_byte(handle: BinaryIO) -> None:
+    """Guarantee byte 0 exists so there is a range to lock.
+
+    The handle is opened append-mode, so this write lands at EOF — which is
+    byte 0 precisely when the file is empty. Skipped otherwise, because
+    appending once per acquisition would grow the file without bound.
+    """
+    if os.fstat(handle.fileno()).st_size >= _LOCK_BYTE_LENGTH:
+        return
+    handle.write(b"\0")
+    handle.flush()
+
+
+def _try_lock_file(handle: BinaryIO) -> bool:
+    """One NON-BLOCKING attempt. True if taken, False if someone else holds it.
+
+    Any error that is not "already locked" propagates: a read-only volume or a
+    bad descriptor is a broken environment, not a busy runtime, and must not be
+    reported to the user as "wait your turn".
+    """
     if os.name == "nt":
         import msvcrt
 
         handle.seek(0)
-        handle.write(b"\0")
-        handle.flush()
-        handle.seek(0)
-        msvcrt.locking(handle.fileno(), msvcrt.LK_LOCK, 1)
-        return
+        try:
+            msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, _LOCK_BYTE_LENGTH)
+        except OSError as exc:
+            if exc.errno in _LOCK_CONTENTION_ERRNOS:
+                return False
+            raise
+        return True
 
     import fcntl
 
-    fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+    try:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError as exc:
+        if exc.errno in _LOCK_CONTENTION_ERRNOS:
+            return False
+        raise
+    return True
+
+
+def _lock_file(handle: BinaryIO, deadline: float) -> bool:
+    """Wait for the cross-process lock until ``deadline``. False if it expires.
+
+    Replaces a single blocking call on both platforms. Windows
+    ``msvcrt.locking(LK_LOCK)`` retried ten times at one-second intervals and
+    then RAISED ``OSError(EDEADLK)`` — measured at 9.1s, far under one batch
+    chunk — so an unrelated AI feature failed instead of queueing. POSIX
+    ``flock(LOCK_EX)`` had the opposite flaw: it waited forever, with no way to
+    answer a caller that supplied a timeout. One bounded poll loop fixes both.
+    """
+    _ensure_lock_byte(handle)
+    interval = _LOCK_POLL_MIN_SECONDS
+    while True:
+        if _try_lock_file(handle):
+            return True
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return False
+        time.sleep(min(interval, remaining))
+        interval = min(interval * 2, _LOCK_POLL_MAX_SECONDS)
+
+
+def _write_lock_descriptor(handle: BinaryIO, label: str) -> None:
+    """Publish who holds the lock, at byte 1, where a waiter can read it."""
+    payload = json.dumps(
+        {"pid": os.getpid(), "label": label, "started_at": time.time()},
+        ensure_ascii=True,
+    ).encode("utf-8", errors="replace")[:_LOCK_DESCRIPTOR_MAX_BYTES]
+    handle.truncate(_LOCK_BYTE_LENGTH)  # drop any previous holder's descriptor
+    handle.write(payload)  # append-mode: lands at byte 1
+    handle.flush()
+    os.fsync(handle.fileno())
+
+
+def _read_lock_descriptor(lock_path: Path) -> Optional[Dict[str, Any]]:
+    """Read the current holder's descriptor, or None if it cannot be trusted.
+
+    A descriptor written by an older build (which started at byte 0) parses as
+    garbage here and correctly degrades to None rather than to a wrong name.
+    """
+    try:
+        with open(lock_path, "rb") as handle:
+            handle.seek(_LOCK_BYTE_LENGTH)
+            raw = handle.read(_LOCK_DESCRIPTOR_MAX_BYTES)
+    except OSError:
+        return None
+    if not raw:
+        return None
+    try:
+        parsed = json.loads(raw.decode("utf-8", errors="replace"))
+    except (ValueError, UnicodeDecodeError):
+        return None
+    return parsed if isinstance(parsed, dict) else None
+
+
+def _process_is_alive(pid: Any) -> Optional[bool]:
+    """True / False / None (undecidable) for whether ``pid`` is still running.
+
+    Deliberately NOT ``os.kill(pid, 0)`` on Windows: CPython maps ``os.kill``
+    there to ``TerminateProcess``, so the "probe" would kill the process it is
+    asking about.
+    """
+    try:
+        pid_value = int(pid)
+    except (TypeError, ValueError):
+        return None
+    if pid_value <= 0:
+        return None
+
+    if os.name == "nt":
+        try:
+            import ctypes
+
+            synchronize = 0x00100000
+            wait_timeout = 0x00000102
+            error_access_denied = 5
+            kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+            kernel32.OpenProcess.argtypes = [
+                ctypes.c_uint32,
+                ctypes.c_int,
+                ctypes.c_uint32,
+            ]
+            kernel32.OpenProcess.restype = ctypes.c_void_p
+            kernel32.WaitForSingleObject.argtypes = [ctypes.c_void_p, ctypes.c_uint32]
+            kernel32.WaitForSingleObject.restype = ctypes.c_uint32
+            kernel32.CloseHandle.argtypes = [ctypes.c_void_p]
+            handle = kernel32.OpenProcess(synchronize, 0, pid_value)
+            if not handle:
+                # Access denied means it exists but is out of reach; anything
+                # else (invalid parameter) means there is no such process.
+                return ctypes.get_last_error() == error_access_denied
+            try:
+                return kernel32.WaitForSingleObject(handle, 0) == wait_timeout
+            finally:
+                kernel32.CloseHandle(handle)
+        except Exception:  # noqa: BLE001 - a liveness hint must never break a lease
+            logger.debug("Windows process liveness probe failed", exc_info=True)
+            return None
+
+    try:
+        os.kill(pid_value, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    except OSError:
+        return None
+    return True
+
+
+def _describe_local_blocker(tier: str) -> Optional[Dict[str, Any]]:
+    """Name the in-process lease holding ``tier``, from the /api/system/ai-jobs
+    snapshot — the source that already publishes label/elapsed/stuck."""
+    for job in get_ai_jobs_snapshot()["jobs"]:  # already longest-running first
+        if job["tier"] == tier:
+            return {
+                "scope": "thread",
+                "label": job["label"],
+                "priority": job["priority"],
+                "elapsed_seconds": job["elapsed_seconds"],
+                "stuck": job["stuck"],
+            }
+    return None
+
+
+def _describe_cross_process_blocker(
+    lock_path: Path,
+) -> Tuple[str, Optional[Dict[str, Any]]]:
+    """Classify who is holding the cross-process lock.
+
+    Three outcomes, kept apart on purpose:
+
+    * a live holder that named itself -> BUSY, and we can say what it is;
+    * a holder that did not name itself (descriptor missing, truncated, or
+      written by an older build) -> BUSY, but say so generically rather than
+      inventing a name;
+    * the lock is held while the pid in the descriptor is verifiably GONE ->
+      not ordinary contention. Both Windows ``LockFile`` and POSIX ``flock``
+      are released by the OS when the owner dies, so a dead owner cannot be
+      what is blocking us; something else is, and "wait for it" would be
+      wrong advice.
+    """
+    descriptor = _read_lock_descriptor(lock_path)
+    if not descriptor:
+        return REASON_BUSY, None
+
+    started_at = descriptor.get("started_at")
+    elapsed: Optional[float] = None
+    if isinstance(started_at, (int, float)):
+        elapsed = round(max(0.0, time.time() - float(started_at)), 1)
+
+    pid = descriptor.get("pid")
+    alive = _process_is_alive(pid)
+    blocker = {
+        "scope": "process",
+        "pid": pid if isinstance(pid, int) else None,
+        "label": str(descriptor.get("label") or "") or None,
+        "elapsed_seconds": elapsed,
+        "holder_alive": alive,
+    }
+    if alive is False:
+        return REASON_STALE_LOCK, blocker
+    return REASON_BUSY, blocker
+
+
+def _busy_message(reason: str, blocker: Optional[Dict[str, Any]], waited: float) -> str:
+    """One short, path-free sentence naming the blocker.
+
+    Kept under the 180-character ceiling that ``frontend/js/modules/utils/
+    errors.js`` uses to discard messages, and free of file paths for the same
+    reason — otherwise the only actionable part is thrown away before display.
+    """
+    label = (blocker or {}).get("label") or "Another AI job"
+    elapsed = (blocker or {}).get("elapsed_seconds")
+    running = f" (running {elapsed:.0f}s)" if isinstance(elapsed, (int, float)) else ""
+    if reason == REASON_STALE_LOCK:
+        return (
+            f"The AI runtime is locked, but the job that claimed it ({label}) is no "
+            f"longer running. Restart the app to clear the lock."
+        )
+    if blocker is None:
+        return (
+            f"Another process is using the AI runtime. Waited {waited:.0f}s. "
+            f"Try again once it finishes."
+        )
+    return (
+        f"{label} is using the AI runtime{running}. Waited {waited:.0f}s. "
+        f"Try again when it finishes, or cancel it."
+    )
 
 
 def _unlock_file(handle: BinaryIO) -> None:
@@ -429,7 +782,7 @@ def _unlock_file(handle: BinaryIO) -> None:
 
         handle.seek(0)
         try:
-            msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+            msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, _LOCK_BYTE_LENGTH)
         except OSError:
             logger.debug("AI runtime Windows file unlock failed", exc_info=True)
         return
