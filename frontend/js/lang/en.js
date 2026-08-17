@@ -4841,4 +4841,28 @@ window.I18nLang_en = {
     'promptlab.captionNoneYet': 'No captions recorded yet. A rescan reads the .txt files sitting next to your images.',
     'promptlab.captionNotTracked': 'This library has not recorded captions yet.',
 
+    // Tag knowledge popover (GET /api/tags/info) on the autocomplete. The
+    // scope note is load-bearing, not boilerplate: a danbooru post count says
+    // how often booru users tagged something and nothing about any model's
+    // training data, and this popover sits exactly where a reader would be
+    // tempted to treat it as the latter. The dialect note appears only on the
+    // Dataset Maker caption editor, and only when the project's target model is
+    // documented to want natural-language captions.
+    'tagInfo.dialogLabel': 'Tag details',
+    'tagInfo.open': 'Tag details (Right arrow)',
+    'tagInfo.close': 'Close',
+    'tagInfo.loading': 'Loading tag details…',
+    'tagInfo.failed': 'Could not load details for "{tag}": {error}',
+    'tagInfo.aliasOf': '"{typed}" is an alias of {canonical}.',
+    'tagInfo.notInVocab': 'Not in the bundled Danbooru vocabulary — the app has no popularity or alias data for it.',
+    'tagInfo.category': 'Category',
+    'tagInfo.danbooruPosts': 'Danbooru posts',
+    'tagInfo.libraryCount': 'In your library',
+    'tagInfo.libraryImages': '{count} images',
+    'tagInfo.aliases': 'Also written',
+    'tagInfo.implies': 'Implies',
+    'tagInfo.impliedBy': 'Implied by',
+    'tagInfo.scopeNote': 'Vocabulary and library facts. Danbooru counts describe how often booru users tagged something; they do not say what any model was trained on.',
+    'tagInfo.dialectNote': 'This project targets a natural-language model, so Booru tag conventions do not apply to its captions. Tags stay useful for library search and review.',
+
 };

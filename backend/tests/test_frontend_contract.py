@@ -2795,3 +2795,179 @@ def test_tipo_card_states_keep_the_lists_the_backend_passes():
             assert placeholder in match.group("value"), (
                 f"{pack_name}:{key} drops the {placeholder} the backend passes"
             )
+
+
+def test_the_tag_popover_reads_every_field_tag_info_returns():
+    """``/api/tags/info`` gathers eight facts; a popover is the reason it exists.
+
+    ``get_tag_info``'s docstring names this surface, and each field costs the
+    backend real work - an alias scan over the vocabulary blob, both directions
+    of the implication table, a live library count. A renderer that quietly drops
+    one leaves that work invisible, which is how the endpoint sat unreachable in
+    the first place.
+    """
+    repo_root = Path(__file__).resolve().parents[2]
+    autocomplete = (
+        repo_root / "frontend" / "js" / "caption-autocomplete.js"
+    ).read_text(encoding="utf-8")
+
+    assert "/api/tags/info?tag=" in autocomplete, (
+        "the autocomplete no longer asks the endpoint built for it"
+    )
+    for field in (
+        "canonical",
+        "found_in_vocab",
+        "category",
+        "danbooru_count",
+        "aliases",
+        "zh",
+        "implies",
+        "implied_by",
+        "library_count",
+    ):
+        assert f"info.{field}" in autocomplete, (
+            f"the popover ignores info.{field}, which the endpoint computes for it"
+        )
+
+
+def test_the_tag_popover_says_whose_facts_its_counts_are():
+    """A booru post count next to a tag input invites exactly one wrong reading.
+
+    "1.3M posts" says booru users applied that tag 1.3M times. It says nothing
+    about any model's training set, and this popover appears where a reader is
+    most likely to treat it as a training-data or quality signal. The scope note
+    is the sentence that prevents that, so it is a contract, not decoration.
+    """
+    repo_root = Path(__file__).resolve().parents[2]
+    packs = _locale_pack_sources(repo_root)
+
+    english = re.search(
+        r"^\s*'tagInfo\.scopeNote'\s*:\s*'(?P<value>[^']*)'",
+        packs["en.js"],
+        re.MULTILINE,
+    )
+    assert english is not None, "en.js is missing tagInfo.scopeNote"
+    assert "do not say what any model was trained on" in english.group("value")
+
+    chinese = re.search(
+        r"^\s*'tagInfo\.scopeNote'\s*:\s*'(?P<value>[^']*)'",
+        packs["zh-CN.js"],
+        re.MULTILINE,
+    )
+    assert chinese is not None, "zh-CN.js is missing tagInfo.scopeNote"
+    assert "训练" in chinese.group("value"), (
+        "the Chinese scope note must make the same disclaimer, not a shorter one"
+    )
+
+    autocomplete = (
+        repo_root / "frontend" / "js" / "caption-autocomplete.js"
+    ).read_text(encoding="utf-8")
+    assert "tagInfo.scopeNote" in autocomplete, (
+        "the note exists in the packs but nothing renders it"
+    )
+
+
+def test_the_tag_popovers_dialect_map_matches_the_backends():
+    """The popover suppresses Booru tag lore for natural-language targets.
+
+    ``caption_dialect.py`` is explicit that only ``krea2`` and ``anima`` have
+    first-party evidence for a caption dialect, and that ``sdxl`` and ``flux``
+    are un-opinionated on purpose - guessing for them "would manufacture
+    warnings the evidence does not support". The frontend needs the same map to
+    decide when the dialect note is true, so pin the two together: a target
+    added or re-labelled on one side must not silently disagree on the other.
+    """
+    repo_root = Path(__file__).resolve().parents[2]
+    profiles = (repo_root / "frontend" / "js" / "modules" / "target-model.js").read_text(
+        encoding="utf-8"
+    )
+
+    frontend_map = {
+        model: dialect
+        for model, dialect in re.findall(
+            r"^\s{8}(\w+):\s*\{[^}]*?\n\s{12}dialect:\s*'(\w+)'",
+            profiles,
+            re.MULTILINE | re.DOTALL,
+        )
+    }
+
+    from services.caption_dialect import CAPTION_DIALECT_TARGET_MODELS
+
+    assert frontend_map == dict(CAPTION_DIALECT_TARGET_MODELS), (
+        "target-model.js and caption_dialect.py disagree about caption dialects: "
+        f"frontend={frontend_map} backend={dict(CAPTION_DIALECT_TARGET_MODELS)}"
+    )
+
+
+def test_the_tag_popover_claims_nothing_about_model_capability():
+    """Nothing here may turn a vocabulary count into advice.
+
+    The popover's whole job is stating facts the app holds. Wording that tells
+    the user a tag "works well" or that "the model knows" it would be inventing
+    a capability claim out of a booru statistic - the same failure as telling a
+    user to import prompt metadata that cannot exist.
+    """
+    repo_root = Path(__file__).resolve().parents[2]
+    packs = _locale_pack_sources(repo_root)
+    banned = (
+        "works well",
+        "better results",
+        "the model knows",
+        "the model understands",
+        "recommended tag",
+        "模型认识",
+        "效果更好",
+        "推荐标签",
+    )
+
+    for pack_name, source in packs.items():
+        values = re.findall(
+            r"^\s*'tagInfo\.[A-Za-z0-9_]+'\s*:\s*'(?P<value>[^']*)'",
+            source,
+            re.MULTILINE,
+        )
+        assert values, f"{pack_name} declares no tagInfo.* strings"
+        for value in values:
+            for phrase in banned:
+                assert phrase not in value, (
+                    f"{pack_name} tagInfo string claims model capability: {value!r}"
+                )
+
+
+def test_the_dialect_note_is_limited_to_the_projects_own_captions():
+    """``#dataset-target-model`` governs one project's captions and nothing else.
+
+    The same autocomplete serves the image-detail tag editor, the mass tag
+    boxes, three blacklists and the Prompt Lab writing boxes. None of those is
+    the open project's caption text, so applying the project's target model to
+    them would be a claim about text the setting does not reach.
+    """
+    repo_root = Path(__file__).resolve().parents[2]
+    autocomplete = (
+        repo_root / "frontend" / "js" / "caption-autocomplete.js"
+    ).read_text(encoding="utf-8")
+
+    assert re.search(
+        r"attach\(projectEditor,\s*\{\s*project:\s*true\s*\}\)", autocomplete
+    ), "the Dataset Maker caption editor is no longer the project-scoped surface"
+
+    for other in (
+        "modal-tags-add-input",
+        "mass-tag-add-tags",
+        "dataset-blacklist",
+        "tag-pre-blacklist",
+        "batch-export-blacklist",
+        "pl-build-prompt",
+    ):
+        assert not re.search(
+            rf"{re.escape(other)}'[^\n]*project:\s*true", autocomplete
+        ), f"{other} was given the project caption scope it does not have"
+
+    gate = re.search(
+        r"isProjectCaptionSurface\(anchor\)[^\n]*captionDialect\?\.\(\)\s*===\s*'natural'",
+        autocomplete,
+    )
+    assert gate is not None, (
+        "the dialect note must require both the project surface and a "
+        "natural-language target"
+    )

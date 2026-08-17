@@ -4832,4 +4832,26 @@ window.I18nLang_zhCN = {
     'promptlab.captionNoneYet': '还没有记录任何 caption。重新扫描会读取图片旁边的 .txt 文件。',
     'promptlab.captionNotTracked': '这个图库还没有记录 caption。',
 
+    // 标签资料浮层（GET /api/tags/info），挂在自动补全上。那句范围说明不是套话：
+    // danbooru 数量只说明 booru 用户给某个概念打过多少次标签，完全不代表任何模型
+    // 的训练数据，而这个浮层恰好出现在最容易被误读成后者的位置。方言提示只在
+    // Dataset Maker 的 caption 编辑框出现，且仅当项目目标模型有据可依地需要自然
+    // 语言 caption 时才出现。
+    'tagInfo.dialogLabel': '标签资料',
+    'tagInfo.open': '标签资料（右方向键）',
+    'tagInfo.close': '关闭',
+    'tagInfo.loading': '正在加载标签资料…',
+    'tagInfo.failed': '无法加载「{tag}」的资料：{error}',
+    'tagInfo.aliasOf': '「{typed}」是 {canonical} 的别名。',
+    'tagInfo.notInVocab': '不在内置 Danbooru 词表中——程序没有它的热度或别名数据。',
+    'tagInfo.category': '类别',
+    'tagInfo.danbooruPosts': 'Danbooru 图片数',
+    'tagInfo.libraryCount': '你的图库中',
+    'tagInfo.libraryImages': '{count} 张',
+    'tagInfo.aliases': '其他写法',
+    'tagInfo.implies': '蕴含',
+    'tagInfo.impliedBy': '被蕴含于',
+    'tagInfo.scopeNote': '这些是词表与图库的事实。Danbooru 数量说明的是 booru 用户给它打过多少次标签，并不代表任何模型的训练内容。',
+    'tagInfo.dialectNote': '本项目的目标模型使用自然语言，因此 Booru 标签惯例并不适用于它的 caption。标签仍然适合图库检索与审核。',
+
 };

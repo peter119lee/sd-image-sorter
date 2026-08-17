@@ -49,7 +49,19 @@
         dropdown: null,
         abort: null,
         seq: 0,
+        info: null,
+        infoSeq: 0,
     };
+
+    function t(key, fallback, params) {
+        const translated = window.I18n?.t?.(key, params);
+        if (translated && translated !== key) return translated;
+        let text = fallback;
+        for (const [name, value] of Object.entries(params || {})) {
+            text = text.split(`{${name}}`).join(String(value));
+        }
+        return text;
+    }
 
     function currentToken(el) {
         const value = el.value || '';
@@ -180,6 +192,27 @@
             count.textContent = formatCount(s.count);
             meta.appendChild(count);
 
+            const details = document.createElement('button');
+            details.type = 'button';
+            details.className = 'cap-ac-info-btn';
+            details.tabIndex = -1;
+            details.textContent = 'i';
+            const detailsLabel = t('tagInfo.open', 'Tag details (\u2192)', {});
+            details.title = detailsLabel;
+            details.setAttribute('aria-label', detailsLabel);
+            // Both handlers: mousedown keeps the row's accept and the input's
+            // blur from firing, so looking at a tag never commits it.
+            details.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+            });
+            details.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                showTagInfo(el, s.tag);
+            });
+            meta.appendChild(details);
+
             item.append(dot, name, meta);
             item.addEventListener('mousedown', (e) => {
                 // mousedown so the click commits before the input blurs.
@@ -227,14 +260,248 @@
         }
     }
 
+    // ---- Tag knowledge popover -----------------------------------------
+    // GET /api/tags/info has answered with everything the app knows about one
+    // tag since v3.5.0, and the only door to it was the Separation Console's
+    // per-row menu — nowhere near where tags are actually typed.
+    //
+    // Two rules bound what it may say. Its numbers are vocabulary and library
+    // facts: a danbooru post count is how often booru users tagged something,
+    // which is not a statement about any model's training set, and the note is
+    // there so nobody reads it as one. And when the open project targets a
+    // model documented to want natural-language captions, booru tag lore is not
+    // advice for that project's captions, so the popover says so rather than
+    // presenting the same numbers as guidance.
+
+    function infoOpen() {
+        return !!(STATE.info && !STATE.info.hidden);
+    }
+
+    function hideTagInfo() {
+        if (!STATE.info) return;
+        STATE.info.hidden = true;
+        STATE.info.replaceChildren();
+        document.removeEventListener('mousedown', onDocumentMouseDown, true);
+    }
+
+    function onDocumentMouseDown(event) {
+        if (!infoOpen()) return;
+        const target = event.target;
+        if (STATE.info.contains(target)) return;
+        if (target instanceof Element && target.closest('.cap-ac-info-btn')) return;
+        hideTagInfo();
+    }
+
+    function ensureInfoPanel() {
+        if (STATE.info) return STATE.info;
+        const panel = document.createElement('div');
+        panel.className = 'cap-ac-info';
+        panel.setAttribute('role', 'dialog');
+        panel.hidden = true;
+        document.body.appendChild(panel);
+        STATE.info = panel;
+        return panel;
+    }
+
+    /** Sit beside the suggestion list while it is open, so the details never
+     *  cover the list they were opened from; fall back to the input itself when
+     *  the popover was opened without a dropdown. */
+    function placeInfoPanel(surface) {
+        const openDropdown = STATE.dropdown && !STATE.dropdown.hidden
+            ? STATE.dropdown
+            : null;
+        window.PopupPosition?.place(STATE.info, {
+            anchor: openDropdown || surface,
+            placement: 'right-start',
+            gap: 8,
+            width: 320,
+            maxHeight: 420,
+        });
+    }
+
+    /** Whether this surface's text is governed by the open project's target
+     *  model. Only the Dataset Maker caption editor is: the library tag editors,
+     *  blacklists and prompt-writing boxes are not that project's captions, and
+     *  borrowing its setting there would be a claim about text the setting does
+     *  not reach. */
+    function isProjectCaptionSurface(el) {
+        return !!el && el.dataset?.capAcProject === '1';
+    }
+
+    function infoRow(label, value) {
+        const row = document.createElement('div');
+        row.className = 'cap-ac-info-row';
+        const term = document.createElement('span');
+        term.className = 'cap-ac-info-label';
+        term.textContent = label;
+        const detail = document.createElement('span');
+        detail.className = 'cap-ac-info-value';
+        detail.textContent = value;
+        row.append(term, detail);
+        return row;
+    }
+
+    function renderTagInfo(panel, anchor, query, info) {
+        panel.replaceChildren();
+        panel.setAttribute(
+            'aria-label',
+            t('tagInfo.dialogLabel', 'Tag details', {})
+        );
+
+        const head = document.createElement('div');
+        head.className = 'cap-ac-info-head';
+        const dot = document.createElement('span');
+        dot.className = `cap-ac-dot cap-ac-dot-${info.category || 'unknown'}`;
+        const name = document.createElement('span');
+        name.className = 'cap-ac-info-name';
+        name.textContent = info.canonical || query;
+        head.append(dot, name);
+        if (info.zh) {
+            const zh = document.createElement('span');
+            zh.className = 'cap-ac-info-zh';
+            zh.textContent = info.zh;
+            head.appendChild(zh);
+        }
+        const close = document.createElement('button');
+        close.type = 'button';
+        close.className = 'cap-ac-info-close';
+        close.textContent = '\u2715';
+        const closeLabel = t('tagInfo.close', 'Close', {});
+        close.title = closeLabel;
+        close.setAttribute('aria-label', closeLabel);
+        close.addEventListener('click', hideTagInfo);
+        head.appendChild(close);
+        panel.appendChild(head);
+
+        const body = document.createElement('div');
+        body.className = 'cap-ac-info-body';
+
+        const canonical = info.canonical || query;
+        if (canonical && canonical !== query) {
+            const alias = document.createElement('p');
+            alias.className = 'cap-ac-info-lead';
+            alias.textContent = t(
+                'tagInfo.aliasOf',
+                '"{typed}" is an alias of {canonical}.',
+                { typed: query, canonical }
+            );
+            body.appendChild(alias);
+        }
+
+        if (info.found_in_vocab) {
+            if (info.category) {
+                body.appendChild(infoRow(
+                    t('tagInfo.category', 'Category', {}),
+                    info.category
+                ));
+            }
+            const exact = Number(info.danbooru_count) || 0;
+            const posts = infoRow(
+                t('tagInfo.danbooruPosts', 'Danbooru posts', {}),
+                formatCount(exact) || '0'
+            );
+            posts.querySelector('.cap-ac-info-value').title = exact.toLocaleString();
+            body.appendChild(posts);
+        } else {
+            const miss = document.createElement('p');
+            miss.className = 'cap-ac-info-lead';
+            miss.textContent = t(
+                'tagInfo.notInVocab',
+                'Not in the bundled Danbooru vocabulary — the app has no popularity or alias data for it.',
+                {}
+            );
+            body.appendChild(miss);
+        }
+
+        body.appendChild(infoRow(
+            t('tagInfo.libraryCount', 'In your library', {}),
+            t('tagInfo.libraryImages', '{count} images', {
+                count: Number(info.library_count) || 0,
+            })
+        ));
+
+        const lists = [
+            ['tagInfo.aliases', 'Also written', info.aliases],
+            ['tagInfo.implies', 'Implies', info.implies],
+            ['tagInfo.impliedBy', 'Implied by', info.implied_by],
+        ];
+        for (const [key, fallback, values] of lists) {
+            const items = Array.isArray(values) ? values.filter(Boolean) : [];
+            if (items.length === 0) continue;
+            body.appendChild(infoRow(t(key, fallback, {}), items.slice(0, 8).join(', ')));
+        }
+        panel.appendChild(body);
+
+        const scope = document.createElement('p');
+        scope.className = 'cap-ac-info-note';
+        scope.textContent = t(
+            'tagInfo.scopeNote',
+            'Vocabulary and library facts. Danbooru counts describe how often booru users tagged something; they do not say what any model was trained on.',
+            {}
+        );
+        panel.appendChild(scope);
+
+        if (isProjectCaptionSurface(anchor) && window.TargetModel?.captionDialect?.() === 'natural') {
+            const dialect = document.createElement('p');
+            dialect.className = 'cap-ac-info-note cap-ac-info-dialect';
+            dialect.textContent = t(
+                'tagInfo.dialectNote',
+                'This project targets a natural-language model, so Booru tag conventions do not apply to its captions. Tags stay useful for library search and review.',
+                {}
+            );
+            panel.appendChild(dialect);
+        }
+
+        placeInfoPanel(anchor);
+    }
+
+    async function showTagInfo(anchor, tag) {
+        const query = String(tag || '').trim();
+        if (!query) return;
+        const panel = ensureInfoPanel();
+        const seq = ++STATE.infoSeq;
+        panel.replaceChildren();
+        const loading = document.createElement('p');
+        loading.className = 'cap-ac-info-lead';
+        loading.textContent = t('tagInfo.loading', 'Loading tag details\u2026', {});
+        panel.appendChild(loading);
+        panel.hidden = false;
+        document.addEventListener('mousedown', onDocumentMouseDown, true);
+        placeInfoPanel(anchor);
+
+        try {
+            const response = await fetch(`/api/tags/info?tag=${encodeURIComponent(query)}`);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const info = await response.json();
+            if (seq !== STATE.infoSeq) return;
+            renderTagInfo(panel, anchor, query, info);
+        } catch (err) {
+            if (seq !== STATE.infoSeq) return;
+            panel.replaceChildren();
+            const failed = document.createElement('p');
+            failed.className = 'cap-ac-info-lead';
+            failed.textContent = t(
+                'tagInfo.failed',
+                'Could not load details for "{tag}": {error}',
+                { tag: query, error: String(err?.message || err) }
+            );
+            panel.appendChild(failed);
+            placeInfoPanel(anchor);
+        }
+    }
+
     function attach(el, opts) {
         if (!el || el.dataset.captionAutocomplete === '1') return;
         el.dataset.captionAutocomplete = '1';
         if (opts && opts.mode === 'insert') el.dataset.capAcMode = 'insert';
+        if (opts && opts.project) el.dataset.capAcProject = '1';
 
         let inputDebounce = null;
         el.addEventListener('input', () => {
             if (inputDebounce) clearTimeout(inputDebounce);
+            // The open popover describes the token that was there a keystroke
+            // ago; keeping it would leave stale facts next to new text.
+            hideTagInfo();
             inputDebounce = setTimeout(async () => {
                 const tok = currentToken(el);
                 if (!shouldSuggest(tok.text)) {
@@ -262,7 +529,28 @@
         // Enter handler on the same element; accepting a suggestion must win
         // and stop that handler from also firing.
         el.addEventListener('keydown', (e) => {
+            // Layered dismissal: Escape takes the details popover first, so a
+            // glance at one tag does not also cost the suggestion list.
+            if (e.key === 'Escape' && infoOpen()) {
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                hideTagInfo();
+                return;
+            }
             if (!STATE.dropdown || STATE.dropdown.hidden) return;
+            if (e.key === 'ArrowRight') {
+                // Only when the caret has nowhere further right to go, so the
+                // key keeps its normal meaning while editing mid-line.
+                const atEnd = (el.selectionStart ?? 0) === (el.value || '').length
+                    && (el.selectionEnd ?? 0) === (el.value || '').length;
+                const highlighted = STATE.lastSuggestions[STATE.active];
+                if (atEnd && highlighted) {
+                    e.preventDefault();
+                    e.stopImmediatePropagation();
+                    showTagInfo(el, highlighted.tag);
+                }
+                return;
+            }
             if (e.key === 'ArrowDown') {
                 e.preventDefault();
                 STATE.active = (STATE.active + 1) % STATE.lastSuggestions.length;
@@ -290,8 +578,11 @@
     }
 
     function bind() {
+        // The Dataset Maker caption editor writes the open project's captions,
+        // so the project's target model governs this text and nothing else's.
+        const projectEditor = document.getElementById('dataset-editor-textarea');
+        if (projectEditor) attach(projectEditor, { project: true });
         const surfaces = [
-            'dataset-editor-textarea',   // Dataset Maker caption editor
             'modal-tags-add-input',      // image detail tag editor
             'mass-tag-add-tags',         // mass tag editor: add
             'mass-tag-remove-tags',      // mass tag editor: remove
@@ -325,5 +616,11 @@
     // endpoint queries live data; there is no client-side vocab cache).
     // isOpen lets surfaces with their own Enter handlers (image detail
     // modal) yield to the suggestion accept regardless of listener order.
-    window.CaptionAutocomplete = { attach, isOpen, refreshVocab: async () => {} };
+    window.CaptionAutocomplete = {
+        attach,
+        isOpen,
+        showTagInfo,
+        hideTagInfo,
+        refreshVocab: async () => {},
+    };
 })();

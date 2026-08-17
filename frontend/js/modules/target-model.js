@@ -59,6 +59,12 @@
         } catch (_) { return en; }
     }
 
+    // Mirrors backend/services/caption_dialect.py CAPTION_DIALECT_TARGET_MODELS.
+    // Only krea2 and anima have first-party evidence for a caption dialect;
+    // sdxl and flux are deliberately un-opinionated there, so they carry no
+    // `dialect` and every reader must treat a missing one as "no opinion"
+    // rather than guessing. backend/tests/test_frontend_contract.py pins this
+    // map to the backend's so the two cannot drift apart.
     const PROFILES = {
         sdxl: {
             captionType: 'booru',
@@ -78,6 +84,7 @@
         },
         krea2: {
             captionType: 'nl',
+            dialect: 'natural',
             captionProfile: 'krea2_long_nl',
             tokenBudget: 512,
             captionHelpKeys: KREA2_CAPTION_HELP_KEYS,
@@ -88,6 +95,7 @@
         },
         anima: {
             captionType: 'booru',
+            dialect: 'tags',
             tokenBudget: 512,
             hint: () => t(
                 'Booru-native vocabulary (Qwen3 encoder) — rich tag lists work; use the Anima export presets for @-triggers and sections.',
@@ -111,6 +119,12 @@
         tokenBudget() {
             const profile = this.profile();
             return profile ? profile.tokenBudget : null;
+        },
+
+        /** Caption dialect this target is documented to want, or null for
+         *  "no evidenced opinion" (sdxl, flux, and no target chosen). */
+        captionDialect() {
+            return this.profile()?.dialect || null;
         },
 
         /** Smart Tag caption profile; null means use its normal purpose preset. */

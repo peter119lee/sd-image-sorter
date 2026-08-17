@@ -111,6 +111,134 @@
 
 .hue-choice-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 
+/* ---- Tag knowledge popover (GET /api/tags/info) --------------------------
+   A raised flat panel next to the suggestion list: facts in a label/value
+   grid, then the scope note that keeps its counts from being read as model
+   knowledge. */
+
+.cap-ac-info-btn {
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+    padding: 0;
+    border: 1px solid var(--border, #2B2B2E);
+    border-radius: 50%;
+    background: transparent;
+    color: var(--text-muted, #8A8A90);
+    font-size: 0.68rem;
+    font-style: italic;
+    font-weight: 600;
+    line-height: 1;
+    cursor: help;
+}
+
+.caption-autocomplete-item:hover .cap-ac-info-btn,
+.caption-autocomplete-item.active .cap-ac-info-btn {
+    border-color: var(--accent-line, rgba(200, 135, 60, 0.45));
+    color: var(--accent, #C8873C);
+}
+
+.cap-ac-info {
+    position: fixed;
+    z-index: 10001;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px 12px;
+    background: var(--surface-2, #1C1C1E);
+    border: 1px solid var(--border, #2B2B2E);
+    border-radius: var(--radius-md, 4px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+    overflow-y: auto;
+    font-size: 0.82rem;
+    color: var(--text, #E8E8EA);
+}
+
+.cap-ac-info[hidden] { display: none; }
+
+.cap-ac-info-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--hairline-2, #26262A);
+}
+
+.cap-ac-info-name {
+    font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+    font-size: 0.86rem;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+.cap-ac-info-zh {
+    color: var(--text-secondary, #A6A6AB);
+    font-size: 0.78rem;
+}
+
+.cap-ac-info-close {
+    margin-left: auto;
+    flex-shrink: 0;
+    padding: 2px 6px;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm, 4px);
+    background: transparent;
+    color: var(--text-muted, #8A8A90);
+    font-size: 0.78rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.cap-ac-info-close:hover {
+    border-color: var(--border-strong, #3A3A3E);
+    color: var(--text, #E8E8EA);
+}
+
+.cap-ac-info-body {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.cap-ac-info-lead {
+    margin: 0;
+    color: var(--text-secondary, #A6A6AB);
+    line-height: 1.45;
+}
+
+.cap-ac-info-row {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+}
+
+.cap-ac-info-label {
+    flex: 0 0 108px;
+    color: var(--text-muted, #8A8A90);
+    font-size: 0.76rem;
+}
+
+.cap-ac-info-value {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-variant-numeric: tabular-nums;
+    overflow-wrap: anywhere;
+}
+
+.cap-ac-info-note {
+    margin: 0;
+    padding-top: 8px;
+    border-top: 1px solid var(--hairline-2, #26262A);
+    color: var(--text-muted, #8A8A90);
+    font-size: 0.74rem;
+    line-height: 1.45;
+}
+
+.cap-ac-info-dialect {
+    border-top-color: var(--accent-line, rgba(200, 135, 60, 0.45));
+    color: var(--text-secondary, #A6A6AB);
+}
+
 .cap-ac-dot-character  { background: #DEB688; }
 .cap-ac-dot-artist     { background: #D39F62; }
 .cap-ac-dot-outfit     { background: #E4C5A1; }
