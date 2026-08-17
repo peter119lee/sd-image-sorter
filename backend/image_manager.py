@@ -1,11 +1,11 @@
 """
 Image manager for file operations (scanning, moving, copying).
 """
+import errno
 import gzip
 import logging
 import os
 import shutil
-import tempfile
 import threading
 import time
 import itertools
@@ -34,6 +34,7 @@ from sidecar_fingerprint import compute_sidecar_fingerprint
 from metadata_storage import compact_metadata_json
 from metadata_parser import PARSED_METADATA_VERSION, parse_image
 from exceptions import ScanError, ScanCancelledError, FileOperationError
+from utils.atomic_staging import create_staging_sibling, publish_staging_file
 from utils.path_validation import is_directory_symlink_or_junction, validate_folder_path
 from utils.source_paths import (
     IndexedPathAccessError,
@@ -1099,36 +1100,69 @@ def move_image(image_id: int, destination_folder: str, image_path: str) -> str:
         ) from e
 
 
+# Only a rename that genuinely crossed a volume boundary may fall back to a
+# copy. Windows raises EXDEV (WinError 17) for that, verified by moving a file
+# between two drives here; an ACL-denied or read-only destination folder raises
+# PermissionError/EACCES instead, which is already the answer the caller needs.
+_CROSS_VOLUME_RENAME_ERRNOS = frozenset({errno.EXDEV, errno.ENOTSUP})
+
+
+def _flush_staged_file(staging_path: Path) -> None:
+    """Force the staged bytes out of the OS cache before publishing them."""
+    descriptor = os.open(staging_path, os.O_RDWR | getattr(os, "O_BINARY", 0))
+    try:
+        os.fsync(descriptor)
+    except OSError:
+        pass
+    finally:
+        os.close(descriptor)
+
+
 def _copy_file_atomically(source_path: str, destination_path: str) -> None:
-    """Copy into a same-directory temporary file before publishing the result."""
-    destination_directory = os.path.dirname(destination_path)
-    temporary_prefix = f".{os.path.basename(destination_path)}."
-    descriptor, temporary_path = tempfile.mkstemp(
-        dir=destination_directory,
-        prefix=temporary_prefix,
-        suffix=".tmp",
-    )
+    """Copy into a same-directory staging file before publishing the result.
+
+    Staging goes through ``utils.atomic_staging`` rather than ``tempfile``,
+    which cannot be used against a folder chosen by the user: on Windows
+    ``mkstemp`` reads a ``PermissionError`` as "that random name is already
+    taken" and retries it up to ``TMP_MAX`` (2,147,483,647 on the shipped
+    interpreter), because ``os.access`` only inspects the read-only attribute
+    and calls an ACL-denied folder writable. Staging into a folder this process
+    may not write therefore never returned. Publishing goes through the same
+    module because ``os.replace`` severs a hard link, which would leave the
+    user's other name for this file holding the pre-move bytes.
+
+    The staging name is given a ``.tmp`` tail deliberately: the scan admits
+    candidates by extension alone, so a staging file abandoned by a killed
+    process must not look like an image to it.
+    """
+    target = Path(destination_path)
+    staging_path, descriptor = create_staging_sibling(target.with_name(f"{target.name}.tmp"))
     os.close(descriptor)
 
     try:
-        shutil.copy2(source_path, temporary_path)
-        os.replace(temporary_path, destination_path)
-    except Exception as copy_error:
+        shutil.copy2(source_path, staging_path)
+        _flush_staged_file(staging_path)
+        publish_staging_file(staging_path, target)
+    except BaseException:
         try:
-            os.unlink(temporary_path)
+            os.unlink(staging_path)
         except FileNotFoundError:
             pass
         except OSError as cleanup_error:
-            raise FileOperationError(
-                f"Copy failed and temporary file cleanup also failed: {copy_error}; cleanup error: {cleanup_error}",
-                path=destination_path,
-                operation="copy",
-            ) from copy_error
+            # The copy's own error is what the user needs, so it stays the one
+            # that propagates; the file left behind is recorded rather than
+            # dropped silently.
+            logger.warning(
+                "Copy to %s failed and its staging file %s could not be removed: %s",
+                destination_path,
+                staging_path,
+                cleanup_error,
+            )
         raise
 
 
 def _move_file_atomically(source_path: str, destination_path: str) -> None:
-    """Move a file, staging the cross-volume case through a temporary sibling.
+    """Move a file, staging a genuine cross-volume move through a sibling.
 
     ``shutil.move`` falls back to a streaming copy when the rename crosses a
     volume boundary, and if that copy dies (drive full, USB/network drive
@@ -1136,14 +1170,19 @@ def _move_file_atomically(source_path: str, destination_path: str) -> None:
     final filename, where the next scan indexes them as a real image. Reuse
     ``_copy_file_atomically`` for the fallback so the destination name only ever
     appears once the copy is complete.
+
+    Only a cross-volume rename takes that fallback. Every other refusal is
+    already an answer: a destination folder the user may not write raises
+    ``PermissionError``, and staging a copy into it reported the wrong cause at
+    best — and, while that staging went through ``tempfile``, hung instead of
+    reporting anything at all.
     """
     try:
         os.replace(source_path, destination_path)
         return
-    except OSError:
-        # Same reasoning as shutil.move: a failed rename is retried as a copy
-        # so cross-volume moves keep working. The copy's own error surfaces.
-        pass
+    except OSError as rename_error:
+        if rename_error.errno not in _CROSS_VOLUME_RENAME_ERRNOS:
+            raise
 
     _copy_file_atomically(source_path, destination_path)
     os.unlink(source_path)
