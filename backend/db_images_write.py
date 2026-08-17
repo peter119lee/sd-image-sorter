@@ -37,6 +37,7 @@ from utils.source_paths import (
     indexed_image_path_casefold,
     indexed_image_path_match_key,
 )
+from caption_format import caption_format_for_storage
 from metadata_storage import compact_existing_metadata_json, compact_metadata_json
 
 
@@ -256,6 +257,12 @@ def _upsert_image_record(
         # record means the caller could not question the filesystem about
         # sidecars, which must not be mistaken for "this image has no sidecar"
         # (recorded as an empty string by sidecar_fingerprint.py).
+        #
+        # sidecar_caption_format is DERIVED here from the caption text this
+        # statement is about to store, not taken from the record. Deriving it at
+        # the write boundary is what makes the marker and the text structurally
+        # unable to disagree, whatever a caller passes. It never affects the
+        # caption value itself.
         cursor.execute(
             """
             UPDATE images
@@ -263,6 +270,7 @@ def _upsert_image_record(
                 generator = ?,
                 prompt = ?,
                 sidecar_caption = ?,
+                sidecar_caption_format = ?,
                 negative_prompt = ?,
                 metadata_json = ?,
                 width = ?,
@@ -295,6 +303,7 @@ def _upsert_image_record(
                 record.get("generator", "unknown"),
                 record.get("prompt"),
                 record.get("sidecar_caption"),
+                caption_format_for_storage(record.get("sidecar_caption")),
                 record.get("negative_prompt"),
                 record.get("metadata_json"),
                 record.get("width"),
@@ -330,11 +339,12 @@ def _upsert_image_record(
         cursor.execute(
             """
             INSERT INTO images
-            (path, filename, generator, prompt, sidecar_caption, negative_prompt, metadata_json,
+            (path, filename, generator, prompt, sidecar_caption, sidecar_caption_format,
+             negative_prompt, metadata_json,
              width, height, file_size, checkpoint, checkpoint_normalized, loras, model_hash, is_readable, read_error,
              source_mtime_ns, source_size, metadata_status, content_fingerprint, sidecar_fingerprint,
              library_order_time, source_file_mtime, created_at, raw_metadata_gz, indexed_at, library_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?)
             """,
             (
                 path,
@@ -342,6 +352,7 @@ def _upsert_image_record(
                 record.get("generator", "unknown"),
                 record.get("prompt"),
                 record.get("sidecar_caption"),
+                caption_format_for_storage(record.get("sidecar_caption")),
                 record.get("negative_prompt"),
                 record.get("metadata_json"),
                 record.get("width"),
@@ -533,6 +544,8 @@ def update_image_metadata(
             SET generator = ?,
                 prompt = ?,
                 sidecar_caption = CASE WHEN ? = 1 THEN ? ELSE sidecar_caption END,
+                sidecar_caption_format =
+                    CASE WHEN ? = 1 THEN ? ELSE sidecar_caption_format END,
                 negative_prompt = ?,
                 metadata_json = ?,
                 width = ?,
@@ -560,6 +573,14 @@ def update_image_metadata(
                 prompt,
                 1 if rewrite_sidecar_caption else 0,
                 sidecar_caption if rewrite_sidecar_caption else None,
+                # Same CASE guard, same derivation source: a caller that knows
+                # nothing about captions rewrites neither the text nor its marker.
+                1 if rewrite_sidecar_caption else 0,
+                (
+                    caption_format_for_storage(sidecar_caption)
+                    if rewrite_sidecar_caption
+                    else None
+                ),
                 negative_prompt,
                 metadata_json,
                 width,
@@ -618,6 +639,7 @@ def update_reparsed_prompt_fields(
                 checkpoint_normalized = COALESCE(?, checkpoint_normalized),
                 loras = COALESCE(?, loras),
                 sidecar_caption = COALESCE(?, sidecar_caption),
+                sidecar_caption_format = COALESCE(?, sidecar_caption_format),
                 raw_metadata_gz = NULL,
                 indexed_at = CURRENT_TIMESTAMP
             WHERE id = ?
@@ -630,6 +652,9 @@ def update_reparsed_prompt_fields(
                 normalize_checkpoint_name(checkpoint) if checkpoint else None,
                 serialized_loras,
                 sidecar_caption,
+                # Same COALESCE shape as the caption above: no caption in this
+                # replay means the stored caption AND its marker both survive.
+                caption_format_for_storage(sidecar_caption),
                 image_id,
             ),
         )
@@ -664,10 +689,11 @@ def update_reparsed_sidecar_caption(image_id: int, sidecar_caption: str) -> None
             """
             UPDATE images
             SET sidecar_caption = ?,
+                sidecar_caption_format = ?,
                 indexed_at = CURRENT_TIMESTAMP
             WHERE id = ?
             """,
-            (sidecar_caption, image_id),
+            (sidecar_caption, caption_format_for_storage(sidecar_caption), image_id),
         )
 
 # --- Split re-exports (2026-07) --------------------------------------------

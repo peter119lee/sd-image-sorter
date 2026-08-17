@@ -33,6 +33,7 @@ FULL_SCHEMA_STATEMENTS: tuple[str, ...] = (
         ai_caption TEXT,
         nl_caption TEXT,
         sidecar_caption TEXT,
+        sidecar_caption_format TEXT,
         model_hash TEXT,
         aesthetic_score REAL,
         is_readable INTEGER DEFAULT 1,
@@ -234,6 +235,11 @@ LEGACY_IMAGE_COLUMNS: tuple[tuple[str, str], ...] = (
     # is usually a human/tagger tag list, and apart from ai_caption/nl_caption
     # because nothing in this app generated it (migration 042).
     ("sidecar_caption", "TEXT"),
+    # v3.5.x: which FORMAT the sidecar caption is in — tags / natural / mixed /
+    # unknown (migration 044). A different axis from the provenance split above:
+    # format can be derived from the text, provenance cannot. NULL = no caption
+    # or not yet classified. Never used to drop or shorten text.
+    ("sidecar_caption_format", "TEXT"),
     ("model_hash", "TEXT"),
     ("aesthetic_score", "REAL"),
     ("is_readable", "INTEGER DEFAULT 1"),

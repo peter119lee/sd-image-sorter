@@ -72,8 +72,13 @@ EXPECTED_DERIVED_IMAGE_UPDATE_STATEMENTS = Counter({
         # the image's own pixels: it gates whether the scan re-reads a sidecar
         # and never participates in derived-state invalidation, so it belongs to
         # the scan upsert and adds no new `content_fingerprint` writer.
+        # Migration 044 added `sidecar_caption_format`, derived here from the
+        # caption text this same statement stores (never copied from the record)
+        # so the marker cannot describe different text. Also not derived state:
+        # it is a property of a parsed text field, cleared and rewritten with it.
         "db_images_write.py",
-        "UPDATE images SET filename = ?, generator = ?, prompt = ?, sidecar_caption = ?, negative_prompt = ?, "
+        "UPDATE images SET filename = ?, generator = ?, prompt = ?, sidecar_caption = ?, "
+        "sidecar_caption_format = ?, negative_prompt = ?, "
         "metadata_json = ?, width = ?, height = ?, file_size = ?, checkpoint = ?, "
         "checkpoint_normalized = ?, loras = ?, model_hash = COALESCE(?, model_hash), "
         "is_readable = ?, read_error = ?, source_mtime_ns = COALESCE(?, source_mtime_ns), "
@@ -110,9 +115,12 @@ EXPECTED_DERIVED_IMAGE_UPDATE_STATEMENTS = Counter({
         # Migration 042: `sidecar_caption` is rewritten only when the caller
         # actually re-parsed the file (the CASE guard), so a caller that knows
         # nothing about captions cannot silently drop one. Still one writer.
+        # Migration 044: the format marker carries the SAME CASE guard as the
+        # caption text, so the pair is rewritten together or not at all.
         "db_images_write.py",
         "UPDATE images SET generator = ?, prompt = ?, "
         "sidecar_caption = CASE WHEN ? = 1 THEN ? ELSE sidecar_caption END, "
+        "sidecar_caption_format = CASE WHEN ? = 1 THEN ? ELSE sidecar_caption_format END, "
         "negative_prompt = ?, metadata_json = ?, "
         "width = ?, height = ?, file_size = ?, checkpoint = ?, checkpoint_normalized = ?, "
         "loras = ?, model_hash = COALESCE(?, model_hash), is_readable = COALESCE(?, is_readable), "

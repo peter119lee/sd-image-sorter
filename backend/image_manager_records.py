@@ -51,6 +51,7 @@ def _build_placeholder_record(
             "generator": existing.get("generator"),
             "prompt": existing.get("prompt"),
             "sidecar_caption": existing.get("sidecar_caption"),
+            "sidecar_caption_format": existing.get("sidecar_caption_format"),
             "negative_prompt": existing.get("negative_prompt"),
             "metadata_json": existing.get("metadata_json"),
             "width": existing.get("width"),
@@ -77,6 +78,7 @@ def _build_placeholder_record(
         "generator": "unknown",
         "prompt": None,
         "sidecar_caption": None,
+        "sidecar_caption_format": None,
         "negative_prompt": None,
         "metadata_json": compact_metadata_json({}),
         "width": None,
@@ -137,6 +139,10 @@ def _build_metadata_success_record(
         "generator": metadata["generator"],
         "prompt": metadata["prompt"],
         "sidecar_caption": metadata.get("sidecar_caption"),
+        # What the parse detected. Carried for readers of the record only: the DB
+        # write boundary re-derives the marker from the caption text it actually
+        # stores, so a stale or missing value here cannot desync the pair.
+        "sidecar_caption_format": metadata.get("sidecar_caption_format"),
         "negative_prompt": metadata["negative_prompt"],
         "metadata_json": metadata_json,
         "width": metadata["width"],
@@ -178,6 +184,7 @@ def _build_metadata_error_record(
         "generator": "unknown",
         "prompt": None,
         "sidecar_caption": None,
+        "sidecar_caption_format": None,
         "negative_prompt": None,
         "metadata_json": compact_metadata_json({}),
         "width": None,

@@ -133,7 +133,8 @@ def _get_existing_images_by_paths(
             continue
         cursor.execute(
             f"""
-                    SELECT id, path, filename, generator, prompt, sidecar_caption, negative_prompt, metadata_json,
+                    SELECT id, path, filename, generator, prompt, sidecar_caption,
+                   sidecar_caption_format, negative_prompt, metadata_json,
                    width, height, file_size, checkpoint, checkpoint_normalized, loras, model_hash,
                    library_order_time, source_file_mtime, created_at,
                    is_readable, read_error, source_mtime_ns, source_size, metadata_status,

@@ -63,6 +63,12 @@ _IMAGE_COLUMNS_BASE_FIELDS = (
     # generation prompt nor something this app generated, so it is its own
     # field rather than a variant of prompt / ai_caption / nl_caption.
     "sidecar_caption",
+    # Which FORMAT that caption is in — tags / natural / mixed / unknown
+    # (migration 044). Format is a different axis from the provenance split
+    # above and is derived from the text, so it rides along as a marker instead
+    # of another text column. Read-only hint for presentation and conversion:
+    # nothing may filter or shorten captions by it.
+    "sidecar_caption_format",
     "aesthetic_score",
     # v3.3.2 user star rating (FF-2): INTEGER 0-5, NOT NULL DEFAULT 0 (0 = unrated).
     "user_rating",

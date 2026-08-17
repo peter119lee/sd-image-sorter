@@ -26,6 +26,11 @@ SIDECAR_EXTENSIONS = (".txt", ".json", ".xmp")
 # claimed this text as the prompt it rendered from, so it must not reach the
 # SD-prompt field. Only sidecar loaders ever emit this key.
 SIDECAR_CAPTION_METADATA_KEY = "sidecar_caption"
+# Result key carrying the DETECTED FORMAT of that caption text (tags / natural /
+# mixed / unknown; see caption_format). A different axis from the provenance the
+# key above encodes: provenance cannot be derived from the text, format can.
+# Never a metadata key — nothing in a file claims this; the parser derives it.
+SIDECAR_CAPTION_FORMAT_RESULT_KEY = "sidecar_caption_format"
 _sidecar_directory_cache: Dict[str, Tuple[Tuple[int, int], Optional[Set[str]]]] = {}
 WEBP_SIGNATURE = b"RIFF"
 WEBP_FOURCC = b"WEBP"

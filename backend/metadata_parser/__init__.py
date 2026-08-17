@@ -33,8 +33,10 @@ from pathlib import Path
 from types import ModuleType
 from typing import Optional, Dict, Any, TypedDict
 from PIL import Image
+from caption_format import caption_format_for_storage
 from .constants import (
     PARSED_METADATA_VERSION,
+    SIDECAR_CAPTION_FORMAT_RESULT_KEY,
     SIDECAR_CAPTION_METADATA_KEY,
     SIDECAR_EXTENSIONS,
 )
@@ -293,6 +295,7 @@ class MetadataParser(
                 "generator": str,  # comfyui, nai, webui, forge, others, unknown
                 "prompt": str or None,   # the SD generation prompt, nothing else
                 "sidecar_caption": str or None,  # caption text from a .txt/.json sidecar
+                "sidecar_caption_format": str or None,  # tags|natural|mixed|unknown
                 "negative_prompt": str or None,
                 "checkpoint": str or None,
                 "loras": list of str,
@@ -308,6 +311,7 @@ class MetadataParser(
             "generator": "unknown",
             "prompt": None,
             "sidecar_caption": None,
+            "sidecar_caption_format": None,
             "negative_prompt": None,
             "checkpoint": None,
             "loras": [],
@@ -407,6 +411,11 @@ class MetadataParser(
             result["generator"] = parsed["generator"]
             result["prompt"] = parsed["prompt"]
             result["sidecar_caption"] = parsed.get(SIDECAR_CAPTION_METADATA_KEY)
+            # Derived from the caption text being returned, so the marker can
+            # never describe a different string than the one the caller gets.
+            result[SIDECAR_CAPTION_FORMAT_RESULT_KEY] = caption_format_for_storage(
+                result["sidecar_caption"]
+            )
             result["negative_prompt"] = parsed["negative_prompt"]
             result["checkpoint"] = parsed["checkpoint"]
             result["loras"] = parsed["loras"]

@@ -11,6 +11,17 @@ from urllib.parse import urlsplit, urlunsplit
 import httpx
 from PIL import Image
 
+# The segment-shape rules ("is this comma segment a tag or leaked prose?") moved
+# to ``caption_format`` in 2026-08 so this parser and the sidecar caption-format
+# classifier share ONE implementation instead of two that drift. Rebound under
+# the historical private names because this module's readers,
+# ``tests/test_vlm_tag_parser.py`` and the migration-012 parity test all resolve
+# them as ``vlm_providers.base.<name>`` and must get the same objects, not copies.
+from caption_format import (
+    PROSE_SUFFIX_CHARS as _PROSE_SUFFIX_CHARS,
+    looks_like_garbage_tag as _looks_like_garbage_tag,
+)
+
 try:  # pragma: no cover - import shim
     from launcher_port import is_loopback_host
 except Exception:  # pragma: no cover - launcher_port is stdlib-only; this is defensive
@@ -485,83 +496,6 @@ class VLMProvider:
         return result
 
 
-_MARKDOWN_PREFIXES = ("#", "*", "-", "+", ">", "•", "·", "—", "–", "·")
-_PROSE_SUFFIX_CHARS = {".", "!", "?", "。", "！", "？"}
-_FORBIDDEN_SUBSTRINGS = ("$$", "```", "://", "|", "<sub>", "<sup>")
-
-
-def _looks_like_garbage_tag(tag: str) -> bool:
-    """Reject markdown headers, prose, LaTeX, sentence fragments and other VLM noise.
-
-    Real-world VLM responses (especially Gemma / Qwen / GPT) regularly leak
-    chain-of-thought into the danbooru-tags output: ``### 1. Address the …``,
-    ``*   **Character Design:** the character has long``,
-    ``$$x = \\frac{-3y \\pm \\sqrt{(3y)^2 - 4(1)(y^2 - 1)}}{2}$$``,
-    ``Are you looking for information on the character`` etc. The previous
-    parser only checked length 2 ≤ len ≤ 100 so all of those became tags
-    and polluted the user's library. This filter rejects them by shape.
-    """
-    if not tag:
-        return True
-    if not (2 <= len(tag) <= 100):
-        return True
-
-    stripped = tag.strip()
-    if not stripped:
-        return True
-
-    # Markdown markers / numbered lists / blockquotes
-    if stripped[0] in _MARKDOWN_PREFIXES:
-        return True
-    # Numbered list "1." "1)" "(1)"
-    if len(stripped) >= 2 and stripped[0].isdigit():
-        # match leading digits then "." or ")" then space
-        idx = 0
-        while idx < len(stripped) and stripped[idx].isdigit():
-            idx += 1
-        if idx < len(stripped) and stripped[idx] in (".", ")"):
-            tail = stripped[idx + 1 :].lstrip()
-            # If after the number there's prose (multiple words / capitalized
-            # English sentence), reject. Pure danbooru tags don't start with
-            # leading numbers like "1. solo" — and even if they did, the
-            # rejection is safer than letting "1. Address the issue" through.
-            if tail and (" " in tail or any(c.isupper() for c in tail[:1])):
-                return True
-
-    lowered = stripped.lower()
-    for forbidden in _FORBIDDEN_SUBSTRINGS:
-        if forbidden in lowered:
-            return True
-
-    # Prose markers: a real danbooru tag like "long_hair, smile, 1girl" never
-    # ends with sentence punctuation, never contains `: ` (colon + space) or
-    # `; ` mid-string. Reject such cases.
-    if stripped[-1] in _PROSE_SUFFIX_CHARS:
-        return True
-    if ": " in stripped or "; " in stripped:
-        return True
-    # Multiple inner quotes usually mean prose ("Cyphotes, "blue hair, ...).
-    if stripped.count('"') >= 2 or stripped.count("'") >= 3:
-        return True
-
-    # Tags rarely contain more than ~6 spaces. Multi-word natural language
-    # phrases like "*   **Character Design:** The character has long" easily
-    # cross that boundary. Allow short multi-word artist / character names
-    # ("hatsune miku", "blue archive") but reject sentence-shaped strings.
-    if stripped.count(" ") >= 6:
-        return True
-
-    # Sentence-case English with 4+ spaces is almost always prose
-    # ("This image features a highly detailed").
-    if stripped.count(" ") >= 4 and stripped[:1].isupper() and stripped[1:2].islower():
-        return True
-
-    # Lone leading quote without a matching closing quote is typically a
-    # broken VLM fragment ("\"Cyphotes", "\" \"standing").
-    if stripped[0] in ('"', "'") and stripped.count(stripped[0]) == 1:
-        return True
-
-    return False
 
 
 def _parse_tag_list(text: str) -> List[str]:
