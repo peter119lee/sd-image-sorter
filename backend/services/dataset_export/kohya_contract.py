@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import os
-import tempfile
 import tomllib
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional, Tuple
@@ -13,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from services.dataset_export.models import DatasetExportRequest, DatasetPackageOptions
 from services.tag_export.captions import VALID_CONTENT_MODES
+from utils.atomic_staging import create_staging_sibling, publish_staging_file
 
 
 KOHYA_CONTRACT_VERSION = "1.0.0"
@@ -370,14 +370,17 @@ def render_kohya_dataset_config(options: KohyaDatasetConfigOptions) -> str:
 
 
 def _write_kohya_config_atomically(target: Path, content: str) -> None:
+    """Stage the config beside its target, then publish it over the target.
+
+    Both halves come from ``utils.atomic_staging``, for the reasons spelled out
+    in ``anima_contract._write_anima_config_atomically``: ``tempfile`` retried an
+    unwritable destination folder up to ``tempfile.TMP_MAX`` times instead of
+    reporting its refusal, and a bare ``os.replace`` severs a hard link on the
+    destination.
+    """
     temporary_path: Optional[Path] = None
     try:
-        descriptor, raw_temporary_path = tempfile.mkstemp(
-            dir=target.parent,
-            prefix=f".{target.name}.",
-            suffix=".tmp",
-        )
-        temporary_path = Path(raw_temporary_path)
+        temporary_path, descriptor = create_staging_sibling(target)
         with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as handle:
             written = handle.write(content)
             if written != len(content):
@@ -387,7 +390,7 @@ def _write_kohya_config_atomically(target: Path, content: str) -> None:
                 )
             handle.flush()
             os.fsync(handle.fileno())
-        os.replace(str(temporary_path), str(target))
+        publish_staging_file(temporary_path, target)
         temporary_path = None
     except OSError as exc:
         cleanup_error: Optional[OSError] = None

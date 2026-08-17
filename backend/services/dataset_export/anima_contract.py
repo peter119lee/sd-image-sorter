@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import os
-import tempfile
 import tomllib
 from collections.abc import Mapping
 from pathlib import Path
@@ -15,6 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from config import ALLOWED_IMAGE_EXTENSIONS
 from services.dataset_export.models import DatasetExportRequest, DatasetPackageOptions
 from services.tag_export.captions import VALID_CONTENT_MODES
+from utils.atomic_staging import create_staging_sibling, publish_staging_file
 
 
 ANIMA_CONTRACT_VERSION = "1.0.0"
@@ -456,14 +456,23 @@ def _options_from_request(
 
 
 def _write_anima_config_atomically(target: Path, content: str) -> None:
+    """Stage the config beside its target, then publish it over the target.
+
+    Both halves come from ``utils.atomic_staging``. ``tempfile`` cannot stage
+    here: it read an unwritable destination folder's refusal as a name collision
+    and retried it up to ``tempfile.TMP_MAX`` — measured at 2,147,483,647 on this
+    interpreter, not the 10,000 the docs imply — so a config write into a folder
+    the process cannot write to hung instead of reporting the refusal. Publishing
+    is shared for the same reason as the dataset row writer — a bare
+    ``os.replace`` severs a hard link on the destination. A hardlinked target is
+    not reachable through the export today, because
+    ``artifacts._invalidate_existing_anima_config`` moves any existing
+    ``dataset_config.toml`` aside before this runs; sharing the publish path
+    keeps a future caller from reintroducing the hazard.
+    """
     temporary_path: Path | None = None
     try:
-        descriptor, raw_temporary_path = tempfile.mkstemp(
-            dir=target.parent,
-            prefix=f".{target.name}.",
-            suffix=".tmp",
-        )
-        temporary_path = Path(raw_temporary_path)
+        temporary_path, descriptor = create_staging_sibling(target)
         os.close(descriptor)
         with temporary_path.open("w", encoding="utf-8", newline="\n") as handle:
             written = handle.write(content)
@@ -474,7 +483,7 @@ def _write_anima_config_atomically(target: Path, content: str) -> None:
                 )
             handle.flush()
             os.fsync(handle.fileno())
-        os.replace(str(temporary_path), str(target))
+        publish_staging_file(temporary_path, target)
     except OSError as exc:
         cleanup_error: OSError | None = None
         if temporary_path is not None:

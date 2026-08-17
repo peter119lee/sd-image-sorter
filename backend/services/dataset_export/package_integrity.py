@@ -6,7 +6,6 @@ import hashlib
 import os
 import shutil
 import stat
-import tempfile
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -55,6 +54,7 @@ from services.dataset_export.models import (
     DatasetPackageVerificationResponse,
 )
 from services.dataset_export.annotations import AnnotationProvenance
+from utils.atomic_staging import create_staging_sibling, publish_staging_file
 from utils.path_validation import normalize_user_path, validate_folder_path
 
 
@@ -319,18 +319,23 @@ def preflight_package_targets(
 
 
 def _atomic_write_text(target: Path, content: str) -> None:
+    """Stage package metadata beside its target, then publish it over the target.
+
+    Staging and publishing both go through ``utils.atomic_staging`` rather than
+    ``tempfile`` plus a bare ``os.replace``. ``mkstemp`` read an unwritable
+    destination folder's refusal as a name collision and retried it up to
+    ``tempfile.TMP_MAX`` — measured at 2,147,483,647 on this interpreter, not the
+    10,000 the docs imply — so aiming a package export at a folder it cannot
+    write to hung instead of reporting the refusal; ``os.replace`` publishes a
+    new inode, which would sever a hard link on the destination.
+    """
     encoded = content.encode("utf-8")
     descriptor: Optional[int] = None
     temporary: Optional[Path] = None
     write_error: Optional[OSError] = None
     cleanup_error: Optional[OSError] = None
     try:
-        descriptor, raw_path = tempfile.mkstemp(
-            dir=target.parent,
-            prefix=f".{target.name}.",
-            suffix=".tmp",
-        )
-        temporary = Path(raw_path)
+        temporary, descriptor = create_staging_sibling(target)
         with os.fdopen(descriptor, "wb") as handle:
             descriptor = None
             written = handle.write(encoded)
@@ -342,7 +347,7 @@ def _atomic_write_text(target: Path, content: str) -> None:
             os.fsync(handle.fileno())
         if target.is_symlink():
             target.unlink()
-        os.replace(str(temporary), str(target))
+        publish_staging_file(temporary, target)
         temporary = None
     except OSError as exc:
         write_error = exc
@@ -434,27 +439,32 @@ def copy_package_file_atomic(
     target: Path,
     package_root: Path,
 ) -> None:
-    """Copy through a unique sibling temp so a target symlink is never followed."""
+    """Copy through a unique sibling temp so a target symlink is never followed.
+
+    This is the one package writer that lands on a file the user may already
+    own: ``overwrite_policy="overwrite"`` republishes over images already in the
+    chosen folder, and hardlinking a large image set is a real space-saving
+    practice. So publishing goes through ``utils.atomic_staging``, which keeps a
+    linked destination's other names pointing at the newly published bytes
+    instead of leaving them on the pre-export copy. Staging goes through the same
+    module because ``tempfile`` retried an unwritable folder up to
+    ``tempfile.TMP_MAX`` times instead of reporting its refusal.
+    """
     _prepare_package_parent(package_root, target)
     descriptor: Optional[int] = None
     temporary: Optional[Path] = None
     copy_error: Optional[OSError] = None
     cleanup_error: Optional[OSError] = None
     try:
-        descriptor, raw_path = tempfile.mkstemp(
-            dir=target.parent,
-            prefix=f".{target.name}.",
-            suffix=".tmp",
-        )
+        temporary, descriptor = create_staging_sibling(target)
         os.close(descriptor)
         descriptor = None
-        temporary = Path(raw_path)
         shutil.copy2(source, temporary)
         with temporary.open("r+b") as handle:
             os.fsync(handle.fileno())
         if target.is_symlink():
             target.unlink()
-        os.replace(str(temporary), str(target))
+        publish_staging_file(temporary, target)
         temporary = None
     except OSError as exc:
         copy_error = exc
@@ -690,12 +700,16 @@ class PackageInventoryWriter:
         descriptor: Optional[int] = None
         temporary_path: Optional[Path] = None
         try:
-            descriptor, raw_path = tempfile.mkstemp(
-                dir=output_folder,
-                prefix=f".{PACKAGE_INVENTORY_FILENAME}.{run_id}.",
-                suffix=".tmp",
+            # ``utils.atomic_staging``, not ``tempfile``: staging into a folder
+            # the process cannot write to used to retry the refusal up to
+            # ``tempfile.TMP_MAX`` times, so an unwritable output folder hung the
+            # export here — before a single row was written — instead of
+            # reporting the refusal. The run id is no longer part of the staging
+            # name because ``PackageFileLock`` already admits one run per folder,
+            # and the bounded name search steps over a file a killed run left.
+            temporary_path, descriptor = create_staging_sibling(
+                output_folder / PACKAGE_INVENTORY_FILENAME
             )
-            temporary_path = Path(raw_path)
             self._handle: IO[bytes] = os.fdopen(descriptor, "wb")
             descriptor = None
             self._temporary_path = temporary_path
@@ -773,7 +787,7 @@ class PackageInventoryWriter:
                 f"close_error={close_error}, cleanup_error={cleanup_error}"
             ) from primary
         try:
-            os.replace(str(self._temporary_path), str(target))
+            publish_staging_file(self._temporary_path, target)
             byte_size = target.stat().st_size
         except OSError as exc:
             replace_cleanup_error: Optional[OSError] = None

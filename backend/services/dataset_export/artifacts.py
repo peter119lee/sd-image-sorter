@@ -16,7 +16,7 @@ from __future__ import annotations
 import json
 import logging
 import os
-import tempfile
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -306,20 +306,30 @@ def _invalidate_existing_anima_config(
                 f"move or rename it before exporting: target={target}"
             ),
         )
+    # One exclusive create, never a search: the token in the name makes it unique,
+    # so there is nothing to retry. ``tempfile.mkstemp`` cannot reserve this name —
+    # it read an unwritable folder's refusal as a name collision and retried up to
+    # ``tempfile.TMP_MAX`` (2,147,483,647 here), turning this 409 into a hang with
+    # no ceiling, and this is the FIRST thing a trainer-config export writes into
+    # the folder the user chose, ahead of every row.
+    # ``atomic_staging.create_staging_sibling`` does not fit either: the archive
+    # keeps the user-visible ``dataset_config.toml.previous.*`` name rather than a
+    # hidden staging sibling. Same shape as ``_retire_owned_package_manifest``.
+    previous = output_folder / f"{_ANIMA_PREVIOUS_CONFIG_PREFIX}{uuid.uuid4().hex}"
     try:
-        descriptor, raw_previous = tempfile.mkstemp(
-            dir=output_folder,
-            prefix=_ANIMA_PREVIOUS_CONFIG_PREFIX,
+        descriptor = os.open(
+            previous,
+            os.O_CREAT | os.O_EXCL | os.O_WRONLY | getattr(os, "O_BINARY", 0),
         )
     except OSError as exc:
         raise HTTPException(
             status_code=409,
             detail=(
                 "A unique previous Anima config path could not be reserved: "
-                f"target={target}, error_type={type(exc).__name__}, error={exc}"
+                f"target={target}, previous={previous}, "
+                f"error_type={type(exc).__name__}, error={exc}"
             ),
         ) from exc
-    previous = Path(raw_previous)
     try:
         os.close(descriptor)
     except OSError as exc:

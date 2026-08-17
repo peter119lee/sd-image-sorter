@@ -940,7 +940,9 @@ def test_manifest_replace_failure_preserves_building_manifest_and_cleans_temp(
     current = json.loads(manifest_path.read_text(encoding="utf-8"))
     assert current["run_id"] == exported["package_run_id"]
     assert current["package_status"] == "building"
-    assert list(output_folder.glob(".export_manifest.json.*.tmp")) == []
+    # Any dot-prefixed sibling of the manifest, whatever the staging name: pinning
+    # the old ``.<name>.<random>.tmp`` shape only pinned tempfile's random name.
+    assert list(output_folder.glob(".export_manifest.json*")) == []
 
 
 @pytest.mark.parametrize("entrypoint", ["pending", "begin"])

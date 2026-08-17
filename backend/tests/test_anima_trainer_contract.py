@@ -550,7 +550,9 @@ def test_anima_writer_short_write_preserves_target_and_cleans_temp(
     assert "short write" in str(observed_error)
     assert str(target).casefold() in str(observed_error).casefold()
     assert target.read_text(encoding="utf-8") == original
-    assert tuple(tmp_path.glob(".dataset_config.toml.*.tmp")) == ()
+    # Any dot-prefixed sibling of the target, whatever the staging name: pinning
+    # the old ``.<name>.<random>.tmp`` shape only pinned tempfile's random name.
+    assert tuple(tmp_path.glob(".dataset_config.toml*")) == ()
 
 
 def test_anima_writer_replace_failure_preserves_target_and_cleans_temp(
@@ -581,7 +583,7 @@ def test_anima_writer_replace_failure_preserves_target_and_cleans_temp(
 
     assert str(target).casefold() in str(exc.value).casefold()
     assert target.read_text(encoding="utf-8") == original
-    assert tuple(tmp_path.glob(".dataset_config.toml.*.tmp")) == ()
+    assert tuple(tmp_path.glob(".dataset_config.toml*")) == ()
 
 
 def test_verifier_requires_explicit_existing_environment(tmp_path: Path) -> None:
