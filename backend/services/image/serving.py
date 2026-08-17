@@ -35,10 +35,10 @@ from services.image_metadata_writer import (
     build_exif_bytes,
     build_pnginfo,
     build_sd_parameters_text,
+    collect_frames_for_save,
     dropped_parameter_settings_warning,
     harvest_source_text_chunks,
     normalize_edited_metadata,
-    prepare_image_for_save,
     uncarried_chunk_warning,
     write_image_atomically,
 )
@@ -229,8 +229,7 @@ class ServingMixin:
             with Image.open(source) as image:
                 source_format = image.format
                 source_chunks = harvest_source_text_chunks(image)
-                save_image = prepare_image_for_save(image, pil_format, warnings)
-                save_kwargs: Dict[str, Any] = {}
+                frames, save_kwargs = collect_frames_for_save(image, pil_format, warnings)
                 icc_profile = image.info.get("icc_profile")
                 if icc_profile:
                     save_kwargs["icc_profile"] = icc_profile
@@ -258,9 +257,10 @@ class ServingMixin:
                         warnings.append(uncarried)
 
             try:
-                write_image_atomically(save_image, final_output_path, pil_format, save_kwargs)
+                write_image_atomically(frames[0], final_output_path, pil_format, save_kwargs)
             finally:
-                save_image.close()
+                for frame in frames:
+                    frame.close()
 
         write_result = save_and_reconcile_checked(
             str(output.path),

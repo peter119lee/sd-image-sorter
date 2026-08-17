@@ -13,6 +13,9 @@ R2 (P0) ``services/image_metadata_writer.build_pnginfo`` built a fresh
     ``PngInfo`` from the edited fields only, so editing one field destroyed the
     ComfyUI workflow, the NovelAI ``Comment`` block and every third-party chunk.
 
+R4 (P2) The save dropped every frame but the current one, silently turning an
+    animation into a still.
+
 Fault-injection note: patch the ``Image.SAVE`` / ``Image.SAVE_ALL`` **registry
 entry**, never ``PngImagePlugin._save``. The registries captured the original
 function object at import, so a module-attribute patch injects nothing and the
@@ -26,7 +29,7 @@ import os
 from pathlib import Path
 
 import pytest
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageSequence
 from PIL.PngImagePlugin import PngInfo
 
 import metadata_parser
@@ -561,3 +564,104 @@ class TestEmbeddedChunkPreservation:
         )
         # ...and only the genuinely missing ones are named.
         assert "Sampler" not in warnings
+
+
+# ---------------------------------------------------------------------------
+# R4 — an animated image must keep its frames, or the save must be refused
+# ---------------------------------------------------------------------------
+
+class TestAnimationIsNotSilentlyDiscarded:
+    def test_animated_webp_keeps_every_frame_as_webp(self, test_client, tmp_path):
+        source = _write_animation(tmp_path / "anim.webp", 4)
+        assert _frame_count(source) == 4
+        output = tmp_path / "anim-edited.webp"
+
+        response = _post_save(
+            test_client, source, output, "webp",
+            {"prompt": "edited", "steps": 20, "sampler": "Euler a"},
+            overwrite=False,
+        )
+        assert response.status_code == 200, response.text
+        assert _frame_count(output) == 4, "the animation was flattened to a still"
+        assert metadata_parser.parse_image(str(output))["prompt"] == "edited"
+
+    def test_animated_webp_keeps_every_frame_as_apng(self, test_client, tmp_path):
+        source = _write_animation(tmp_path / "anim2.webp", 4)
+        output = tmp_path / "anim2-edited.png"
+
+        response = _post_save(
+            test_client, source, output, "png", {"prompt": "edited", "steps": 20},
+            overwrite=False,
+        )
+        assert response.status_code == 200, response.text
+        assert _frame_count(output) == 4
+        assert metadata_parser.parse_image(str(output))["prompt"] == "edited"
+
+    def test_animated_palette_source_keeps_its_frames(self, test_client, tmp_path):
+        """Palette frames crash Pillow's APNG encoder unless normalized first."""
+        source = _write_animation(tmp_path / "anim.gif", 4, mode="P")
+        assert _frame_count(source) == 4
+        output = tmp_path / "anim-gif-edited.png"
+
+        response = _post_save(
+            test_client, source, output, "png", {"prompt": "edited"}, overwrite=False
+        )
+        assert response.status_code == 200, response.text
+        assert _frame_count(output) == 4
+
+    def test_animated_in_place_overwrite_keeps_its_frames(self, test_client, tmp_path):
+        source = _write_animation(tmp_path / "anim-inplace.webp", 3)
+
+        response = _post_save(
+            test_client, source, source, "webp", {"prompt": "edited"}, overwrite=True
+        )
+        assert response.status_code == 200, response.text
+        assert _frame_count(source) == 3
+
+    def test_saving_an_animation_as_jpeg_warns_that_the_animation_is_lost(
+        self, test_client, tmp_path
+    ):
+        source = _write_animation(tmp_path / "anim3.webp", 4)
+        output = tmp_path / "anim3.jpg"
+
+        response = _post_save(
+            test_client, source, output, "jpg", {"prompt": "edited"}, overwrite=False
+        )
+        assert response.status_code == 200, response.text
+        warnings = " ".join(response.json()["warnings"]).lower()
+        assert "animation" in warnings, (
+            "flattening an animation into a JPEG must be disclosed, not silent"
+        )
+        assert _frame_count(output) == 1
+
+    def test_an_oversized_animation_is_refused_rather_than_flattened(
+        self, test_client, tmp_path, monkeypatch
+    ):
+        from services import image_metadata_writer
+
+        monkeypatch.setattr(image_metadata_writer, "MAX_ANIMATION_TOTAL_PIXELS", 1024)
+        source = _write_animation(tmp_path / "big.webp", 4)
+        original_bytes = source.read_bytes()
+
+        response = _post_save(
+            test_client, source, source, "webp", {"prompt": "edited"}, overwrite=True
+        )
+        assert response.status_code == 400, response.text
+        assert "animation" in response.text.lower()
+        assert source.read_bytes() == original_bytes, (
+            "the refusal must leave the animation exactly as it was"
+        )
+
+    def test_a_still_image_is_unaffected_by_the_animation_path(self, test_client, tmp_path):
+        source = _write_png(tmp_path / "still.png", {"parameters": WEBUI_PARAMETERS})
+        output = tmp_path / "still-edited.png"
+
+        response = _post_save(
+            test_client, source, output, "png", {"prompt": "edited", "steps": 20},
+            overwrite=False,
+        )
+        assert response.status_code == 200, response.text
+        assert _frame_count(output) == 1
+        assert metadata_parser.parse_image(str(output))["prompt"] == "edited"
+        with Image.open(output) as image:
+            assert list(ImageSequence.Iterator(image)).__len__() == 1

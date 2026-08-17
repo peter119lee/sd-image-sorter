@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from PIL import Image, PngImagePlugin
+from PIL import Image, ImageSequence, PngImagePlugin
 
 
 JPEG_LIMITATION_WARNING = "JPEG metadata support is limited; use PNG for the most reliable SD prompt preservation."
@@ -26,15 +26,38 @@ UNCARRIED_CHUNKS_WARNING = (
     "{label} cannot store these embedded metadata blocks, so they were not carried over: "
     "{keys}. Save as PNG to keep them."
 )
-
+ANIMATION_FLATTENED_WARNING = (
+    "{label} cannot store animation, so only the current frame was saved "
+    "(the original has {frames} frames). Save as PNG or WebP to keep the animation."
+)
 DROPPED_PARAMETER_SETTINGS_WARNING = (
     "The editor rebuilds the parameter block from the fields it shows, so these "
     "settings from the original are not in the saved file: {keys}."
 )
-
+ANIMATION_TOO_LARGE_MESSAGE = (
+    "This animation is too large to rewrite safely ({frames} frames, {megapixels:.0f} "
+    "megapixels in total), and saving would have dropped every frame but one. Nothing "
+    "was written and the original is unchanged. Export a single frame instead, or edit "
+    "the metadata with a tool that streams frames."
+)
 
 FORMAT_LABELS = {"PNG": "PNG", "WEBP": "WebP", "JPEG": "JPEG"}
 
+# Containers Pillow can write more than one frame into. JPEG has no SAVE_ALL
+# entry at all, so passing save_all=True for it raises KeyError rather than
+# degrading — verified against Pillow 12.3.0.
+ANIMATION_CAPABLE_FORMATS = frozenset({"PNG", "WEBP"})
+
+# Pillow 12.3.0's APNG encoder crashes on palette frames
+# (UnboundLocalError on 'colors' in PngImagePlugin._save), so frames outside
+# this set are promoted to RGBA before an animated write.
+ANIMATION_SAFE_FRAME_MODES = frozenset({"RGB", "RGBA", "L"})
+
+# Every frame of an animation has to be decoded at once for append_images, so
+# the work is bounded the way the censor and obfuscation save paths bound
+# theirs. Over the cap the save is refused instead of silently flattening the
+# animation, because a refusal is recoverable and a flatten is not.
+MAX_ANIMATION_TOTAL_PIXELS = 80_000_000
 
 # Ceiling on a single carried text chunk, matching obfuscation's own limit for
 # harvested EXIF/XMP text: a real parameter block or workflow is a few kB to a
@@ -457,6 +480,68 @@ def prepare_image_for_save(image: Image.Image, pil_format: str, warnings: list[s
     background.alpha_composite(converted)
     warnings.append(JPEG_ALPHA_WARNING)
     return background.convert("RGB")
+
+
+def collect_frames_for_save(
+    image: Image.Image,
+    pil_format: str,
+    warnings: List[str],
+) -> Tuple[List[Image.Image], Dict[str, Any]]:
+    """Return the frames to write plus the kwargs that keep them animated.
+
+    The save used to hand Pillow the current frame only, so editing one field
+    turned an animated WebP (AnimateDiff output is routinely animated) into a
+    still with no warning. PNG and WebP can both carry every frame, so they do;
+    JPEG cannot, so the loss is stated instead of assumed acceptable.
+
+    Raises:
+        ValueError: the animation needs more decoded pixels than
+            ``MAX_ANIMATION_TOTAL_PIXELS``. Refusing keeps the animation; a
+            flatten would destroy it.
+    """
+    frame_count = int(getattr(image, "n_frames", 1) or 1)
+    if frame_count <= 1:
+        return [prepare_image_for_save(image, pil_format, warnings)], {}
+
+    if pil_format not in ANIMATION_CAPABLE_FORMATS:
+        warnings.append(
+            ANIMATION_FLATTENED_WARNING.format(
+                label=FORMAT_LABELS.get(pil_format, pil_format),
+                frames=frame_count,
+            )
+        )
+        return [prepare_image_for_save(image, pil_format, warnings)], {}
+
+    width, height = image.size
+    total_pixels = frame_count * max(width, 0) * max(height, 0)
+    if total_pixels > MAX_ANIMATION_TOTAL_PIXELS:
+        raise ValueError(
+            ANIMATION_TOO_LARGE_MESSAGE.format(
+                frames=frame_count,
+                megapixels=total_pixels / 1_000_000,
+            )
+        )
+
+    frames: List[Image.Image] = []
+    durations: List[Any] = []
+    for frame in ImageSequence.Iterator(image):
+        prepared = frame.copy()
+        if prepared.mode not in ANIMATION_SAFE_FRAME_MODES:
+            prepared = prepared.convert("RGBA")
+        frames.append(prepared)
+        durations.append(frame.info.get("duration"))
+
+    save_kwargs: Dict[str, Any] = {"save_all": True, "append_images": frames[1:]}
+    if any(duration for duration in durations):
+        save_kwargs["duration"] = [int(duration or 0) for duration in durations]
+    loop = (image.info or {}).get("loop")
+    if loop is not None:
+        try:
+            save_kwargs["loop"] = int(loop)
+        except (TypeError, ValueError):
+            pass
+
+    return frames, save_kwargs
 
 
 def _discard_backup(backup_path: Path) -> None:
