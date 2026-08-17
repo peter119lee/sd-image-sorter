@@ -348,10 +348,14 @@ def _stable_base_version(app_version: str) -> str:
     """Strip a prerelease suffix (``-beta.1`` / ``-rc.2`` / ``-alpha.3``) so
     the stable-line docs can be checked against the STABLE version.
 
-    The README badge, the CHANGELOG heading, and ``docs/RELEASE_NOTES_v<x>.md``
-    all track the stable line (``3.5.0``) even while app_info.py carries a
-    prerelease string (``3.5.0-beta.4``). For a plain stable version this strip
-    is a no-op, so stable releases behave exactly as before.
+    The CHANGELOG heading and ``docs/RELEASE_NOTES_v<x>.md`` track the stable
+    line (``3.5.0``) even while app_info.py carries a prerelease string
+    (``3.5.0-beta.4``). For a plain stable version this strip is a no-op, so
+    stable releases behave exactly as before.
+
+    The README version badge is no longer in this list: it is a dynamic
+    shields.io ``github/v/release`` badge that reads the published release
+    directly, so there is no local string left to keep in sync.
 
     This deliberately no longer governs README *download* links. Those used to
     embed ``sd-image-sorter-v{base_version}-...`` filenames under
@@ -394,9 +398,21 @@ def test_release_public_docs_versions_follow_app_info():
     readme_text = (ROOT / "README.md").read_text(encoding="utf-8")
     changelog_text = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
 
-    # README badge (the stable front door) tracks the base version; a
-    # prerelease must not rewrite the landing page badge.
-    assert f"version-{base_version}-ff8a00" in readme_text
+    # The version badge is rendered by shields.io from the repository's latest
+    # GitHub release rather than typed into the README. A literal
+    # ``badge/version-<x>`` had to be hand-edited on every bump and had already
+    # drifted: it read 3.5.0 while the published release was v3.5.0-beta.4.
+    # Owner/repo are read from app_info for the same reason the download links
+    # are -- a rename must not leave the badge on a URL that only resolves
+    # while GitHub still honours a redirect.
+    owner = _read_app_info_constant("GITHUB_OWNER")
+    repo = _read_app_info_constant("GITHUB_REPO")
+    assert f"img.shields.io/github/v/release/{owner}/{repo}" in readme_text
+    assert "img.shields.io/badge/version-" not in readme_text, (
+        "README pins the version into a static shields.io badge. That badge "
+        "goes stale on the next release; use the dynamic github/v/release one."
+    )
+
     assert re.search(
         rf"^## \[{re.escape(base_version)}\] - \d{{4}}-\d{{2}}-\d{{2}}$",
         changelog_text,

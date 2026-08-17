@@ -16,7 +16,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-3.5.0-ff8a00" alt="Version">
+  <img src="https://img.shields.io/github/v/release/Rinne414/sd-image-sorter?label=version&amp;color=ff8a00" alt="Version">
   <img src="https://img.shields.io/badge/python-3.12%20%7C%203.13-3776AB" alt="Python">
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-4B5563" alt="Platform">
   <img src="https://img.shields.io/badge/license-MIT-22C55E" alt="License">
@@ -545,8 +545,8 @@ sd-image-sorter/
 | 名称 | 贡献 |
 |:--|:--|
 | [SmilingWolf](https://huggingface.co/SmilingWolf) | WD14 Tagger 系列模型 |
-| [Camie](https://huggingface.co/camie-tagger/camie-tagger-v2) | Camie Tagger v2 模型 |
-| [PixAI](https://huggingface.co/PixAI-Tagger/PixAI-Tagger-v0.9) | PixAI Tagger v0.9 模型 |
+| [Camie](https://huggingface.co/Camais03/camie-tagger-v2) | Camie Tagger v2 模型 |
+| [PixAI](https://huggingface.co/pixai-labs/pixai-tagger-v0.9) | PixAI Tagger v0.9 模型 |
 | [ToriiGate](https://huggingface.co/Minthy/ToriiGate-0.5) | ToriiGate 多模态 VLM Tagger |
 | [Wenaka2004](https://github.com/Wenaka2004/auto-censor) | 自动打码思路与 YOLO 隐私检测模型 |
 | [NudeNet](https://github.com/notAI-tech/NudeNet) | NudeNet NSFW 检测模型 |
@@ -556,9 +556,9 @@ sd-image-sorter/
 | [OpenCLIP](https://github.com/mlfoundations/open_clip) | CLIP ViT-L/14 相似图搜索 |
 | [Receyuki](https://github.com/receyuki/stable-diffusion-prompt-reader) | Prompt Reader 方向启发 |
 | [大番茄图片混淆](https://dfqtphx.netlify.app/) | 图片混淆 Hilbert 曲线方案 |
-| [小番茄图片隐藏](https://singularpoint.cn/hideImg1.html) | 图片隐藏兼容方案 |
+| [小番茄图片隐藏](https://singularpoint.cn/hideImg.html) | 图片隐藏兼容方案 |
 | [OpenAI](https://openai.com) / [Anthropic](https://anthropic.com) / [Google Gemini](https://ai.google.dev) / [Ollama](https://ollama.com) | VLM captioning providers & 本地运行时 |
-| [zanllp/infinite-image-browsing](https://github.com/zanllp/sd-webui-infinite-image-browsing) | 图库浏览 + 元数据搜索灵感来源 |
+| [zanllp/infinite-image-browsing](https://github.com/zanllp/infinite-image-browsing) | 图库浏览 + 元数据搜索灵感来源 |
 | [starik222/BooruDatasetTagManager](https://github.com/starik222/BooruDatasetTagManager) | Caption Editor 三栏工作台设计参考 |
 | [Tera-Dark/Tag-Master](https://github.com/Tera-Dark/Tag-Master) | Booru 标签管理 + 自动补全 UX 参考 |
 | [n0va39/ComfyUI-EXIF-viewer](https://github.com/n0va39/ComfyUI-EXIF-viewer) | ComfyUI workflow prompt 推测和 Civitai resources 提取的实现参考 |
@@ -841,8 +841,8 @@ Practical rule:
 | Name | Contribution |
 |:--|:--|
 | [SmilingWolf](https://huggingface.co/SmilingWolf) | WD14 Tagger models |
-| [Camie](https://huggingface.co/camie-tagger/camie-tagger-v2) | Camie Tagger v2 model |
-| [PixAI](https://huggingface.co/PixAI-Tagger/PixAI-Tagger-v0.9) | PixAI Tagger v0.9 model |
+| [Camie](https://huggingface.co/Camais03/camie-tagger-v2) | Camie Tagger v2 model |
+| [PixAI](https://huggingface.co/pixai-labs/pixai-tagger-v0.9) | PixAI Tagger v0.9 model |
 | [ToriiGate](https://huggingface.co/Minthy/ToriiGate-0.5) | ToriiGate multimodal VLM tagger |
 | [Wenaka2004](https://github.com/Wenaka2004/auto-censor) | Auto-censor concept & YOLO privacy detection model |
 | [NudeNet](https://github.com/notAI-tech/NudeNet) | NudeNet NSFW detection model |
@@ -852,9 +852,9 @@ Practical rule:
 | [OpenCLIP](https://github.com/mlfoundations/open_clip) | CLIP ViT-L/14 for similar image search |
 | [Receyuki](https://github.com/receyuki/stable-diffusion-prompt-reader) | Prompt Reader inspiration |
 | [大番茄图片混淆](https://dfqtphx.netlify.app/) | Hilbert curve image obfuscation |
-| [小番茄图片隐藏](https://singularpoint.cn/hideImg1.html) | Image hiding compatibility |
+| [小番茄图片隐藏](https://singularpoint.cn/hideImg.html) | Image hiding compatibility |
 | [OpenAI](https://openai.com) / [Anthropic](https://anthropic.com) / [Google Gemini](https://ai.google.dev) / [Ollama](https://ollama.com) | VLM captioning providers & local runtime |
-| [zanllp/infinite-image-browsing](https://github.com/zanllp/sd-webui-infinite-image-browsing) | Gallery browsing + metadata search inspiration |
+| [zanllp/infinite-image-browsing](https://github.com/zanllp/infinite-image-browsing) | Gallery browsing + metadata search inspiration |
 | [starik222/BooruDatasetTagManager](https://github.com/starik222/BooruDatasetTagManager) | Caption Editor 3-pane workbench design reference |
 | [Tera-Dark/Tag-Master](https://github.com/Tera-Dark/Tag-Master) | Booru tag management + autocomplete UX reference |
 | [n0va39/ComfyUI-EXIF-viewer](https://github.com/n0va39/ComfyUI-EXIF-viewer) | ComfyUI workflow prompt inference and Civitai resources extraction reference implementation |
