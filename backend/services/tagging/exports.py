@@ -93,14 +93,32 @@ class ExportsMixin:
             return self._export_progress.copy()
 
     def reset_export_progress(self) -> Dict[str, Any]:
+        """Reset a stuck batch tag-export job back to idle (refused while running).
+
+        Same contract as the move / batch-move / delete / remove resets
+        (d7013e2, 2e2ae37): 409 on a genuinely running job, "Nothing to reset"
+        only when it really was already idle, and a distinct ``reset`` answer
+        when it cleared something. It used to refuse with a 200 dict, which
+        reads as success to any caller checking the status code, and to report
+        "Nothing to reset" even when it had just cleared a terminal export.
+        Bumping the run id neutralizes an abandoned worker that later wakes up,
+        so it cannot overwrite what this reset just published.
+        """
         with self._export_lock:
-            if self._export_progress["status"] == "running":
-                return {"status": "running", "message": "Cannot reset a running job"}
-            self._export_progress = self._build_default_export_progress_state()
-            return {
-                "status": self._export_progress["status"],
-                "message": "Nothing to reset",
+            status = self._export_progress["status"]
+            if status == "running":
+                raise HTTPException(
+                    status_code=409, detail="Cannot reset the tag export while it is still running"
+                )
+            if status == "idle":
+                return {"status": "idle", "message": "Nothing to reset"}
+            self._export_run_id += 1
+            self._export_progress = {
+                **self._build_default_export_progress_state(),
+                "message": "Reset by user",
+                "updated_at": time.time(),
             }
+            return {"status": "reset", "message": "Tag export progress reset to idle"}
 
     def _set_export_progress_if_current(
         self, run_id: int, state: Dict[str, Any]

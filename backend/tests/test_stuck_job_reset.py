@@ -185,3 +185,91 @@ class TestStuckJobReset:
             svc._update_move_progress_if_current(stale_run_id, status="running") is False
         )
         assert svc.get_move_progress()["status"] == "idle"
+
+
+class TestStuckExportJobReset:
+    """The batch tag-export job is the fifth family and the last holdout.
+
+    ``reset_export_progress`` answered HTTP 200 with
+    ``{"status": "running", "message": "Cannot reset a running job"}`` while it
+    was refusing, so a caller that checks only the status code — which is the
+    normal way to tell a refusal from a success — reads a refusal as a
+    successful reset. It also reported "Nothing to reset" after clearing a
+    terminal ``done``/``error`` payload, so the answer never distinguished
+    "there was nothing there" from "I just cleared your finished export".
+    """
+
+    @staticmethod
+    def _service():
+        from services.tagging_service import TaggingService
+
+        return TaggingService()
+
+    def test_reset_refuses_a_running_export_with_409(self):
+        service = self._service()
+        service._export_progress = {
+            **service._build_default_export_progress_state(),
+            "status": "running",
+        }
+
+        with pytest.raises(HTTPException) as excinfo:
+            service.reset_export_progress()
+
+        assert excinfo.value.status_code == 409
+        assert service.get_export_progress()["status"] == "running"
+
+    def test_the_refusal_reaches_the_wire_as_409(self, test_client):
+        """A status-code-only caller must not read the refusal as success."""
+        from routers import tags as tags_router
+
+        service = tags_router.get_tagging_service()
+        service._export_progress = {
+            **service._build_default_export_progress_state(),
+            "status": "running",
+        }
+
+        response = test_client.post("/api/tags/export-batch/reset")
+
+        assert response.status_code == 409
+
+    def test_reset_reports_reset_when_it_cleared_a_terminal_export(self):
+        service = self._service()
+        service._export_progress = {
+            **service._build_default_export_progress_state(),
+            "status": "done",
+            "message": "Export complete: 40 files.",
+        }
+
+        outcome = service.reset_export_progress()
+
+        assert outcome["status"] == "reset"
+        assert outcome["message"] != "Nothing to reset"
+        assert service.get_export_progress()["status"] == "idle"
+
+    def test_reset_reports_nothing_to_reset_only_when_idle(self):
+        service = self._service()
+
+        assert service.reset_export_progress() == {
+            "status": "idle",
+            "message": "Nothing to reset",
+        }
+
+    def test_reset_abandons_a_stale_export_worker(self):
+        """A zombie worker must not be able to write over the reset state."""
+        service = self._service()
+        service._export_progress = {
+            **service._build_default_export_progress_state(),
+            "status": "error",
+        }
+        stale_run_id = service._export_run_id
+
+        service.reset_export_progress()
+
+        assert (
+            service._set_export_progress_if_current(
+                stale_run_id,
+                {**service._build_default_export_progress_state(), "status": "running"},
+            )
+            is False
+        )
+        assert service.get_export_progress()["status"] == "idle"

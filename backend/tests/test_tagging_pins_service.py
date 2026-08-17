@@ -661,27 +661,34 @@ def test_export_job_initial_progress_and_reset_matrix() -> None:
     snapshot["status"] = "mutated"
     assert service.get_export_progress()["status"] == "idle"
 
-    # Reset while running is refused.
+    # Reset while running is refused with 409, like the four sibling job
+    # families (d7013e2, 2e2ae37). It used to answer 200 with a dict, which any
+    # caller checking the status code reads as a successful reset.
     service._export_progress = {
         **service._build_default_export_progress_state(),
         "status": "running",
     }
-    assert service.reset_export_progress() == {
-        "status": "running",
-        "message": "Cannot reset a running job",
-    }
+    with pytest.raises(HTTPException) as excinfo:
+        service.reset_export_progress()
+    assert excinfo.value.status_code == 409
 
-    # QUIRK: resetting a terminal state DOES reset, but the response message
-    # still says "Nothing to reset".
+    # Resetting a terminal state resets, and now says so. The old
+    # "Nothing to reset" answer here was the QUIRK this pin used to record.
     service._export_progress = {
         **service._build_default_export_progress_state(),
         "status": "done",
     }
     assert service.reset_export_progress() == {
+        "status": "reset",
+        "message": "Tag export progress reset to idle",
+    }
+    assert service.get_export_progress()["status"] == "idle"
+
+    # An already-idle job is the only case that reports nothing happened.
+    assert service.reset_export_progress() == {
         "status": "idle",
         "message": "Nothing to reset",
     }
-    assert service.get_export_progress()["status"] == "idle"
 
 
 def test_set_export_progress_if_current_guards_stale_runs() -> None:
