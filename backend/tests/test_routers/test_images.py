@@ -1061,6 +1061,41 @@ class TestExportSelectionData:
         assert isinstance(data["images"][0]["tags"], list)
         assert data["missing_ids"] == []
 
+    def test_export_selection_data_carries_the_sidecar_caption(self, test_client, test_db):
+        """A caption-only row must not export as an image with no text.
+
+        Migration 042 moved ``.txt`` sidecar text out of ``prompt`` into
+        ``sidecar_caption``, and ``services/tag_export/captions.py`` promotes a
+        prose sidecar when it composes the natural-language caption. The export
+        payload omitted the column, so a client composing the same caption from
+        this page saw an empty prompt and an empty ai_caption for a row that
+        does carry text.
+        """
+        import database as db
+
+        image_id = int(db.add_image(
+            path="/test/export-sidecar.png",
+            filename="export-sidecar.png",
+            generator="others",
+            prompt=None,
+            metadata_json="{}",
+        ))
+        with db.get_db() as conn:
+            conn.execute(
+                "UPDATE images SET sidecar_caption = ?, sidecar_caption_format = NULL WHERE id = ?",
+                ("A woman with silver hair stands in a sunlit doorway.", image_id),
+            )
+
+        response = test_client.post("/api/images/export-data", json={"image_ids": [image_id]})
+
+        assert response.status_code == 200, response.text
+        image = response.json()["images"][0]
+        assert image["prompt"] == ""
+        assert image["ai_caption"] == ""
+        assert image["sidecar_caption"] == (
+            "A woman with silver hair stands in a sunlit doorway."
+        )
+
     def test_export_selection_data_reports_missing_ids(self, test_client, test_db_with_images):
         """Missing images should not fail the whole export payload."""
         existing_id = test_db_with_images["image_ids"][0]

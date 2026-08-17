@@ -9,7 +9,12 @@ import cycle with the ``database`` facade.
 from typing import Optional, List, Dict, Any
 
 from db_core import get_db
-from db_helpers import normalize_prompt_token, escape_like_pattern
+from db_helpers import (
+    MISSING_TEXT_SQL,
+    NO_PROMPT_SQL,
+    escape_like_pattern,
+    normalize_prompt_token,
+)
 from db_tags import (
     _facet_search_rank_params,
     _facet_search_rank_sql,
@@ -59,18 +64,30 @@ def _library_health_percent(value: float, total: int) -> float:
 
 
 def get_library_health_report(*, sample_limit: int = 8) -> Dict[str, Any]:
-    """Return a read-only quality audit for the indexed image library."""
+    """Return a read-only quality audit for the indexed image library.
+
+    ``issue_counts`` is the actionable set: every key in it is something a user
+    can do something about. ``statistics`` holds counts that are true but are
+    not defects — currently ``missing_prompt``, which says how much of the
+    library carries real SD generation parameters. It lives outside
+    ``issue_counts`` deliberately: an image that Stable Diffusion never made has
+    no prompt to recover, so reporting it as an issue offers a repair that
+    cannot succeed. The recoverable counterpart is ``issue_counts.missing_text``
+    — neither a prompt nor a sidecar caption — which is exactly the set the L3
+    recovery job can still change.
+    """
     bounded_sample_limit = max(1, min(int(sample_limit or 8), 25))
 
     with get_db() as conn:
         cursor = conn.cursor()
         summary_row = cursor.execute(
-            """
+            f"""
             SELECT
                 COUNT(*) AS total,
                 SUM(CASE WHEN COALESCE(is_readable, 1) = 0 THEN 1 ELSE 0 END) AS unreadable,
                 SUM(CASE WHEN COALESCE(is_readable, 1) = 1 THEN 1 ELSE 0 END) AS readable,
-                SUM(CASE WHEN COALESCE(is_readable, 1) = 1 AND (prompt IS NULL OR TRIM(prompt) = '') THEN 1 ELSE 0 END) AS missing_prompt,
+                SUM(CASE WHEN COALESCE(is_readable, 1) = 1 AND {NO_PROMPT_SQL} THEN 1 ELSE 0 END) AS missing_prompt,
+                SUM(CASE WHEN COALESCE(is_readable, 1) = 1 AND ({MISSING_TEXT_SQL}) THEN 1 ELSE 0 END) AS missing_text,
                 SUM(CASE WHEN COALESCE(is_readable, 1) = 1 AND (negative_prompt IS NULL OR TRIM(negative_prompt) = '') THEN 1 ELSE 0 END) AS missing_negative_prompt,
                 SUM(CASE WHEN COALESCE(is_readable, 1) = 1 AND (checkpoint_normalized IS NULL OR TRIM(checkpoint_normalized) = '') THEN 1 ELSE 0 END) AS missing_checkpoint,
                 SUM(CASE WHEN COALESCE(is_readable, 1) = 1 AND (width IS NULL OR height IS NULL OR width <= 0 OR height <= 0) THEN 1 ELSE 0 END) AS missing_dimensions,
@@ -90,7 +107,7 @@ def get_library_health_report(*, sample_limit: int = 8) -> Dict[str, Any]:
 
         issue_counts: Dict[str, int] = {
             "unreadable": int(summary_row["unreadable"] or 0) if summary_row else 0,
-            "missing_prompt": int(summary_row["missing_prompt"] or 0) if summary_row else 0,
+            "missing_text": int(summary_row["missing_text"] or 0) if summary_row else 0,
             "missing_negative_prompt": int(summary_row["missing_negative_prompt"] or 0) if summary_row else 0,
             "missing_checkpoint": int(summary_row["missing_checkpoint"] or 0) if summary_row else 0,
             "missing_dimensions": int(summary_row["missing_dimensions"] or 0) if summary_row else 0,
@@ -101,6 +118,10 @@ def get_library_health_report(*, sample_limit: int = 8) -> Dict[str, Any]:
             "metadata_pending": int(summary_row["metadata_pending"] or 0) if summary_row else 0,
             "metadata_error": int(summary_row["metadata_error"] or 0) if summary_row else 0,
             "unknown_generator": int(summary_row["unknown_generator"] or 0) if summary_row else 0,
+        }
+        # True, useful, and not a defect: see this function's docstring.
+        statistics: Dict[str, int] = {
+            "missing_prompt": int(summary_row["missing_prompt"] or 0) if summary_row else 0,
         }
 
         duplicate_filename_rows = cursor.execute(
@@ -145,11 +166,12 @@ def get_library_health_report(*, sample_limit: int = 8) -> Dict[str, Any]:
         largest_images = [dict(row) for row in oversized_rows]
 
         folder_rows = cursor.execute(
-            """
+            f"""
             SELECT folder,
                    COUNT(*) AS count,
                    SUM(COALESCE(file_size, 0)) AS total_size,
-                   SUM(CASE WHEN COALESCE(is_readable, 1) = 1 AND (prompt IS NULL OR TRIM(prompt) = '') THEN 1 ELSE 0 END) AS missing_prompt,
+                   SUM(CASE WHEN COALESCE(is_readable, 1) = 1 AND {NO_PROMPT_SQL} THEN 1 ELSE 0 END) AS missing_prompt,
+                   SUM(CASE WHEN COALESCE(is_readable, 1) = 1 AND ({MISSING_TEXT_SQL}) THEN 1 ELSE 0 END) AS missing_text,
                    SUM(CASE WHEN COALESCE(is_readable, 1) = 1 AND tagged_at IS NULL THEN 1 ELSE 0 END) AS untagged,
                    SUM(CASE WHEN COALESCE(is_readable, 1) = 0 THEN 1 ELSE 0 END) AS unreadable
             FROM (
@@ -170,14 +192,20 @@ def get_library_health_report(*, sample_limit: int = 8) -> Dict[str, Any]:
         ).fetchall()
         top_folders = [dict(row) for row in folder_rows]
 
+        # A sample list is an invitation to act, so it follows the same rule as
+        # the counts: a row whose only text is a sidecar caption is not a text
+        # problem. ``sidecar_caption`` rides along because rows listed for some
+        # other reason still have to be describable — without it a consumer can
+        # only report "missing prompt" for a row that does carry text.
         issue_sample_rows = cursor.execute(
-            """
+            f"""
             SELECT id, filename, path, generator, metadata_status, read_error,
-                   prompt, checkpoint_normalized, width, height, file_size, tagged_at
+                   prompt, sidecar_caption, checkpoint_normalized, width, height,
+                   file_size, tagged_at
             FROM images
             WHERE COALESCE(is_readable, 1) = 0
                OR LOWER(COALESCE(metadata_status, 'complete')) IN ('pending', 'error')
-               OR (COALESCE(is_readable, 1) = 1 AND (prompt IS NULL OR TRIM(prompt) = ''))
+               OR (COALESCE(is_readable, 1) = 1 AND ({MISSING_TEXT_SQL}))
                OR (COALESCE(is_readable, 1) = 1 AND (checkpoint_normalized IS NULL OR TRIM(checkpoint_normalized) = ''))
                OR (COALESCE(is_readable, 1) = 1 AND (width IS NULL OR height IS NULL OR width <= 0 OR height <= 0))
                OR (COALESCE(is_readable, 1) = 1 AND tagged_at IS NULL)
@@ -186,7 +214,7 @@ def get_library_health_report(*, sample_limit: int = 8) -> Dict[str, Any]:
                     WHEN COALESCE(is_readable, 1) = 0 THEN 0
                     WHEN LOWER(COALESCE(metadata_status, 'complete')) = 'error' THEN 1
                     WHEN LOWER(COALESCE(metadata_status, 'complete')) = 'pending' THEN 2
-                    WHEN prompt IS NULL OR TRIM(prompt) = '' THEN 3
+                    WHEN {MISSING_TEXT_SQL} THEN 3
                     WHEN checkpoint_normalized IS NULL OR TRIM(checkpoint_normalized) = '' THEN 4
                     WHEN width IS NULL OR height IS NULL OR width <= 0 OR height <= 0 THEN 5
                     WHEN tagged_at IS NULL THEN 6
@@ -199,10 +227,13 @@ def get_library_health_report(*, sample_limit: int = 8) -> Dict[str, Any]:
         ).fetchall()
         issue_samples = [dict(row) for row in issue_sample_rows]
 
-    metadata_ready = max(readable - issue_counts["missing_prompt"] - issue_counts["missing_dimensions"], 0)
+    # "Ready" asks whether we know what is in the image, not whether an SD tool
+    # made it: a row carrying sidecar caption text is described, so only genuine
+    # textlessness counts against it.
+    metadata_ready = max(readable - issue_counts["missing_text"] - issue_counts["missing_dimensions"], 0)
     actionable_count = (
         issue_counts["unreadable"]
-        + issue_counts["missing_prompt"]
+        + issue_counts["missing_text"]
         + issue_counts["missing_checkpoint"]
         + issue_counts["missing_dimensions"]
         + issue_counts["untagged"]
@@ -213,7 +244,7 @@ def get_library_health_report(*, sample_limit: int = 8) -> Dict[str, Any]:
         weighted_penalty = (
             issue_counts["unreadable"] * 2.0
             + issue_counts["metadata_error"] * 2.0
-            + issue_counts["missing_prompt"] * 1.4
+            + issue_counts["missing_text"] * 1.4
             + issue_counts["missing_dimensions"] * 1.3
             + issue_counts["missing_checkpoint"] * 0.8
             + issue_counts["unknown_generator"] * 0.6
@@ -236,6 +267,7 @@ def get_library_health_report(*, sample_limit: int = 8) -> Dict[str, Any]:
             "actionable_count": actionable_count,
         },
         "issue_counts": issue_counts,
+        "statistics": statistics,
         "duplicate_filenames": {
             "groups": duplicate_filename_groups,
             "images": duplicate_filename_images,
@@ -274,11 +306,14 @@ def _build_library_health_recommendations(
             "severity": "warning",
             "count": issue_counts.get("unreadable", 0) + issue_counts.get("metadata_error", 0),
         })
-    if issue_counts.get("missing_prompt", 0) > 0:
+    # Deliberately keyed on missing_text, not missing_prompt: a recommendation is
+    # an offer to act, and re-parsing an image that Stable Diffusion never made
+    # cannot produce a prompt however many times it runs.
+    if issue_counts.get("missing_text", 0) > 0:
         recommendations.append({
-            "kind": "missing_prompt",
-            "severity": "warning" if _library_health_percent(issue_counts["missing_prompt"], total) >= 10 else "info",
-            "count": issue_counts["missing_prompt"],
+            "kind": "missing_text",
+            "severity": "warning" if _library_health_percent(issue_counts["missing_text"], total) >= 10 else "info",
+            "count": issue_counts["missing_text"],
         })
     if issue_counts.get("missing_checkpoint", 0) > 0:
         recommendations.append({

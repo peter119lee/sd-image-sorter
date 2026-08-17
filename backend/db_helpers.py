@@ -284,6 +284,26 @@ def _ensure_content_fingerprint_value(
         return None
 
 
+# Text-presence predicates, defined once because two layers must agree on them:
+# the L3 repair job (services/metadata_repair_service.py) decides what a recovery
+# run can still change, and the library-health facets decide what the user is
+# told needs attention. They disagreed once already — migration 042 gave sidecar
+# text its own column, so "no prompt" stopped meaning "no text" — and the result
+# was a panel reporting thousands of permanent problems with a repair that could
+# not clear them.
+#
+# Bare column tests with NO population guard: each caller adds its own, because
+# the populations genuinely differ (the facets and the repair job restrict to
+# COALESCE(is_readable, 1) = 1; the per-generator health row counts every row).
+NO_PROMPT_SQL = "(prompt IS NULL OR TRIM(prompt) = '')"
+NO_SIDECAR_CAPTION_SQL = "(sidecar_caption IS NULL OR TRIM(sidecar_caption) = '')"
+# "No text at all": neither an SD generation prompt nor a sidecar caption. This
+# is the counter a recovery run actually drives to zero, so it — not
+# NO_PROMPT_SQL — is what may be reported as a problem to fix. A missing prompt
+# legitimately stays missing forever for an image Stable Diffusion never made.
+MISSING_TEXT_SQL = f"{NO_PROMPT_SQL} AND {NO_SIDECAR_CAPTION_SQL}"
+
+
 def normalize_prompt_token(token: str) -> str:
     """Normalize a prompt token for consistent matching.
 

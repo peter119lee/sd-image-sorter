@@ -684,6 +684,13 @@ class SelectionMixin:
                     "height": image.get("height"),
                     "aesthetic_score": image.get("aesthetic_score"),
                     "ai_caption": image.get("ai_caption") or "",
+                    # Sidecar text (migration 042). Neither a generation prompt
+                    # nor something this app wrote, so it cannot be folded into
+                    # either field above — and without it a caption-only row
+                    # exports as an image with no text at all, while
+                    # services/tag_export/captions.py does promote a prose
+                    # sidecar when it composes the natural-language caption.
+                    "sidecar_caption": image.get("sidecar_caption") or "",
                     "generation_params": extract_generation_params(image),
                     "tags": [tag["tag"] for tag in tags_map.get(image_id, [])],
                 }

@@ -186,6 +186,9 @@ class ExportSelectionImage(BaseModel):
     height: Optional[int] = None
     aesthetic_score: Optional[float] = None
     ai_caption: str = ""
+    # Migration 042 sidecar text. Declared here or the response model silently
+    # drops it back out of the payload the service now returns.
+    sidecar_caption: str = ""
     generation_params: dict[str, Any] = Field(default_factory=dict)
     tags: List[str] = Field(default_factory=list)
 

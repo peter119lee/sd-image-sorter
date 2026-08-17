@@ -3320,7 +3320,11 @@ def test_library_health_reports_metadata_and_archive_signals(test_client, tmp_pa
     assert response.status_code == 200
     data = response.json()
     assert data["summary"]["total_images"] == 3
-    assert data["issue_counts"]["missing_prompt"] == 1
+    # image_b has neither a prompt nor a sidecar caption, so it is both the
+    # recoverable shortfall and part of the no-SD-parameters statistic. The two
+    # live in different blocks on purpose: only missing_text is actionable.
+    assert data["issue_counts"]["missing_text"] == 1
+    assert data["statistics"]["missing_prompt"] == 1
     assert data["issue_counts"]["unreadable"] == 1
     assert data["duplicate_filenames"]["images"] == 2
     assert data["duplicate_filenames"]["samples"][0]["filename"] == "same.png"

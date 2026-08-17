@@ -17,6 +17,8 @@ from db_core import (
     get_db,
 )
 from db_helpers import (
+    MISSING_TEXT_SQL,
+    NO_PROMPT_SQL,
     _path_query_match_clause,
     _folder_scope_query_match_clause,
     _row_to_dict,
@@ -63,26 +65,38 @@ def get_images_in_folder_scope(folder_path: str, recursive: bool = True) -> List
 def count_prompt_coverage_in_folder_scope(
     folder_path: str, recursive: bool = True
 ) -> Dict[str, int]:
-    """Count indexed images under a scan root and how many stored no prompt.
+    """Count indexed images under a scan root and how much text they stored.
 
     Lets a finished scan report the shortfall with its denominator instead of
     only "N images indexed". Uses the same ``COALESCE(is_readable, 1)`` guard
-    as the rest of the codebase so legacy rows are not silently excluded, and
-    the same missing-prompt predicate as the metadata re-parse job so the two
-    figures cannot disagree.
+    as the rest of the codebase so legacy rows are not silently excluded.
+
+    Two shortfalls, because since migration 042 they are different questions and
+    only one of them is a problem:
+
+    * ``missing_prompt`` — no SD generation prompt. A statistic: an image the
+      user drew, downloaded or photographed has none and never will.
+    * ``missing_text`` — no prompt AND no sidecar caption. This is the set the
+      metadata recovery job can still change, so it is the only one a scan
+      summary may point the user at. The predicate is shared with that job
+      (``db_helpers.MISSING_TEXT_SQL``) so the two figures cannot disagree.
     """
     clause, params = _folder_scope_query_match_clause(folder_path)
     if not clause:
-        return {"total": 0, "missing_prompt": 0}
+        return {"total": 0, "missing_prompt": 0, "missing_text": 0}
 
     with get_db() as conn:
         cursor = conn.cursor()
+        # The scope clause is a top-level OR chain, so it MUST be parenthesized
+        # before anything is ANDed onto it — otherwise the readable guard binds
+        # to the last alternative only and unreadable rows land in the shortfall.
         cursor.execute(
             f"""
             SELECT path,
-                   CASE WHEN prompt IS NULL OR TRIM(prompt) = '' THEN 1 ELSE 0 END
+                   CASE WHEN {NO_PROMPT_SQL} THEN 1 ELSE 0 END,
+                   CASE WHEN {MISSING_TEXT_SQL} THEN 1 ELSE 0 END
             FROM images
-            WHERE {clause} AND COALESCE(is_readable, 1) = 1
+            WHERE ({clause}) AND COALESCE(is_readable, 1) = 1
             """,
             params,
         )
@@ -97,6 +111,7 @@ def count_prompt_coverage_in_folder_scope(
     return {
         "total": len(rows),
         "missing_prompt": sum(int(row[1] or 0) for row in rows),
+        "missing_text": sum(int(row[2] or 0) for row in rows),
     }
 
 
