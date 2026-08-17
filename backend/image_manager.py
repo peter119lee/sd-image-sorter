@@ -1046,13 +1046,13 @@ def move_image(image_id: int, destination_folder: str, image_path: str) -> str:
         with _DESTINATION_OPERATION_LOCK:
             image_path, new_path = _prepare_destination_path(image_path, destination_folder, "move")
 
-            shutil.move(image_path, new_path)
+            _move_file_atomically(image_path, new_path)
             try:
                 update_image_path(image_id, new_path)
             except Exception as db_error:
                 try:
                     if os.path.exists(new_path):
-                        shutil.move(new_path, image_path)
+                        _move_file_atomically(new_path, image_path)
                 except Exception as rollback_error:
                     raise FileOperationError(
                         f"Database update failed after moving file, and rollback failed: {db_error}; rollback error: {rollback_error}",
@@ -1114,6 +1114,28 @@ def _copy_file_atomically(source_path: str, destination_path: str) -> None:
                 operation="copy",
             ) from copy_error
         raise
+
+
+def _move_file_atomically(source_path: str, destination_path: str) -> None:
+    """Move a file, staging the cross-volume case through a temporary sibling.
+
+    ``shutil.move`` falls back to a streaming copy when the rename crosses a
+    volume boundary, and if that copy dies (drive full, USB/network drive
+    dropped, process killed) the half-written bytes are left sitting under the
+    final filename, where the next scan indexes them as a real image. Reuse
+    ``_copy_file_atomically`` for the fallback so the destination name only ever
+    appears once the copy is complete.
+    """
+    try:
+        os.replace(source_path, destination_path)
+        return
+    except OSError:
+        # Same reasoning as shutil.move: a failed rename is retried as a copy
+        # so cross-volume moves keep working. The copy's own error surfaces.
+        pass
+
+    _copy_file_atomically(source_path, destination_path)
+    os.unlink(source_path)
 
 
 def copy_image(

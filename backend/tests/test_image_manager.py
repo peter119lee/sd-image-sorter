@@ -2,6 +2,7 @@
 Unit tests for scan progress callbacks.
 """
 
+import errno
 import os
 import subprocess
 import sys
@@ -67,6 +68,66 @@ def test_move_image_restores_file_when_database_update_fails(test_db, tmp_path: 
 
     assert source_path.exists()
     assert not (destination_dir / source_path.name).exists()
+    assert db.get_image_by_id(image_id)["path"] == str(source_path)
+
+
+def test_interrupted_cross_volume_move_leaves_no_truncated_destination(
+    test_db, tmp_path: Path, monkeypatch
+):
+    """A move to another drive that dies mid-copy must publish nothing.
+
+    ``shutil.move`` falls back to a streaming copy when the rename crosses a
+    volume boundary and leaves the half-written bytes sitting at the final
+    filename, where the next scan indexes them as a real image.
+    """
+    source_dir = tmp_path / "cross-volume-source"
+    destination_dir = tmp_path / "cross-volume-dest"
+    source_dir.mkdir()
+    destination_dir.mkdir()
+    source_path = source_dir / "cross-volume.png"
+    Image.new("RGB", (32, 32), color="teal").save(source_path)
+    source_bytes = source_path.read_bytes()
+    image_id = db.add_image(path=str(source_path), filename=source_path.name)
+
+    real_rename = os.rename
+    real_replace = os.replace
+
+    def _is_the_library_file(candidate) -> bool:
+        return os.path.abspath(str(candidate)) == os.path.abspath(str(source_path))
+
+    def cross_device_rename(src, dst, *args, **kwargs):
+        if _is_the_library_file(src):
+            raise OSError(errno.EXDEV, "Invalid cross-device link")
+        return real_rename(src, dst, *args, **kwargs)
+
+    def cross_device_replace(src, dst, *args, **kwargs):
+        if _is_the_library_file(src):
+            raise OSError(errno.EXDEV, "Invalid cross-device link")
+        return real_replace(src, dst, *args, **kwargs)
+
+    def copyfile_dies_partway(src, dst, *, follow_symlinks=True):
+        Path(dst).write_bytes(b"\x89PNG\r\n\x1a\n")
+        raise OSError(errno.ENOSPC, "simulated drive full mid-copy")
+
+    def copyfile2_dies_partway(src, dst, flags):
+        Path(dst).write_bytes(b"\x89PNG\r\n\x1a\n")
+        raise OSError(errno.ENOSPC, "simulated drive full mid-copy")
+
+    monkeypatch.setattr(os, "rename", cross_device_rename)
+    monkeypatch.setattr(os, "replace", cross_device_replace)
+    # Windows CPython 3.12 routes shutil.copy2 through _winapi.CopyFile2 and
+    # never reaches shutil.copyfile, so patching only the latter injects nothing.
+    winapi = getattr(image_manager.shutil, "_winapi", None)
+    if hasattr(winapi, "CopyFile2"):
+        monkeypatch.setattr(winapi, "CopyFile2", copyfile2_dies_partway)
+    else:
+        monkeypatch.setattr(image_manager.shutil, "copyfile", copyfile_dies_partway)
+
+    with pytest.raises(FileOperationError):
+        image_manager.move_image(image_id, str(destination_dir), str(source_path))
+
+    assert source_path.read_bytes() == source_bytes
+    assert list(destination_dir.iterdir()) == []
     assert db.get_image_by_id(image_id)["path"] == str(source_path)
 
 
