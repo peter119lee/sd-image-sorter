@@ -9,6 +9,7 @@ from fastapi import HTTPException, UploadFile, BackgroundTasks
 from starlette.concurrency import run_in_threadpool
 
 import database as db
+from ai_runtime_guard import AiRuntimeBusyError
 from model_health import get_model_health
 from similarity import (
     SimilarityEmbeddingMissingError,
@@ -48,6 +49,11 @@ class SimilarityService:
 
         try:
             ensure_clip_model_ready()
+        except AiRuntimeBusyError:
+            # CLIP is not unavailable, it is queued behind another AI job.
+            # main.py maps this to a 409 naming the blocker; 503 would read as
+            # "the model is broken" and send the user to the Model Center.
+            raise
         except Exception as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
 

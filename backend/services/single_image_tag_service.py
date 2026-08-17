@@ -43,6 +43,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import HTTPException
 from pydantic import BaseModel, Field
 
+from ai_runtime_guard import AiRuntimeBusyError
 from config import ALLOWED_IMAGE_EXTENSIONS
 from utils.path_validation import normalize_user_path, validate_file_path
 
@@ -145,6 +146,13 @@ def tag_single_image(request: SingleImageTagRequest) -> Dict[str, Any]:
         tagger = _load_tagger(**loader_kwargs)
         result = tagger.tag(str(source), **_thresholds(request))
     except HTTPException:
+        raise
+    except AiRuntimeBusyError:
+        # "Busy" is not "could not run". The tagger is fine; something else
+        # holds the shared runtime. main.py answers this with a 409 that names
+        # the blocker, which is recoverable advice — folding it into the 503
+        # below would tell the user to go check WD14 in the Model Center for a
+        # problem that resolves itself.
         raise
     except Exception as exc:  # noqa: BLE001 - one actionable answer for any runtime failure
         logger.exception(

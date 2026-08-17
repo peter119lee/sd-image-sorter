@@ -117,6 +117,7 @@ from app_static import mount_frontend_static, serve_frontend_index, static_cache
 _STATIC_CACHE_BUST_RE = app_static._STATIC_CACHE_BUST_RE
 
 import database as db
+from ai_runtime_guard import AiRuntimeBusyError
 from exceptions import (
     SDImageSorterError,
     ImageNotFoundError,
@@ -455,6 +456,43 @@ async def sd_image_sorter_exception_handler(request: Request, exc: SDImageSorter
         response_content = {"error": exc.message, "type": exc.__class__.__name__}
 
     return JSONResponse(status_code=status_code, content=response_content)
+
+
+@app.exception_handler(AiRuntimeBusyError)
+async def ai_runtime_busy_exception_handler(
+    request: Request, exc: AiRuntimeBusyError
+) -> JSONResponse:
+    """A busy AI runtime is a 409, not a 500.
+
+    Every heavy model route takes the same lease, so mapping it once here
+    covers Censor detect, similarity search, aesthetic scoring, artist
+    identification and ``POST /api/tag/single`` together, instead of repeating
+    the same try/except in each router. The request was refused by policy —
+    something else legitimately holds the runtime — which is a conflict, not a
+    server fault and not a broken endpoint.
+
+    ``reason`` is passed through because "someone is working" and "the lock is
+    held but the job that claimed it is gone" need different answers: the first
+    resolves itself, the second needs a restart.
+    """
+    logger.warning(
+        "AI runtime busy on %s %s (%s): %s",
+        request.method,
+        request.url.path,
+        getattr(exc, "reason", "busy"),
+        exc,
+    )
+    return JSONResponse(
+        status_code=409,
+        content={
+            "error": str(exc),
+            "type": "AiRuntimeBusyError",
+            "status_code": 409,
+            "reason": getattr(exc, "reason", "busy"),
+            "blocker": getattr(exc, "blocker", None),
+            "waited_seconds": getattr(exc, "waited_seconds", None),
+        },
+    )
 
 
 @app.exception_handler(HTTPException)
