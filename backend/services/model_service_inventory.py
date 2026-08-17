@@ -30,6 +30,13 @@ def _svc():
     return model_service
 
 
+def _tipo_pip_hint() -> str:
+    """The exact opt-in install command, read from the module that owns it."""
+    from services.tipo_service import PIP_INSTALL_HINT
+
+    return PIP_INSTALL_HINT
+
+
 def _build_inventory(health: Dict[str, Any]) -> List[Dict[str, Any]]:
     censor = health["censor"]
     artist = health["artist"]
@@ -169,6 +176,23 @@ def _build_inventory(health: Dict[str, Any]) -> List[Dict[str, Any]]:
         cl_tagger_v2_message_key = "models.clTaggerV2.missingDeps"
     else:
         cl_tagger_v2_message_key = "models.clTaggerV2.missing"
+
+    # -- TIPO (prompt expansion) --
+    # Ordered so the owner can tell the three states apart at a glance: a
+    # half-written GGUF ("broken") must never render as "not downloaded yet",
+    # which is the whole reason this card exists.
+    tipo = health.get("tipo", {})
+    tipo_available = bool(tipo.get("available"))
+    tipo_broken_variants = list(tipo.get("broken_variants") or [])
+    tipo_missing_deps = list(tipo.get("missing_dependencies") or [])
+    if tipo_available:
+        tipo_message_key = "models.tipo.ready"
+    elif tipo.get("weight_state") == "broken":
+        tipo_message_key = "models.tipo.broken"
+    elif tipo_missing_deps:
+        tipo_message_key = "models.tipo.missingDeps"
+    else:
+        tipo_message_key = "models.tipo.missing"
 
     # -- Censor Legacy --
     legacy = censor["legacy"]
@@ -366,6 +390,48 @@ def _build_inventory(health: Dict[str, Any]) -> List[Dict[str, Any]]:
                 {
                     "label": "HuggingFace",
                     "url": "https://huggingface.co/cella110n/cl_tagger_v2",
+                },
+            ],
+        },
+        {
+            "id": "tipo",
+            "name": "TIPO Prompt Expansion",
+            "group": "Tagging",
+            "group_key": "models.group.tagging",
+            "available": tipo_available,
+            **with_status(
+                is_ready=tipo_available,
+                is_downloaded=bool(tipo.get("installed_variants")),
+            ),
+            "message": tipo.get("message") or "TIPO prompt expansion is not set up yet.",
+            "message_key": tipo_message_key,
+            "message_params": {
+                "deps": ", ".join(tipo_missing_deps),
+                "variants": ", ".join(tipo_broken_variants),
+            },
+            "path": tipo.get("model_dir") or "",
+            # No Prepare branch exists in model_service_prepare for TIPO: the
+            # runtime is a manual opt-in pip pair and the GGUF downloads on
+            # first use. Advertising a button that cannot run is the
+            # "returns 200 while doing nothing" defect class.
+            "download_supported": False,
+            "default_variant": tipo.get("default_variant") or "200m-ft",
+            "installed_variants": list(tipo.get("installed_variants") or []),
+            "note": (
+                "Expands a danbooru TAG LIST, not natural-language prose. "
+                "Proposals are vocabulary-gated and never auto-applied."
+            ),
+            "setup_steps": [
+                f"Install the opt-in CPU runtime into the backend environment: {_tipo_pip_hint()}",
+                "Restart SD Image Sorter after installing the packages.",
+                "Weights (~100-250 MB GGUF) download on first use into the path above; "
+                "nothing is fetched until you press Suggest.",
+                "If this card says the files are unreadable, delete them from that path and run it again.",
+            ],
+            "external_links": [
+                {
+                    "label": "KGen / TIPO",
+                    "url": "https://github.com/KohakuBlueleaf/KGen",
                 },
             ],
         },

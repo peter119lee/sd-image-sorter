@@ -278,6 +278,18 @@ def _format_sam3_readiness_message(
     return "SAM3 checkpoint and runtime dependencies are ready."
 
 
+def _probe_tipo() -> Dict[str, Any]:
+    """TIPO readiness, delegated to the module that owns its on-disk layout.
+
+    Imported lazily and called through the module object so
+    ``monkeypatch.setattr(tipo_service, ...)`` in tests keeps biting, matching
+    how ``get_cl_tagger_v2_checkpoint_path`` reaches its loader constants.
+    """
+    from services import tipo_service
+
+    return tipo_service.probe_tipo_installation()
+
+
 def get_model_health() -> Dict[str, Any]:
     """Return a machine-readable summary of local model readiness."""
     clip_model_path = get_clip_local_model_path()
@@ -534,6 +546,10 @@ def get_model_health() -> Dict[str, Any]:
             "runtime_compatibility_error": runtime_compatibility_error,
             "message": florence2_message,
         },
+        # Opt-in CPU GGUF prompt-expansion runtime. Lazy import so
+        # model_health stays importable without services/ on the path, and so
+        # tests can monkeypatch the service's own seams.
+        "tipo": _probe_tipo(),
         "oppai_oracle": {
             "available": not oppai_oracle_missing,
             "model_name": "oppai-oracle-v1.1",

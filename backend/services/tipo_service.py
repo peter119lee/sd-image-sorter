@@ -40,6 +40,7 @@ Weights download on demand into ``DATA_DIR/models/tipo/`` (override with
 
 from __future__ import annotations
 
+import importlib.util
 import logging
 import os
 import threading
@@ -55,6 +56,15 @@ import config
 logger = logging.getLogger(__name__)
 
 PIP_INSTALL_HINT = "pip install llama-cpp-python tipo-kgen"
+
+# Import names of the opt-in runtime pair, in install order.
+RUNTIME_MODULES: tuple[str, ...] = ("llama_cpp", "kgen")
+
+# First four bytes of every GGUF file (ggml GGUF spec: 0x47 0x47 0x55 0x46).
+# A weight file that exists without this header is a failed/interrupted
+# download -- an HTML error page, a truncated stub, or a zero-byte placeholder
+# -- and the Model Center must say so instead of reporting "not downloaded".
+GGUF_MAGIC = b"GGUF"
 
 MISSING_DEPS_MESSAGE = (
     "TIPO is not installed. Install it into the backend environment with: "
@@ -114,13 +124,150 @@ _RUNTIME_LOCK = threading.Lock()
 _loaded_model_key: Optional[str] = None
 
 
+DEFAULT_MODEL_KEY = "200m-ft"
+
+
+def tipo_model_dir_path() -> Path:
+    """Resolve the weight home WITHOUT creating it.
+
+    The Model Center health probe must be able to answer "is TIPO installed?"
+    without writing anything into DATA_DIR, so directory creation is deferred
+    to ``tipo_model_dir`` (only the generation path needs it).
+    """
+    override = (os.environ.get("SD_IMAGE_SORTER_TIPO_DIR") or "").strip()
+    if override:
+        return Path(override)
+    return Path(config.DATA_DIR) / "models" / "tipo"
+
+
 def tipo_model_dir() -> Path:
     """Model weight home: DATA_DIR/models/tipo, env-overridable — the same
     stay-portable policy as rembg's ``_rembg_session_home``."""
-    override = (os.environ.get("SD_IMAGE_SORTER_TIPO_DIR") or "").strip()
-    path = Path(override) if override else Path(config.DATA_DIR) / "models" / "tipo"
+    path = tipo_model_dir_path()
     path.mkdir(parents=True, exist_ok=True)
     return path
+
+
+def tipo_weight_path(model_key: str, model_dir: Optional[Path] = None) -> Path:
+    """Expected on-disk weight path for one variant.
+
+    kgen's ``download_gguf`` renames the fetched file to
+    ``{repo_tail}_{filename}`` inside its ``model_dir``; ``_ensure_model_loaded``
+    probes the same name, so the health probe must derive it identically or the
+    card and the loader would disagree.
+    """
+    spec = MODEL_SPECS[model_key]
+    base = model_dir if model_dir is not None else tipo_model_dir_path()
+    return base / f"{spec.repo.split('/')[-1]}_{spec.filename}"
+
+
+def _missing_runtime_modules() -> List[str]:
+    """Import names of the opt-in runtime pair that are not installed."""
+    missing: List[str] = []
+    for module_name in RUNTIME_MODULES:
+        try:
+            found = importlib.util.find_spec(module_name) is not None
+        except Exception:  # noqa: BLE001 - a broken dist must read as missing
+            found = False
+        if not found:
+            missing.append(module_name)
+    return missing
+
+
+def _weight_file_state(path: Path) -> str:
+    """Classify one weight file as ``ready``, ``broken``, or ``missing``."""
+    try:
+        if not path.is_file():
+            return "missing"
+        if path.stat().st_size <= 0:
+            return "broken"
+        with open(path, "rb") as handle:
+            header = handle.read(len(GGUF_MAGIC))
+    except OSError:
+        return "broken"
+    return "ready" if header == GGUF_MAGIC else "broken"
+
+
+def probe_tipo_installation() -> Dict[str, Any]:
+    """Read-only Model Center health probe for TIPO.
+
+    Returns the same shape the other opt-in-runtime cards use
+    (``available`` / ``missing_dependencies`` / ``message``) plus the
+    per-variant split the download-on-demand layout needs:
+
+    * ``installed_variants`` — variants whose GGUF is present and valid;
+    * ``broken_variants``   — variants whose GGUF exists but is unusable;
+    * ``weight_state``      — ``ready`` if any variant is usable, else
+      ``broken`` if any file exists at all, else ``missing``.
+
+    Creates nothing and imports neither llama_cpp nor kgen.
+    """
+    model_dir = tipo_model_dir_path()
+    installed: List[str] = []
+    broken: List[str] = []
+    for model_key in MODEL_SPECS:
+        state = _weight_file_state(tipo_weight_path(model_key, model_dir))
+        if state == "ready":
+            installed.append(model_key)
+        elif state == "broken":
+            broken.append(model_key)
+
+    if installed:
+        weight_state = "ready"
+    elif broken:
+        weight_state = "broken"
+    else:
+        weight_state = "missing"
+
+    missing_dependencies = _missing_runtime_modules()
+    available = weight_state == "ready" and not missing_dependencies
+
+    if weight_state == "ready" and available:
+        message = (
+            "TIPO prompt expansion is ready ("
+            + ", ".join(installed)
+            + ")."
+        )
+    elif weight_state == "ready":
+        message = (
+            "TIPO weights are installed, but the opt-in runtime is missing: "
+            + ", ".join(missing_dependencies)
+            + f". Install it with: {PIP_INSTALL_HINT}"
+        )
+    elif weight_state == "broken":
+        message = (
+            "TIPO weight files are present but unreadable (not valid GGUF): "
+            + ", ".join(broken)
+            + ". Delete them from the path below; the next run re-downloads."
+        )
+    elif missing_dependencies:
+        message = (
+            "TIPO runtime packages are missing: "
+            + ", ".join(missing_dependencies)
+            + f". Install them with: {PIP_INSTALL_HINT}"
+            " Weights (~100-250 MB) download on first use."
+        )
+    else:
+        message = (
+            "TIPO weights are not downloaded yet. They download on first use "
+            "into the path below (~100-250 MB)."
+        )
+
+    try:
+        resolved_dir = str(model_dir.resolve())
+    except OSError:
+        resolved_dir = str(model_dir)
+
+    return {
+        "available": available,
+        "weight_state": weight_state,
+        "installed_variants": installed,
+        "broken_variants": broken,
+        "missing_dependencies": missing_dependencies,
+        "model_dir": resolved_dir,
+        "default_variant": DEFAULT_MODEL_KEY,
+        "message": message,
+    }
 
 
 def _fold(tag: str) -> str:
@@ -172,7 +319,7 @@ def _ensure_model_loaded(model_key: str) -> Dict[str, Any]:
     if _loaded_model_key == model_key and models.text_model is not None:
         return api
     spec = MODEL_SPECS[model_key]
-    target = models.model_dir / f"{spec.repo.split('/')[-1]}_{spec.filename}"
+    target = tipo_weight_path(model_key, models.model_dir)
     try:
         if not target.is_file():
             logger.info(

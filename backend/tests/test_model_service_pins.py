@@ -711,6 +711,7 @@ def test_get_status_wraps_inventory_and_health(monkeypatch):
         "florence2",
         "oppai-oracle",
         "cl-tagger-v2",
+        "tipo",
         "clip",
         "aesthetic",
         "artist",

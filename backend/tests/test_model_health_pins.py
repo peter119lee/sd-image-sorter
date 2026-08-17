@@ -103,6 +103,12 @@ def _wire_clean_state(
     # Neutralize the __file__-anchored repo legacy-artist probe so a developer's
     # real models/artist/ checkout cannot shadow the empty tmp roots.
     monkeypatch.setenv("SD_IMAGE_SORTER_DISABLE_LEGACY_MODEL_COPY", "1")
+    # TIPO resolves its weight home from DATA_DIR, not a model_health getter, so
+    # its own documented override is what keeps the zero-model state real once
+    # a developer has actually downloaded the GGUF.
+    tipo_root = tmp_path / "tipo"
+    tipo_root.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setenv("SD_IMAGE_SORTER_TIPO_DIR", str(tipo_root))
     return tmp_path
 
 
@@ -622,6 +628,7 @@ def test_health_top_level_and_censor_key_sets(monkeypatch, tmp_path):
         "wd14",
         "toriigate",
         "florence2",
+        "tipo",
         "oppai_oracle",
         "cl_tagger_v2",
         "clip",
@@ -639,6 +646,8 @@ def test_health_all_subsystems_unavailable_in_zero_model_state(monkeypatch, tmp_
     assert health["wd14"]["available"] is False
     assert health["toriigate"]["available"] is False
     assert health["florence2"]["available"] is False
+    assert health["tipo"]["available"] is False
+    assert health["tipo"]["weight_state"] == "missing"
     assert health["oppai_oracle"]["available"] is False
     assert health["cl_tagger_v2"]["available"] is False
     assert health["clip"]["available"] is False
