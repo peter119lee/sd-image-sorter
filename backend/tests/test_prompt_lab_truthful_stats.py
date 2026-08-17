@@ -329,6 +329,88 @@ class TestEmptyCheckpointPanelsTellTheTruth:
         assert stats["checkpoint_recipes_empty_reason"] is None
 
 
+class TestNoCheckpointMetadataOffersIndexingWhenItCanHelp:
+    """`no_checkpoint_metadata` first shipped with no action at all, reasoned
+    from the owner's library: nothing there records a checkpoint, so nothing
+    could fill these panels. The owner then said his library is a LoRA training
+    set and that he *does* generate images — into a folder he has never scanned.
+    The library described what had been indexed, not what the user has, so the
+    action exists after all: index the generations.
+
+    It stays conditional. An owner whose library really is all downloaded
+    artwork must read a fact about his library plus an offer that plainly does
+    not apply to him, never an instruction to go and scan something.
+    """
+
+    def test_a_library_with_no_generated_images_offers_indexing_them(self, test_client, test_db):
+        """The owner's exact shape: sidecar tag text, generator='others',
+        no checkpoint anywhere, and generations living outside the library."""
+        for index in range(3):
+            _seed_row(test_db, name=f"art-{index}.png", tags=("solo",), prompt=SIDECAR_TAG_TEXT)
+
+        stats = _stats(test_client)
+
+        assert stats["top_checkpoints_empty_reason"] == "no_checkpoint_metadata"
+        assert stats["checkpoint_empty_action"] == "scan_generated_images_folder", (
+            "his own generations are simply not indexed here yet, and indexing "
+            "them is a real action this app supports"
+        )
+        assert stats["checkpoint_coverage"]["sd_attributed_images"] == 0, (
+            "the count the offer is conditioned on has to travel with it"
+        )
+
+    def test_already_indexed_generations_are_not_told_to_scan_again(self, test_client, test_db):
+        """The other half of honesty: if SD output IS indexed and still records
+        no checkpoint, scanning a folder cannot fix it — that generator never
+        wrote a model name. Offering the scan would waste a long operation."""
+        image_id = _seed_row(test_db, name="mine.png", prompt="1girl, cinematic lighting")
+        with test_db.get_db() as conn:
+            conn.execute("UPDATE images SET generator = 'webui' WHERE id = ?", (image_id,))
+
+        stats = _stats(test_client)
+
+        assert stats["top_checkpoints_empty_reason"] == "no_checkpoint_metadata"
+        assert stats["checkpoint_empty_action"] is None
+        assert stats["checkpoint_coverage"]["sd_attributed_images"] == 1
+
+    def test_checkpoints_on_missing_files_keep_their_own_remedy(self, test_client, test_db):
+        """That reason already carries a rescan remedy of its own; blurring the
+        two would send the user off to scan a different folder instead."""
+        _seed_row(test_db, name="dead-with-cp.png", readable=False, checkpoint="ponyRealism.safetensors")
+        _seed_row(test_db, name="live.png", tags=("solo",))
+
+        stats = _stats(test_client)
+
+        assert stats["top_checkpoints_empty_reason"] == "checkpoint_metadata_only_on_missing_files"
+        assert stats["checkpoint_empty_action"] is None
+
+    def test_a_scoring_blocker_does_not_offer_a_scan(self, test_client, test_db):
+        """Checkpoints exist, so the generations are indexed; the missing piece
+        is scoring, which the panel already invites."""
+        for index in range(3):
+            _seed_row(test_db, name=f"cp-{index}.png", checkpoint="ponyRealism.safetensors", tags=("solo",))
+
+        stats = _stats(test_client)
+
+        assert stats["checkpoint_score_leaders_empty_reason"] == "no_scored_images"
+        assert stats["checkpoint_empty_action"] is None
+
+    def test_populated_panels_offer_nothing(self, test_client, test_db):
+        for index in range(3):
+            _seed_row(
+                test_db,
+                name=f"leader-{index}.png",
+                checkpoint="ponyRealism.safetensors",
+                aesthetic_score=8.0 + index * 0.1,
+                tags=("studio_lighting",),
+            )
+
+        stats = _stats(test_client)
+
+        assert stats["top_checkpoints_empty_reason"] is None
+        assert stats["checkpoint_empty_action"] is None
+
+
 class TestCheckpointPanelsIgnoreMissingFiles:
     def test_checkpoint_counts_exclude_rows_whose_file_is_gone(self, test_client, test_db):
         """Otherwise every checkpoint count is inflated by the dead rows, the
@@ -478,6 +560,7 @@ class TestAestheticTagPanelsIgnoreMissingFiles:
     "top_checkpoints_empty_reason",
     "checkpoint_score_leaders_empty_reason",
     "checkpoint_recipes_empty_reason",
+    "checkpoint_empty_action",
     "caption_length",
 ])
 def test_stats_payload_exposes_every_new_scope_field(test_client, test_db, field):
