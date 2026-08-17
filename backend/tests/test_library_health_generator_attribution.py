@@ -400,6 +400,38 @@ class TestAnIncompleteScanRecord:
         assert "missing_file_size" not in report["statistics"]
 
 
+class TestTheReconnectAdviceStopsDoubleCountingDeadRows:
+    """Found by the invariant, not by inspection: ``mark_image_unreadable`` sets
+    ``metadata_status = 'error'``, so every dead row lands in both
+    ``issue_counts.unreadable`` and ``issue_counts.metadata_error``, and the
+    ``reparse_or_reconnect`` card added the two together. On the owner's library
+    that advertised **3,074** rows to re-parse where **1,537** exist.
+    """
+
+    @pytest.fixture
+    def dead_row_library(self, test_db, tmp_path: Path) -> Dict[str, Any]:
+        folder = tmp_path / "moved-away"
+        folder.mkdir()
+        dead = [
+            _seed(folder, f"gone-{index}.png", caption=PROSE_CAPTION, readable=False)
+            for index in range(3)
+        ]
+        alive = [_seed(folder, "here.png", caption=PROSE_CAPTION)]
+        return {"folder": folder, "dead": dead, "alive": alive}
+
+    def test_the_advice_names_the_rows_that_exist(self, dead_row_library):
+        report = _report()
+        by_kind = {item["kind"]: item for item in report["recommendations"]}
+
+        distinct_rows = _count_where(
+            f"NOT ({_READABLE_SQL}) "
+            "OR LOWER(COALESCE(metadata_status, 'complete')) = 'error'"
+        )
+
+        assert distinct_rows == len(dead_row_library["dead"])
+        assert by_kind["reparse_or_reconnect"]["count"] == distinct_rows
+
+
 class TestEndpoint:
     def test_the_endpoint_serves_the_split(self, test_client, test_db, tmp_path: Path):
         from services.sorting_service import invalidate_library_health_cache

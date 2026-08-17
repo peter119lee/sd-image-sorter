@@ -116,6 +116,11 @@ def get_library_health_report(*, sample_limit: int = 8) -> Dict[str, Any]:
                 SUM(CASE WHEN COALESCE(is_readable, 1) = 1 AND aesthetic_score IS NULL THEN 1 ELSE 0 END) AS missing_aesthetic,
                 SUM(CASE WHEN LOWER(COALESCE(metadata_status, 'complete')) = 'pending' THEN 1 ELSE 0 END) AS metadata_pending,
                 SUM(CASE WHEN LOWER(COALESCE(metadata_status, 'complete')) = 'error' THEN 1 ELSE 0 END) AS metadata_error,
+                -- Every unreadable row is also a metadata_status = 'error' row,
+                -- because mark_image_unreadable sets both. One re-parse visits
+                -- each such row once, so the advice counts rows and not the two
+                -- counters above.
+                SUM(CASE WHEN COALESCE(is_readable, 1) = 0 OR LOWER(COALESCE(metadata_status, 'complete')) = 'error' THEN 1 ELSE 0 END) AS reparse_or_reconnect,
                 SUM(CASE WHEN COALESCE(is_readable, 1) = 1 AND generator = 'unknown' THEN 1 ELSE 0 END) AS unknown_generator
             FROM images
             """
@@ -139,6 +144,9 @@ def get_library_health_report(*, sample_limit: int = 8) -> Dict[str, Any]:
         }
         incomplete_scan_record_images = (
             int(summary_row["incomplete_scan_record"] or 0) if summary_row else 0
+        )
+        reparse_or_reconnect_images = (
+            int(summary_row["reparse_or_reconnect"] or 0) if summary_row else 0
         )
         # True, useful, and not a defect: see this function's docstring.
         statistics: Dict[str, int] = {
@@ -310,6 +318,7 @@ def get_library_health_report(*, sample_limit: int = 8) -> Dict[str, Any]:
         "recommendations": _build_library_health_recommendations(
             total=total,
             issue_counts=issue_counts,
+            reparse_or_reconnect_images=reparse_or_reconnect_images,
             incomplete_scan_record_images=incomplete_scan_record_images,
             duplicate_filename_images=duplicate_filename_images,
         ),
@@ -320,6 +329,7 @@ def _build_library_health_recommendations(
     *,
     total: int,
     issue_counts: Dict[str, int],
+    reparse_or_reconnect_images: int,
     incomplete_scan_record_images: int,
     duplicate_filename_images: int,
 ) -> List[Dict[str, Any]]:
@@ -333,11 +343,15 @@ def _build_library_health_recommendations(
             "severity": "info",
             "count": issue_counts["metadata_pending"],
         })
-    if issue_counts.get("unreadable", 0) > 0 or issue_counts.get("metadata_error", 0) > 0:
+    # Counted as rows, not as counters: marking a row unreadable also sets
+    # metadata_status = 'error', so adding issue_counts["unreadable"] to
+    # issue_counts["metadata_error"] advertised twice the rows that exist --
+    # 3,074 re-parse targets on a library holding 1,537 of them.
+    if reparse_or_reconnect_images > 0:
         recommendations.append({
             "kind": "reparse_or_reconnect",
             "severity": "warning",
-            "count": issue_counts.get("unreadable", 0) + issue_counts.get("metadata_error", 0),
+            "count": reparse_or_reconnect_images,
         })
     # Deliberately keyed on missing_text, not missing_prompt: a recommendation is
     # an offer to act, and re-parsing an image that Stable Diffusion never made
