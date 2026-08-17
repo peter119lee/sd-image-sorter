@@ -9,7 +9,17 @@ from pathlib import Path
 
 import pytest
 
+from app_info import GITHUB_LATEST_RELEASE_API_URL, GITHUB_REPOSITORY_URL
 from services.update_service import UpdateService
+
+# The built-in GitHub channel, derived from app_info instead of repeated as a
+# literal. Production decides ``is_default_github_channel`` by string-comparing
+# the configured api_url against GITHUB_LATEST_RELEASE_API_URL, so a hardcoded
+# copy stops being "the default" the moment the owner or repo is renamed -- and
+# the test then asserts default-channel behaviour against a URL that is no
+# longer the default.
+_DEFAULT_API_URL = GITHUB_LATEST_RELEASE_API_URL
+_DEFAULT_WEB_URL = f"{GITHUB_REPOSITORY_URL}/releases/latest"
 
 
 def test_get_status_reports_available_patch_update(monkeypatch):
@@ -233,7 +243,7 @@ def test_get_status_default_github_failure_explains_mirror_option(monkeypatch):
     def raise_timeout():
         raise TimeoutError("timed out")
 
-    monkeypatch.setattr("services.update_service.UPDATE_API_URL", "https://api.github.com/repos/peter119lee/sd-image-sorter/releases/latest")
+    monkeypatch.setattr("services.update_service.UPDATE_API_URL", _DEFAULT_API_URL)
     monkeypatch.setattr(service, "_read_release_json", raise_timeout)
 
     status = service.get_status(force=True)
@@ -250,8 +260,8 @@ def test_save_proxy_channel_creates_package_local_override(monkeypatch, tmp_path
     config_dir.mkdir(parents=True, exist_ok=True)
 
     monkeypatch.setattr("services.update_service.CONFIG_DIR", config_dir)
-    monkeypatch.setattr("services.update_service.UPDATE_API_URL", "https://api.github.com/repos/peter119lee/sd-image-sorter/releases/latest")
-    monkeypatch.setattr("services.update_service.UPDATE_WEB_URL", "https://github.com/peter119lee/sd-image-sorter/releases/latest")
+    monkeypatch.setattr("services.update_service.UPDATE_API_URL", _DEFAULT_API_URL)
+    monkeypatch.setattr("services.update_service.UPDATE_WEB_URL", _DEFAULT_WEB_URL)
 
     result = service.save_proxy_channel("https://ghfast.top")
     config_payload = json.loads((config_dir / "update-channel.json").read_text(encoding="utf-8"))
@@ -259,8 +269,8 @@ def test_save_proxy_channel_creates_package_local_override(monkeypatch, tmp_path
     assert result["has_channel_override"] is True
     assert result["download_url_prefix"] == "https://ghfast.top/"
     assert result["is_default_github_channel"] is False
-    assert config_payload["api_url"] == "https://ghfast.top/https://api.github.com/repos/peter119lee/sd-image-sorter/releases/latest"
-    assert config_payload["web_url"] == "https://ghfast.top/https://github.com/peter119lee/sd-image-sorter/releases/latest"
+    assert config_payload["api_url"] == f"https://ghfast.top/{_DEFAULT_API_URL}"
+    assert config_payload["web_url"] == f"https://ghfast.top/{_DEFAULT_WEB_URL}"
 
 
 def test_reset_channel_settings_removes_override(monkeypatch, tmp_path: Path):
@@ -272,8 +282,8 @@ def test_reset_channel_settings_removes_override(monkeypatch, tmp_path: Path):
         json.dumps(
             {
                 "channel_name": "Custom Proxy",
-                "api_url": "https://proxy.example/https://api.github.com/repos/peter119lee/sd-image-sorter/releases/latest",
-                "web_url": "https://proxy.example/https://github.com/peter119lee/sd-image-sorter/releases/latest",
+                "api_url": f"https://proxy.example/{_DEFAULT_API_URL}",
+                "web_url": f"https://proxy.example/{_DEFAULT_WEB_URL}",
                 "download_url_prefix": "https://proxy.example/",
             }
         ),
@@ -281,7 +291,7 @@ def test_reset_channel_settings_removes_override(monkeypatch, tmp_path: Path):
     )
 
     monkeypatch.setattr("services.update_service.CONFIG_DIR", config_dir)
-    monkeypatch.setattr("services.update_service.UPDATE_API_URL", "https://api.github.com/repos/peter119lee/sd-image-sorter/releases/latest")
+    monkeypatch.setattr("services.update_service.UPDATE_API_URL", _DEFAULT_API_URL)
 
     result = service.reset_channel_settings()
 

@@ -5,7 +5,7 @@ Application metadata shared by runtime services and release tooling.
 APP_NAME = "SD Image Sorter"
 APP_VERSION = "3.5.0-beta.4"
 
-GITHUB_OWNER = "peter119lee"
+GITHUB_OWNER = "Rinne414"
 GITHUB_REPO = "sd-image-sorter"
 GITHUB_RELEASES_API_URL = f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}/releases"
 GITHUB_LATEST_RELEASE_API_URL = f"{GITHUB_RELEASES_API_URL}/latest"

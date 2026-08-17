@@ -321,7 +321,7 @@ A local web application for managing, tagging, sorting, and censoring Stable Dif
 4. Sort manually: `POST /api/sort/start`
 
 For detailed documentation, see `docs/API.md` in the GitHub repository:
-https://github.com/peter119lee/sd-image-sorter/blob/main/docs/API.md
+https://github.com/Rinne414/sd-image-sorter/blob/main/docs/API.md
     """,
     version=APP_VERSION,
     lifespan=lifespan,

@@ -67,7 +67,7 @@ This decision will be revisited if any of the following becomes true:
 Until then, macOS users should:
 
 ```bash
-git clone https://github.com/peter119lee/sd-image-sorter.git
+git clone https://github.com/Rinne414/sd-image-sorter.git
 cd sd-image-sorter
 ./run.sh
 ```

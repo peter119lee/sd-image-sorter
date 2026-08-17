@@ -42,6 +42,7 @@ from pathlib import Path
 import pytest
 
 import services.update_service as us
+from app_info import GITHUB_REPOSITORY_URL
 from services.update_service import UpdateService
 
 
@@ -63,7 +64,7 @@ def _point_channel_at_tmp(monkeypatch, tmp_path: Path) -> Path:
     monkeypatch.setattr(
         us,
         "UPDATE_WEB_URL",
-        "https://github.com/peter119lee/sd-image-sorter/releases/latest",
+        f"{GITHUB_REPOSITORY_URL}/releases/latest",
     )
     monkeypatch.setattr(us, "UPDATE_DOWNLOAD_URL_PREFIX", "")
     return config_dir
