@@ -6,7 +6,7 @@ holds metadata-status counts, the library health audit, and checkpoint facets.
 Imports only from db_core / db_helpers / db_tags / utils / stdlib to avoid an
 import cycle with the ``database`` facade.
 """
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, NamedTuple, Tuple
 
 from db_core import get_db
 from db_helpers import (
@@ -65,11 +65,296 @@ def _library_health_percent(value: float, total: int) -> float:
     return round((float(value) / float(total)) * 100.0, 2)
 
 
+_READABLE_SQL = "COALESCE(is_readable, 1) = 1"
+_NO_CHECKPOINT_SQL = "(checkpoint_normalized IS NULL OR TRIM(checkpoint_normalized) = '')"
+_NO_DIMENSIONS_SQL = "(width IS NULL OR height IS NULL OR width <= 0 OR height <= 0)"
+_NO_FILE_SIZE_SQL = "(file_size IS NULL OR file_size <= 0)"
+_METADATA_STATUS_SQL = "LOWER(COALESCE(metadata_status, 'complete'))"
+
+
+class IssueSpec(NamedTuple):
+    """One member of the issue vocabulary published as ``issue_counts``.
+
+    ``sql`` carries its own population guard, so the predicate a key publishes
+    is readable in one place next to what the key claims.
+
+    ``remedy`` names the recommendation kind that offers the action, or is
+    ``None`` for a key that is *reported only*. A reported-only key must give a
+    ``reported_only_reason`` and may carry **no** consequence: no quality weight
+    and no contribution to ``actionable_count``. That pairing is the whole point.
+    Three separate defects in this payload were "a number the user is charged for
+    beside no action that can move it" (``missing_prompt`` in ``7c10fb6``,
+    ``missing_checkpoint`` in ``5332c02``, the metadata-health population in
+    ``62dc568``), so the vocabulary now refuses to express one.
+    """
+
+    key: str
+    sql: str
+    remedy: Optional[str]
+    quality_weight: float = 0.0
+    feeds_actionable: bool = False
+    reported_only_reason: str = ""
+
+
+class IssueRemedy(NamedTuple):
+    """An action offered for one or more issue keys.
+
+    ``keys`` decides the advertised count: a remedy reports the number of
+    **distinct rows** matched by the union of its keys' predicates, never the sum
+    of their counters. Summing was a live defect — every unreadable row is also a
+    ``metadata_status = 'error'`` row (``mark_image_unreadable`` sets both), so
+    ``reparse_or_reconnect`` advertised 3,074 rows to re-parse on the owner's
+    library where 1,537 exist.
+
+    ``action`` records the control the user actually reaches. It cannot be
+    verified from here — it is the one part of the invariant that stays a written
+    convention — but nothing may claim a remedy without naming one.
+    """
+
+    kind: str
+    keys: Tuple[str, ...]
+    severity: str
+    action: str
+    escalate_to_warning_at_percent: Optional[float] = None
+
+
+# Order is the order ``issue_counts`` is published in.
+ISSUE_VOCABULARY: Tuple[IssueSpec, ...] = (
+    IssueSpec(
+        key="unreadable",
+        sql="COALESCE(is_readable, 1) = 0",
+        remedy="reparse_or_reconnect",
+        quality_weight=2.0,
+        feeds_actionable=True,
+    ),
+    IssueSpec(
+        key="missing_text",
+        sql=f"{_READABLE_SQL} AND ({MISSING_TEXT_SQL})",
+        remedy="missing_text",
+        quality_weight=1.4,
+        feeds_actionable=True,
+    ),
+    IssueSpec(
+        key="sd_missing_checkpoint",
+        sql=f"{_READABLE_SQL} AND {_NO_CHECKPOINT_SQL} AND {SD_ATTRIBUTED_GENERATOR_SQL}",
+        remedy="sd_missing_checkpoint",
+        quality_weight=0.8,
+        feeds_actionable=True,
+    ),
+    IssueSpec(
+        key="unattributed_sd_metadata",
+        sql=f"{_READABLE_SQL} AND ({UNATTRIBUTED_SD_METADATA_SQL})",
+        remedy="unattributed_sd_metadata",
+        # Inherits the weight the whole-library unknown_generator count used to
+        # carry, now charged only where an attribution can actually be derived.
+        quality_weight=0.6,
+        feeds_actionable=True,
+    ),
+    IssueSpec(
+        key="missing_dimensions",
+        sql=f"{_READABLE_SQL} AND {_NO_DIMENSIONS_SQL}",
+        remedy="incomplete_scan_record",
+        quality_weight=1.3,
+        feeds_actionable=True,
+    ),
+    IssueSpec(
+        key="missing_file_size",
+        sql=f"{_READABLE_SQL} AND {_NO_FILE_SIZE_SQL}",
+        remedy="incomplete_scan_record",
+        # No weight and no actionable contribution on purpose: this is the second
+        # facet of one incomplete scan record, and the rows are usually the same
+        # rows missing_dimensions already charges for (all 63 of them on the
+        # owner's library). Charging twice for one re-scan is the same
+        # double-count the reparse_or_reconnect card had.
+    ),
+    IssueSpec(
+        key="untagged",
+        sql=f"{_READABLE_SQL} AND tagged_at IS NULL",
+        remedy="untagged",
+        quality_weight=0.5,
+        feeds_actionable=True,
+    ),
+    IssueSpec(
+        key="missing_embedding",
+        sql=f"{_READABLE_SQL} AND embedding IS NULL",
+        remedy=None,
+        reported_only_reason=(
+            "Optional enrichment coverage, not a defect: the complement is "
+            "already published as summary.embedding_percent, and a library that "
+            "never uses Find Similar is not broken for having none. Rendered "
+            "deliberately as a coverage row (library-health.js keeps it visible "
+            "even at zero) rather than as a defect bar, and carries no weight "
+            "and no actionable contribution."
+        ),
+    ),
+    IssueSpec(
+        key="missing_aesthetic",
+        sql=f"{_READABLE_SQL} AND aesthetic_score IS NULL",
+        remedy=None,
+        reported_only_reason=(
+            "Optional enrichment coverage, same reasoning as missing_embedding: "
+            "the complement is summary.aesthetic_percent, and no action is urged."
+        ),
+    ),
+    IssueSpec(
+        key="metadata_pending",
+        sql=f"{_METADATA_STATUS_SQL} = 'pending'",
+        remedy="metadata_pending",
+    ),
+    IssueSpec(
+        key="metadata_error",
+        sql=f"{_METADATA_STATUS_SQL} = 'error'",
+        remedy="reparse_or_reconnect",
+        quality_weight=2.0,
+    ),
+)
+
+# Order is the order ``recommendations`` is published in.
+ISSUE_REMEDIES: Tuple[IssueRemedy, ...] = (
+    IssueRemedy(
+        kind="metadata_pending",
+        keys=("metadata_pending",),
+        severity="info",
+        action="Wait for the running metadata import to finish; the counts settle on their own.",
+    ),
+    IssueRemedy(
+        kind="reparse_or_reconnect",
+        keys=("unreadable", "metadata_error"),
+        severity="warning",
+        action=(
+            "Re-scan the source folder, or reconnect the moved files from the "
+            "reconnect review, so the rows point at readable images again."
+        ),
+    ),
+    IssueRemedy(
+        kind="missing_text",
+        keys=("missing_text",),
+        severity="info",
+        escalate_to_warning_at_percent=10.0,
+        action=(
+            "Run Recover Missing Text in Settings. Its own snapshot "
+            "(metadata_repair_service.snapshot_missing_prompt_ids) walks every "
+            "promptless row, and MISSING_TEXT_SQL — this key's predicate, the "
+            "same shared constant that module imports — is the subset a run can "
+            "still turn from no text into text."
+        ),
+    ),
+    IssueRemedy(
+        kind="sd_missing_checkpoint",
+        keys=("sd_missing_checkpoint",),
+        severity="info",
+        action=(
+            "Re-scan the generated folders so the model name is read back out of "
+            "the file, or record it from the Reader's metadata editor."
+        ),
+    ),
+    IssueRemedy(
+        kind="unattributed_sd_metadata",
+        keys=("unattributed_sd_metadata",),
+        severity="info",
+        action=(
+            "Re-parse the affected images (per image from the detail modal, or by "
+            "re-scanning the folder) so today's parser derives the generator the "
+            "stored generation data implies."
+        ),
+    ),
+    IssueRemedy(
+        kind="incomplete_scan_record",
+        keys=("missing_dimensions", "missing_file_size"),
+        severity="info",
+        action=(
+            "Re-scan the source folder: the scanner re-stats the file and re-reads "
+            "its dimensions, which is the only thing that fills these columns."
+        ),
+    ),
+    IssueRemedy(
+        kind="untagged",
+        keys=("untagged",),
+        severity="info",
+        action="Run AI tagging over the untagged images from the Gallery tagging bar.",
+    ),
+)
+
+
+def _validate_issue_vocabulary(
+    vocabulary: Tuple[IssueSpec, ...] = ISSUE_VOCABULARY,
+    remedies: Tuple[IssueRemedy, ...] = ISSUE_REMEDIES,
+) -> None:
+    """Reject a vocabulary that could express a charge with no remedy.
+
+    Called at import, so a key that claims consequence without naming an action
+    stops the process rather than quietly becoming a permanent issue bar.
+    """
+    keys = [spec.key for spec in vocabulary]
+    duplicates = {key for key in keys if keys.count(key) > 1}
+    if duplicates:
+        raise ValueError(f"issue vocabulary declares duplicate keys: {sorted(duplicates)}")
+
+    remedy_kinds = [remedy.kind for remedy in remedies]
+    duplicate_kinds = {kind for kind in remedy_kinds if remedy_kinds.count(kind) > 1}
+    if duplicate_kinds:
+        raise ValueError(f"issue remedies declare duplicate kinds: {sorted(duplicate_kinds)}")
+
+    for remedy in remedies:
+        if not remedy.keys:
+            raise ValueError(f"remedy {remedy.kind!r} resolves no issue key")
+        if not remedy.action.strip():
+            raise ValueError(f"remedy {remedy.kind!r} names no action the user can reach")
+        unknown = [key for key in remedy.keys if key not in keys]
+        if unknown:
+            raise ValueError(f"remedy {remedy.kind!r} resolves undeclared keys: {unknown}")
+
+    for spec in vocabulary:
+        if spec.remedy is None:
+            if not spec.reported_only_reason.strip():
+                raise ValueError(
+                    f"issue key {spec.key!r} has no remedy and no recorded reason for "
+                    "being reported anyway"
+                )
+            if spec.quality_weight or spec.feeds_actionable:
+                raise ValueError(
+                    f"issue key {spec.key!r} has no remedy yet charges the user "
+                    f"(weight={spec.quality_weight}, actionable={spec.feeds_actionable}); "
+                    "a number nothing can move must not cost anything"
+                )
+            continue
+        if spec.reported_only_reason.strip():
+            raise ValueError(
+                f"issue key {spec.key!r} declares both a remedy and a "
+                "reported-only reason"
+            )
+        if spec.remedy not in remedy_kinds:
+            raise ValueError(
+                f"issue key {spec.key!r} names remedy {spec.remedy!r}, which no "
+                "recommendation emits, so its bar would have no fix attached"
+            )
+        owner = next(remedy for remedy in remedies if remedy.kind == spec.remedy)
+        if spec.key not in owner.keys:
+            raise ValueError(
+                f"issue key {spec.key!r} names remedy {spec.remedy!r} but that "
+                "remedy does not resolve it, so its advertised count would "
+                "describe different rows"
+            )
+
+
+_validate_issue_vocabulary()
+
+
+def _issue_union_sql(remedy: IssueRemedy, by_key: Dict[str, IssueSpec]) -> str:
+    """The rows a remedy visits: the union of its keys, counted once each."""
+    return " OR ".join(f"({by_key[key].sql})" for key in remedy.keys)
+
+
 def get_library_health_report(*, sample_limit: int = 8) -> Dict[str, Any]:
     """Return a read-only quality audit for the indexed image library.
 
-    ``issue_counts`` is the actionable set: every key in it is something a user
-    can do something about.
+    ``issue_counts`` is the issue vocabulary: its keys render as issue bars, feed
+    ``actionable_count`` and carry quality-score weights, so anything in it is a
+    claim that something is wrong and that the user can act. Every member is
+    declared in :data:`ISSUE_VOCABULARY` with the remedy that names its action,
+    or with a recorded reason for being reported without one — and a key with no
+    remedy may carry no weight and no actionable contribution
+    (:func:`_validate_issue_vocabulary` refuses the alternative at import).
 
     ``statistics`` holds counts that are true but are not defects:
     ``missing_prompt``, ``missing_checkpoint``, ``missing_negative_prompt`` and
@@ -91,6 +376,18 @@ def get_library_health_report(*, sample_limit: int = 8) -> Dict[str, Any]:
     scan.
     """
     bounded_sample_limit = max(1, min(int(sample_limit or 8), 25))
+    by_key = {spec.key: spec for spec in ISSUE_VOCABULARY}
+
+    # One scan for every counter: the issue keys, the rows each remedy visits,
+    # and the composition statistics.
+    issue_columns = ",\n                ".join(
+        f"SUM(CASE WHEN {spec.sql} THEN 1 ELSE 0 END) AS issue_{spec.key}"
+        for spec in ISSUE_VOCABULARY
+    )
+    remedy_columns = ",\n                ".join(
+        f"SUM(CASE WHEN {_issue_union_sql(remedy, by_key)} THEN 1 ELSE 0 END) AS remedy_{remedy.kind}"
+        for remedy in ISSUE_REMEDIES
+    )
 
     with get_db() as conn:
         cursor = conn.cursor()
@@ -98,62 +395,37 @@ def get_library_health_report(*, sample_limit: int = 8) -> Dict[str, Any]:
             f"""
             SELECT
                 COUNT(*) AS total,
-                SUM(CASE WHEN COALESCE(is_readable, 1) = 0 THEN 1 ELSE 0 END) AS unreadable,
-                SUM(CASE WHEN COALESCE(is_readable, 1) = 1 THEN 1 ELSE 0 END) AS readable,
-                SUM(CASE WHEN COALESCE(is_readable, 1) = 1 AND {NO_PROMPT_SQL} THEN 1 ELSE 0 END) AS missing_prompt,
-                SUM(CASE WHEN COALESCE(is_readable, 1) = 1 AND ({MISSING_TEXT_SQL}) THEN 1 ELSE 0 END) AS missing_text,
-                SUM(CASE WHEN COALESCE(is_readable, 1) = 1 AND (negative_prompt IS NULL OR TRIM(negative_prompt) = '') THEN 1 ELSE 0 END) AS missing_negative_prompt,
-                SUM(CASE WHEN COALESCE(is_readable, 1) = 1 AND (checkpoint_normalized IS NULL OR TRIM(checkpoint_normalized) = '') THEN 1 ELSE 0 END) AS missing_checkpoint,
-                SUM(CASE WHEN COALESCE(is_readable, 1) = 1 AND (checkpoint_normalized IS NULL OR TRIM(checkpoint_normalized) = '') AND {SD_ATTRIBUTED_GENERATOR_SQL} THEN 1 ELSE 0 END) AS sd_missing_checkpoint,
-                SUM(CASE WHEN COALESCE(is_readable, 1) = 1 AND ({UNATTRIBUTED_SD_METADATA_SQL}) THEN 1 ELSE 0 END) AS unattributed_sd_metadata,
-                SUM(CASE WHEN COALESCE(is_readable, 1) = 1 AND (width IS NULL OR height IS NULL OR width <= 0 OR height <= 0) THEN 1 ELSE 0 END) AS missing_dimensions,
-                SUM(CASE WHEN COALESCE(is_readable, 1) = 1 AND (file_size IS NULL OR file_size <= 0) THEN 1 ELSE 0 END) AS missing_file_size,
-                -- One re-scan fills both columns, so the advice counts the rows
-                -- it visits once each instead of adding the two counters above.
-                SUM(CASE WHEN COALESCE(is_readable, 1) = 1 AND ((width IS NULL OR height IS NULL OR width <= 0 OR height <= 0) OR (file_size IS NULL OR file_size <= 0)) THEN 1 ELSE 0 END) AS incomplete_scan_record,
-                SUM(CASE WHEN COALESCE(is_readable, 1) = 1 AND tagged_at IS NULL THEN 1 ELSE 0 END) AS untagged,
-                SUM(CASE WHEN COALESCE(is_readable, 1) = 1 AND embedding IS NULL THEN 1 ELSE 0 END) AS missing_embedding,
-                SUM(CASE WHEN COALESCE(is_readable, 1) = 1 AND aesthetic_score IS NULL THEN 1 ELSE 0 END) AS missing_aesthetic,
-                SUM(CASE WHEN LOWER(COALESCE(metadata_status, 'complete')) = 'pending' THEN 1 ELSE 0 END) AS metadata_pending,
-                SUM(CASE WHEN LOWER(COALESCE(metadata_status, 'complete')) = 'error' THEN 1 ELSE 0 END) AS metadata_error,
-                -- Every unreadable row is also a metadata_status = 'error' row,
-                -- because mark_image_unreadable sets both. One re-parse visits
-                -- each such row once, so the advice counts rows and not the two
-                -- counters above.
-                SUM(CASE WHEN COALESCE(is_readable, 1) = 0 OR LOWER(COALESCE(metadata_status, 'complete')) = 'error' THEN 1 ELSE 0 END) AS reparse_or_reconnect,
-                SUM(CASE WHEN COALESCE(is_readable, 1) = 1 AND generator = 'unknown' THEN 1 ELSE 0 END) AS unknown_generator
+                SUM(CASE WHEN {_READABLE_SQL} THEN 1 ELSE 0 END) AS readable,
+                {issue_columns},
+                {remedy_columns},
+                SUM(CASE WHEN {_READABLE_SQL} AND {NO_PROMPT_SQL} THEN 1 ELSE 0 END) AS stat_missing_prompt,
+                SUM(CASE WHEN {_READABLE_SQL} AND (negative_prompt IS NULL OR TRIM(negative_prompt) = '') THEN 1 ELSE 0 END) AS stat_missing_negative_prompt,
+                SUM(CASE WHEN {_READABLE_SQL} AND {_NO_CHECKPOINT_SQL} THEN 1 ELSE 0 END) AS stat_missing_checkpoint,
+                SUM(CASE WHEN {_READABLE_SQL} AND generator = 'unknown' THEN 1 ELSE 0 END) AS stat_unknown_generator
             FROM images
             """
         ).fetchone()
 
-        total = int(summary_row["total"] or 0) if summary_row else 0
-        readable = int(summary_row["readable"] or 0) if summary_row else 0
+        def _count(column: str) -> int:
+            if summary_row is None:
+                return 0
+            return int(summary_row[column] or 0)
+
+        total = _count("total")
+        readable = _count("readable")
 
         issue_counts: Dict[str, int] = {
-            "unreadable": int(summary_row["unreadable"] or 0) if summary_row else 0,
-            "missing_text": int(summary_row["missing_text"] or 0) if summary_row else 0,
-            "sd_missing_checkpoint": int(summary_row["sd_missing_checkpoint"] or 0) if summary_row else 0,
-            "unattributed_sd_metadata": int(summary_row["unattributed_sd_metadata"] or 0) if summary_row else 0,
-            "missing_dimensions": int(summary_row["missing_dimensions"] or 0) if summary_row else 0,
-            "missing_file_size": int(summary_row["missing_file_size"] or 0) if summary_row else 0,
-            "untagged": int(summary_row["untagged"] or 0) if summary_row else 0,
-            "missing_embedding": int(summary_row["missing_embedding"] or 0) if summary_row else 0,
-            "missing_aesthetic": int(summary_row["missing_aesthetic"] or 0) if summary_row else 0,
-            "metadata_pending": int(summary_row["metadata_pending"] or 0) if summary_row else 0,
-            "metadata_error": int(summary_row["metadata_error"] or 0) if summary_row else 0,
+            spec.key: _count(f"issue_{spec.key}") for spec in ISSUE_VOCABULARY
         }
-        incomplete_scan_record_images = (
-            int(summary_row["incomplete_scan_record"] or 0) if summary_row else 0
-        )
-        reparse_or_reconnect_images = (
-            int(summary_row["reparse_or_reconnect"] or 0) if summary_row else 0
-        )
+        remedy_targets: Dict[str, int] = {
+            remedy.kind: _count(f"remedy_{remedy.kind}") for remedy in ISSUE_REMEDIES
+        }
         # True, useful, and not a defect: see this function's docstring.
         statistics: Dict[str, int] = {
-            "missing_prompt": int(summary_row["missing_prompt"] or 0) if summary_row else 0,
-            "missing_negative_prompt": int(summary_row["missing_negative_prompt"] or 0) if summary_row else 0,
-            "missing_checkpoint": int(summary_row["missing_checkpoint"] or 0) if summary_row else 0,
-            "unknown_generator": int(summary_row["unknown_generator"] or 0) if summary_row else 0,
+            "missing_prompt": _count("stat_missing_prompt"),
+            "missing_negative_prompt": _count("stat_missing_negative_prompt"),
+            "missing_checkpoint": _count("stat_missing_checkpoint"),
+            "unknown_generator": _count("stat_unknown_generator"),
         }
 
         duplicate_filename_rows = cursor.execute(
@@ -267,29 +539,19 @@ def get_library_health_report(*, sample_limit: int = 8) -> Dict[str, Any]:
     # made it: a row carrying sidecar caption text is described, so only genuine
     # textlessness counts against it.
     metadata_ready = max(readable - issue_counts["missing_text"] - issue_counts["missing_dimensions"], 0)
-    actionable_count = (
-        issue_counts["unreadable"]
-        + issue_counts["missing_text"]
-        + issue_counts["sd_missing_checkpoint"]
-        + issue_counts["unattributed_sd_metadata"]
-        + issue_counts["missing_dimensions"]
-        + issue_counts["untagged"]
-        + duplicate_filename_images
-    )
+    # Both totals are summed straight off the vocabulary's own declarations, so a
+    # key cannot cost the user anything it did not declare — and cannot declare
+    # anything without naming the remedy that moves it.
+    actionable_count = sum(
+        issue_counts[spec.key] for spec in ISSUE_VOCABULARY if spec.feeds_actionable
+    ) + duplicate_filename_images
     quality_score = 100.0
     if total > 0:
-        weighted_penalty = (
-            issue_counts["unreadable"] * 2.0
-            + issue_counts["metadata_error"] * 2.0
-            + issue_counts["missing_text"] * 1.4
-            + issue_counts["missing_dimensions"] * 1.3
-            + issue_counts["sd_missing_checkpoint"] * 0.8
-            # Inherits the weight the whole-library unknown_generator count used
-            # to carry, now charged only where an attribution can be derived.
-            + issue_counts["unattributed_sd_metadata"] * 0.6
-            + min(issue_counts["untagged"], total) * 0.5
-            + min(duplicate_filename_images, total) * 0.5
-        )
+        weighted_penalty = sum(
+            min(issue_counts[spec.key], total) * spec.quality_weight
+            for spec in ISSUE_VOCABULARY
+            if spec.quality_weight
+        ) + min(duplicate_filename_images, total) * 0.5
         average_penalty = weighted_penalty / float(total)
         quality_score = max(0.0, round(100.0 - min(90.0, average_penalty * 22.0), 1))
 
@@ -317,9 +579,7 @@ def get_library_health_report(*, sample_limit: int = 8) -> Dict[str, Any]:
         "issue_samples": issue_samples,
         "recommendations": _build_library_health_recommendations(
             total=total,
-            issue_counts=issue_counts,
-            reparse_or_reconnect_images=reparse_or_reconnect_images,
-            incomplete_scan_record_images=incomplete_scan_record_images,
+            remedy_targets=remedy_targets,
             duplicate_filename_images=duplicate_filename_images,
         ),
     }
@@ -328,74 +588,37 @@ def get_library_health_report(*, sample_limit: int = 8) -> Dict[str, Any]:
 def _build_library_health_recommendations(
     *,
     total: int,
-    issue_counts: Dict[str, int],
-    reparse_or_reconnect_images: int,
-    incomplete_scan_record_images: int,
+    remedy_targets: Dict[str, int],
     duplicate_filename_images: int,
 ) -> List[Dict[str, Any]]:
+    """Offer each declared remedy, numbered by the rows it actually visits.
+
+    ``remedy_targets`` holds ``COUNT(DISTINCT row)`` over the union of each
+    remedy's issue keys, not the sum of those keys' counters. The distinction is
+    the defect this payload keeps producing: ``reparse_or_reconnect`` used to add
+    ``unreadable`` to ``metadata_error``, and since ``mark_image_unreadable``
+    sets both, it advertised twice the rows that exist — 3,074 against 1,537 on
+    the owner's library.
+    """
     recommendations: List[Dict[str, Any]] = []
     if total <= 0:
         return recommendations
 
-    if issue_counts.get("metadata_pending", 0) > 0:
+    for remedy in ISSUE_REMEDIES:
+        count = remedy_targets.get(remedy.kind, 0)
+        if count <= 0:
+            continue
+        severity = remedy.severity
+        if remedy.escalate_to_warning_at_percent is not None:
+            severity = (
+                "warning"
+                if _library_health_percent(count, total) >= remedy.escalate_to_warning_at_percent
+                else "info"
+            )
         recommendations.append({
-            "kind": "metadata_pending",
-            "severity": "info",
-            "count": issue_counts["metadata_pending"],
-        })
-    # Counted as rows, not as counters: marking a row unreadable also sets
-    # metadata_status = 'error', so adding issue_counts["unreadable"] to
-    # issue_counts["metadata_error"] advertised twice the rows that exist --
-    # 3,074 re-parse targets on a library holding 1,537 of them.
-    if reparse_or_reconnect_images > 0:
-        recommendations.append({
-            "kind": "reparse_or_reconnect",
-            "severity": "warning",
-            "count": reparse_or_reconnect_images,
-        })
-    # Deliberately keyed on missing_text, not missing_prompt: a recommendation is
-    # an offer to act, and re-parsing an image that Stable Diffusion never made
-    # cannot produce a prompt however many times it runs.
-    if issue_counts.get("missing_text", 0) > 0:
-        recommendations.append({
-            "kind": "missing_text",
-            "severity": "warning" if _library_health_percent(issue_counts["missing_text"], total) >= 10 else "info",
-            "count": issue_counts["missing_text"],
-        })
-    # Keyed on the SD-attributed subset for the same reason missing_text is:
-    # "your images lack checkpoint info" is not advice you can act on when
-    # nothing generated them. The count travelling with it is the count the
-    # advice can help.
-    if issue_counts.get("sd_missing_checkpoint", 0) > 0:
-        recommendations.append({
-            "kind": "sd_missing_checkpoint",
-            "severity": "info",
-            "count": issue_counts["sd_missing_checkpoint"],
-        })
-    # The actionable subset of "the generator is unknown": a row that records SD
-    # generation data yet names no generator is one today's parser could not have
-    # written, so re-parsing it re-derives the attribution.
-    if issue_counts.get("unattributed_sd_metadata", 0) > 0:
-        recommendations.append({
-            "kind": "unattributed_sd_metadata",
-            "severity": "info",
-            "count": issue_counts["unattributed_sd_metadata"],
-        })
-    # missing_dimensions and missing_file_size are two facets of one incomplete
-    # scan record and usually the same rows, so the offer is one re-scan and the
-    # count beside it is the rows that re-scan visits — not the two counters
-    # added together, which would advertise twice the work that exists.
-    if incomplete_scan_record_images > 0:
-        recommendations.append({
-            "kind": "incomplete_scan_record",
-            "severity": "info",
-            "count": incomplete_scan_record_images,
-        })
-    if issue_counts.get("untagged", 0) > 0:
-        recommendations.append({
-            "kind": "untagged",
-            "severity": "info",
-            "count": issue_counts["untagged"],
+            "kind": remedy.kind,
+            "severity": severity,
+            "count": count,
         })
     if duplicate_filename_images > 0:
         recommendations.append({

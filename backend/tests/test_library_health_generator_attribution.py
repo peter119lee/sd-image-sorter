@@ -336,6 +336,34 @@ class TestAnAbsentNegativePrompt:
         ]
         return {"folder": folder, "rows": rows}
 
+    def test_a_library_with_nothing_wrong_claims_no_problem(self, clean_sd_library):
+        """The decisive shape: every readable row lacks a negative prompt and
+        that is all that is 'missing', so nothing in the issue vocabulary that
+        claims a problem may be non-zero.
+
+        Scoped to keys that claim a problem — a key the vocabulary declares as
+        reported-only coverage (``missing_embedding`` / ``missing_aesthetic``,
+        whose complements are already published as percentages) is not a claim
+        that anything is wrong, and both are rendered deliberately even at zero.
+        The scoping is read out of the vocabulary, never listed here.
+        """
+        from db_facets import ISSUE_VOCABULARY
+
+        report = _report()
+        claims_a_problem = {spec.key for spec in ISSUE_VOCABULARY if spec.remedy is not None}
+        nonzero = {
+            key: value
+            for key, value in report["issue_counts"].items()
+            if value and key in claims_a_problem
+        }
+
+        assert nonzero == {}, (
+            "a key nothing renders today becomes a permanent bar the moment "
+            "someone iterates issue_counts: " + repr(nonzero)
+        )
+        assert _report()["summary"]["actionable_count"] == 0
+        assert _report()["recommendations"] == []
+
     def test_the_negative_prompt_count_survives_as_a_statistic(self, clean_sd_library):
         report = _report()
 

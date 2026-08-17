@@ -924,7 +924,7 @@ Response includes:
 }
 ```
 
-`issue_counts` is the actionable vocabulary — every key is something a user can do something about, and it is what feeds `summary.actionable_count` and the quality-score weights.
+`issue_counts` is the actionable vocabulary — every key is something a user can do something about, and it is what feeds `summary.actionable_count` and the quality-score weights. Every member is declared in `db_facets.ISSUE_VOCABULARY` together with the remedy that names its action, so a key with no remedy carries no weight and no `actionable_count` contribution; the invariant is enforced at import and tested in `backend/tests/test_library_health_issue_vocabulary.py`.
 
 `statistics` holds counts that are true but are not defects: `missing_prompt`, `missing_negative_prompt`, `missing_checkpoint` and `unknown_generator` say how much of the library carries real SD generation provenance, which stays at or near 100% forever for images Stable Diffusion never made. Three have a narrower actionable counterpart covering only the rows something can still be done for — `issue_counts.missing_text` (neither a prompt nor a sidecar caption: the set the L3 recovery job can change), `issue_counts.sd_missing_checkpoint` (readable rows a generator actually claimed that still record no model name), and `issue_counts.unattributed_sd_metadata` (readable rows that record generation data against no generator at all, which today's parser cannot produce, so the attribution is stale and a re-parse derives one). Do not render a `statistics` key as an issue or attach a fix to one.
 
