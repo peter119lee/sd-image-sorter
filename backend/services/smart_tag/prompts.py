@@ -9,10 +9,17 @@ Split verbatim out of services/smart_tag_service.py.
 """
 from __future__ import annotations
 
+import logging
 from typing import Any, Dict, List, Optional
 
+from services.caption_dialect import tag_slot_candidates
 from services.smart_tag.consensus import filter_noise_tags
 from tag_rules import categorize_tag
+
+
+# Shared logger: keep the historical channel name so log capture, filtering and
+# support-log diagnostics behave exactly as before the decomposition.
+logger = logging.getLogger("services.smart_tag_service")
 
 
 # ---------------------------------------------------------------------------
@@ -166,4 +173,16 @@ def _vlm_context_tags_for(
         trigger_word,
     )
     filtered, _stripped = filter_noise_tags(names)
-    return filtered or None
+    grounded = tag_slot_candidates(filtered)
+    if len(grounded) != len(filtered):
+        # Every ``user_prompt_with_tags`` variant states that the interpolated
+        # text is danbooru-style tags, and the Krea 2 profile says so twice, so a
+        # prose clause in that slot is a false statement about the input rather
+        # than a weak hint. This drops only positively prose-shaped candidates
+        # from an in-memory grounding list; no stored caption is touched.
+        logger.warning(
+            "smart-tag: withheld %d prose grounding candidate(s) from the "
+            "prompt's tags slot",
+            len(filtered) - len(grounded),
+        )
+    return grounded or None
