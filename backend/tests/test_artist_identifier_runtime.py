@@ -16,7 +16,12 @@ def _write_zip(path: Path, files: dict[str, bytes]) -> None:
 
 
 def _fake_urlretrieve(source_zip: Path):
-    def fake_urlretrieve(url: str, destination: Path):
+    def fake_urlretrieve(url: str, destination: Path, reporthook=None):
+        # urlretrieve drives a reporthook; the download-size ceiling is enforced
+        # there, so the stub has to drive it too or the cap goes untested.
+        payload_size = source_zip.stat().st_size
+        if reporthook is not None:
+            reporthook(0, payload_size, payload_size)
         shutil.copyfile(source_zip, destination)
         return str(destination), None
 

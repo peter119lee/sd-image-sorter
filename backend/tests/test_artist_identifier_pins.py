@@ -100,7 +100,13 @@ class TestDownloadSafetyCaps:
     def _install_fake_urlretrieve(self, monkeypatch, source_zip: Path) -> None:
         import shutil
 
-        def fake(url, destination):
+        def fake(url, destination, reporthook=None):
+            # Mirrors urlretrieve's contract: the size ceiling is enforced from
+            # the reporthook, so a stub that ignored it would silently bypass
+            # the download cap these fixtures share with the extraction caps.
+            payload_size = source_zip.stat().st_size
+            if reporthook is not None:
+                reporthook(0, payload_size, payload_size)
             shutil.copyfile(source_zip, destination)
             return str(destination), None
 

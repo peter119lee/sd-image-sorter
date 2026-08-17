@@ -79,6 +79,7 @@ from artist.downloads import (
     _ARTIST_USER_AGENT,
     _artist_override_url,
     _assert_http_download_url,
+    _bounded_download_reporthook,
     _candidate_hf_endpoints,
     _copy_existing_tree,
     _download_and_extract_github_zip,
@@ -138,6 +139,11 @@ ARTIST_LSNET_RUNTIME_ZIP_URL = (
 )
 _MAX_ARTIST_RUNTIME_ZIP_ENTRIES = 1024
 _MAX_ARTIST_RUNTIME_UNCOMPRESSED_BYTES = 256 * 1024 * 1024
+# Ceiling on the COMPRESSED download itself. The two caps above only run after
+# the whole response has already been streamed to disk, so without this a
+# hostile or misconfigured server could fill the disk before any guard fires.
+# The real comfyui-lsnet archive is a couple of MB, so 64 MB is ~30x headroom.
+_MAX_ARTIST_RUNTIME_ZIP_BYTES = 64 * 1024 * 1024
 
 
 def _is_kaloscope_model_id(model_id: Optional[str]) -> bool:

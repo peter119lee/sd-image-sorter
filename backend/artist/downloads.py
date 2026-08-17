@@ -181,17 +181,46 @@ def _hf_download_with_fallback(repo_id: str, filename: str, local_dir: str) -> s
     raise last_error
 
 
+def _bounded_download_reporthook(max_bytes: int):
+    """Abort a runtime download once it exceeds ``max_bytes``.
+
+    urlretrieve streams straight to disk, so the extraction-phase caps only run
+    after the whole response has landed. Enforcing the ceiling from urlretrieve's
+    own reporthook keeps ``urllib.request.urlretrieve`` as the mockable seam
+    while still stopping mid-stream: the advertised Content-Length is checked on
+    the first callback, and the running byte count on every callback so a
+    missing or dishonest header is bounded too.
+    """
+
+    def _reporthook(block_num: int, block_size: int, total_size: int) -> None:
+        advertised = int(total_size or 0)
+        if advertised > max_bytes:
+            raise ValueError(
+                f"Runtime download advertises {advertised} bytes, above the "
+                f"{max_bytes}-byte safe download limit"
+            )
+        if int(block_num) * int(block_size) > max_bytes:
+            raise ValueError(
+                f"Runtime download exceeded the {max_bytes}-byte safe download limit"
+            )
+
+    return _reporthook
+
+
 def _download_and_extract_github_zip(zip_url: str, target_dir: Path) -> Path:
     target_dir.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="kaloscope-runtime-") as tmp_dir:
         tmp_dir_path = Path(tmp_dir)
         zip_path = tmp_dir_path / "repo.zip"
-        # Zip-bomb risk is bounded by the extraction-phase caps below (entry
-        # count + total uncompressed bytes), which are the meaningful protection
-        # here. TODO(maintainer): if hostile-server disk exhaustion from an
-        # oversized compressed download becomes a concern, add a Content-Length
-        # precheck — without breaking the mockable urlretrieve seam.
-        urllib.request.urlretrieve(zip_url, zip_path)
+        # Three layers: this download-size ceiling, then the entry-count and
+        # total-uncompressed-bytes caps during extraction below.
+        urllib.request.urlretrieve(
+            zip_url,
+            zip_path,
+            _facade()._bounded_download_reporthook(
+                _facade()._MAX_ARTIST_RUNTIME_ZIP_BYTES
+            ),
+        )
         extract_dir = tmp_dir_path / "extract"
         extract_dir.mkdir(parents=True, exist_ok=True)
         extract_root = extract_dir.resolve()
