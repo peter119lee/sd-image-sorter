@@ -5,7 +5,7 @@ Generates random prompts by selecting from categorized tag pools
 while respecting semantic exclusion rules and outfit tag sets.
 """
 import random
-from typing import Dict, List, Optional, Set, Tuple, Any
+from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
 from tag_rules import (
     categorize_tag,
@@ -22,6 +22,119 @@ from tag_rules import (
     BACKGROUND_TAGS,
     STYLE_TAGS,
 )
+
+
+# ============================================================
+# Danbooru character-count semantics
+# ============================================================
+# From the official wiki (danbooru.donmai.us/wiki_pages/solo and
+# .../wiki_pages/tag_group:character_count):
+#   * `solo` means a single character in the whole image. `solo + 1girl` and
+#     `solo + 1boy` are the wiki's own examples, so they are NOT conflicts.
+#   * Counter tags are split by sex (girl / boy / other), so two characters
+#     means two counts — `1girl + 1boy` rules `solo` out.
+#   * `solo_focus` is the tag for "more than one character, one is the focus",
+#     which makes it correct beside `2girls` and mutually exclusive with `solo`.
+#   * `multiple_girls` implies at least two girls.
+_SOLO_TAG = "solo"
+_SOLO_FOCUS_TAG = "solo_focus"
+
+# Count tags whose presence makes the generator add `solo` for the user.
+# Deliberately the same three values the generator has always used.
+_SOLO_IMPLYING_COUNT_TAGS = frozenset({"solo", "1girl", "1boy"})
+
+
+def _build_character_count_tags() -> Dict[str, Tuple[str, int]]:
+    """Map every counter tag to (sex, how many characters it implies)."""
+    table: Dict[str, Tuple[str, int]] = {}
+    for sex, singular in (("girls", "girl"), ("boys", "boy"), ("others", "other")):
+        table[f"1{singular}"] = (sex, 1)
+        for count in range(2, 6):
+            table[f"{count}{sex}"] = (sex, count)
+        # Danbooru's open-ended bucket; treated as its lower bound.
+        table[f"6+{sex}"] = (sex, 6)
+        table[f"multiple_{sex}"] = (sex, 2)
+    return table
+
+
+_CHARACTER_COUNT_TAGS = _build_character_count_tags()
+
+
+def _normalize_tag_key(tag: Any) -> str:
+    return str(tag or "").strip().lower().replace(" ", "_")
+
+
+def _unique_tag_keys(tags: Iterable[Any]) -> List[str]:
+    keys: List[str] = []
+    for tag in tags:
+        key = _normalize_tag_key(tag)
+        if key and key not in keys:
+            keys.append(key)
+    return keys
+
+
+def _max_count_per_sex(tag_keys: Iterable[str]) -> Dict[str, List[Tuple[str, int]]]:
+    counts: Dict[str, List[Tuple[str, int]]] = {}
+    for key in tag_keys:
+        entry = _CHARACTER_COUNT_TAGS.get(key)
+        if entry:
+            counts.setdefault(entry[0], []).append((key, entry[1]))
+    return counts
+
+
+def implies_multiple_characters(tags: Iterable[Any]) -> bool:
+    """True when the tags together claim two or more characters."""
+    counts = _max_count_per_sex(_unique_tag_keys(tags))
+    return sum(max(count for _key, count in entries) for entries in counts.values()) >= 2
+
+
+def character_count_violations(tags: Iterable[Any]) -> List[Dict[str, Any]]:
+    """Mutually exclusive character-count combinations, shaped like the
+    exclusion-rule violations so both flow through one message builder."""
+    keys = _unique_tag_keys(tags)
+    counts = _max_count_per_sex(keys)
+    count_tags = [key for entries in counts.values() for key, _count in entries]
+    violations: List[Dict[str, Any]] = []
+
+    for entries in counts.values():
+        if len(entries) > 1:
+            first, *rest = [key for key, _count in entries]
+            violations.append({
+                "rule": "Character count",
+                "description": "An image has one character count per sex.",
+                "triggering_tags": [first],
+                "conflicting_tags": rest,
+            })
+
+    if _SOLO_TAG in keys and implies_multiple_characters(keys):
+        violations.append({
+            "rule": "Solo means one character",
+            "description": (
+                "'solo' is for a single character in the whole image. "
+                "Use 'solo_focus' when several are present and one is the focus."
+            ),
+            "triggering_tags": count_tags,
+            "conflicting_tags": [_SOLO_TAG],
+        })
+
+    if _SOLO_TAG in keys and _SOLO_FOCUS_TAG in keys:
+        violations.append({
+            "rule": "Solo versus solo focus",
+            "description": "'solo_focus' only applies when more than one character is present.",
+            "triggering_tags": [_SOLO_FOCUS_TAG],
+            "conflicting_tags": [_SOLO_TAG],
+        })
+
+    return violations
+
+
+def _violation_suggestions(violation: Dict[str, Any]) -> List[str]:
+    """One actionable line per conflicting tag."""
+    triggering = ", ".join(violation.get("triggering_tags", []))
+    return [
+        f"Consider removing '{tag}' (conflicts with {triggering} — {violation['rule']})"
+        for tag in violation.get("conflicting_tags", [])
+    ]
 
 
 class PromptGenerator:
@@ -215,18 +328,55 @@ class PromptGenerator:
         """Get the tag pool organized by category."""
         return dict(self._tag_pool)
 
-    def _append_tag(self, selected_tags: List[dict], seen_tags: Set[str], tag: Any, category: str):
-        """Append a tag once, preserving the first category assignment."""
+    def _append_tag(self, selected_tags: List[dict], seen_tags: Set[str], tag: Any, category: str) -> bool:
+        """Append a tag once, preserving the first category assignment.
+
+        Returns whether the tag was actually added, so callers can keep a
+        parallel exclusion set in step without appending a duplicate.
+        """
         safe_tag = str(tag or "").strip()
         if not safe_tag:
-            return
+            return False
 
-        normalized = safe_tag.lower().replace(" ", "_")
+        normalized = _normalize_tag_key(safe_tag)
         if normalized in seen_tags:
-            return
+            return False
 
         selected_tags.append({"tag": safe_tag, "category": category})
         seen_tags.add(normalized)
+        return True
+
+    def _select_tag(
+        self,
+        selected_tags: List[dict],
+        seen_tags: Set[str],
+        active_set: Set[str],
+        tag: Any,
+        category: str,
+    ) -> bool:
+        """Append a tag once and mirror it into the exclusion-rule set."""
+        added = self._append_tag(selected_tags, seen_tags, tag, category)
+        if added:
+            active_set.add(selected_tags[-1]["tag"])
+        return added
+
+    @staticmethod
+    def _drop_injected_solo(selected_tags: List[dict], *tag_sets: Set[str]) -> None:
+        """Remove the `solo` the generator added when the configuration turned
+        out to ask for more than one character, keeping the given bookkeeping
+        sets (exclusion set, dedupe set) in step.
+
+        Only ever called for a generator-injected `solo`: a `solo` the user
+        chose himself is reported as a conflict instead of being discarded
+        behind his back.
+        """
+        selected_tags[:] = [
+            entry for entry in selected_tags
+            if _normalize_tag_key(entry["tag"]) != _SOLO_TAG
+        ]
+        for tag_set in tag_sets:
+            for tag in {tag for tag in tag_set if _normalize_tag_key(tag) == _SOLO_TAG}:
+                tag_set.discard(tag)
 
     def _normalize_manual_categories(self, raw_categories: Any) -> Dict[str, Dict[str, Any]]:
         """Normalize slot-based Prompt Lab categories from the API payload."""
@@ -334,10 +484,11 @@ class PromptGenerator:
                 self._append_tag(selected_tags, seen_tags, tag, "quality")
 
         count_tag = str(config.get("count_tag", "1girl") or "").strip()
+        injected_solo = False
         if count_tag:
             self._append_tag(selected_tags, seen_tags, count_tag, "meta")
-            if count_tag in {"solo", "1girl", "1boy"}:
-                self._append_tag(selected_tags, seen_tags, "solo", "meta")
+            if _normalize_tag_key(count_tag) in _SOLO_IMPLYING_COUNT_TAGS:
+                injected_solo = self._append_tag(selected_tags, seen_tags, "solo", "meta")
 
         for tag_set in tag_sets:
             for member in tag_set.get("tags", []):
@@ -363,6 +514,14 @@ class PromptGenerator:
                 continue
             for tag in categories.get(category, {}).get("tags", []):
                 self._append_tag(selected_tags, seen_tags, tag, category)
+
+        # A slot the user filled may ask for more than one character, in which
+        # case the `solo` added above was the generator's own doing and must go
+        # rather than contradict him.
+        if injected_solo and implies_multiple_characters(
+            entry["tag"] for entry in selected_tags
+        ):
+            self._drop_injected_solo(selected_tags, seen_tags)
 
         prompt_parts = self._order_tags(selected_tags)
         positive_prompt = ", ".join(prompt_parts)
@@ -418,6 +577,11 @@ class PromptGenerator:
 
         selected_tags = []
         active_tag_set = set()
+        # Every slot appends through _select_tag, so a tag chosen in two
+        # different slots (character and count_tag both "1girl" is the default
+        # configuration) is emitted once. A repeated token silently re-weights
+        # the concept in Stable Diffusion.
+        seen_tags: Set[str] = set()
         warnings = []
         all_rules = self.get_all_rules()
 
@@ -431,17 +595,17 @@ class PromptGenerator:
             quality = []
 
         for q in quality:
-            selected_tags.append({"tag": q, "category": "quality"})
-            active_tag_set.add(q)
+            self._select_tag(selected_tags, seen_tags, active_tag_set, q, "quality")
 
         # Step 2: Count/meta tag
         count_tag = config.get("count_tag", "1girl")
+        injected_solo = False
         if count_tag:
-            selected_tags.append({"tag": count_tag, "category": "meta"})
-            active_tag_set.add(count_tag)
-            if count_tag == "solo" or count_tag == "1girl" or count_tag == "1boy":
-                selected_tags.append({"tag": "solo", "category": "meta"})
-                active_tag_set.add("solo")
+            self._select_tag(selected_tags, seen_tags, active_tag_set, count_tag, "meta")
+            if _normalize_tag_key(count_tag) in _SOLO_IMPLYING_COUNT_TAGS:
+                injected_solo = self._select_tag(
+                    selected_tags, seen_tags, active_tag_set, _SOLO_TAG, "meta"
+                )
 
         # Step 3: Character (optional)
         character = config.get("character")
@@ -449,11 +613,11 @@ class PromptGenerator:
             char_tags = self._tag_pool["character"]
             if char_tags:
                 chosen = self._rng.choice(char_tags)
-                selected_tags.append({"tag": chosen["tag"], "category": "character"})
-                active_tag_set.add(chosen["tag"])
+                self._select_tag(
+                    selected_tags, seen_tags, active_tag_set, chosen["tag"], "character"
+                )
         elif character and character != "none":
-            selected_tags.append({"tag": character, "category": "character"})
-            active_tag_set.add(character)
+            self._select_tag(selected_tags, seen_tags, active_tag_set, character, "character")
 
         # Step 4: Outfit set
         outfit = config.get("outfit")
@@ -466,15 +630,14 @@ class PromptGenerator:
                 available_sets = [s for s in all_sets if s["name"] not in ("Nude", "Lingerie")]
             if available_sets:
                 chosen_set = self._rng.choice(available_sets)
-                self._apply_tag_set(chosen_set, selected_tags, active_tag_set)
+                self._apply_tag_set(chosen_set, selected_tags, active_tag_set, seen_tags)
         elif outfit and outfit != "none":
             matching_sets = [s for s in all_sets if s["name"] == outfit]
             if matching_sets:
-                self._apply_tag_set(matching_sets[0], selected_tags, active_tag_set)
+                self._apply_tag_set(matching_sets[0], selected_tags, active_tag_set, seen_tags)
             else:
                 # Treat as a raw tag
-                selected_tags.append({"tag": outfit, "category": "outfit"})
-                active_tag_set.add(outfit)
+                self._select_tag(selected_tags, seen_tags, active_tag_set, outfit, "outfit")
 
         # Step 5: Pose (with exclusion checking)
         excluded = get_exclusion_targets(active_tag_set, all_rules)
@@ -483,8 +646,7 @@ class PromptGenerator:
             "pose", pose, excluded, WEIGHTED_GROUPS.get("pose")
         )
         if pose_tag:
-            selected_tags.append({"tag": pose_tag, "category": "pose"})
-            active_tag_set.add(pose_tag)
+            self._select_tag(selected_tags, seen_tags, active_tag_set, pose_tag, "pose")
             # Recompute exclusions with new tag
             excluded = get_exclusion_targets(active_tag_set, all_rules)
 
@@ -494,8 +656,7 @@ class PromptGenerator:
             "angle", angle, excluded, WEIGHTED_GROUPS.get("angle")
         )
         if angle_tag:
-            selected_tags.append({"tag": angle_tag, "category": "angle"})
-            active_tag_set.add(angle_tag)
+            self._select_tag(selected_tags, seen_tags, active_tag_set, angle_tag, "angle")
             excluded = get_exclusion_targets(active_tag_set, all_rules)
 
         # Step 7: Body features (hair, eyes - respecting exclusions)
@@ -503,8 +664,7 @@ class PromptGenerator:
         if body != "none":
             body_tags = self._pick_body_features(excluded)
             for bt in body_tags:
-                selected_tags.append({"tag": bt, "category": "body"})
-                active_tag_set.add(bt)
+                self._select_tag(selected_tags, seen_tags, active_tag_set, bt, "body")
             excluded = get_exclusion_targets(active_tag_set, all_rules)
 
         # Step 8: Expression (respecting exclusions)
@@ -513,15 +673,13 @@ class PromptGenerator:
             "expression", expression, excluded, WEIGHTED_GROUPS.get("expression")
         )
         if expr_tag:
-            selected_tags.append({"tag": expr_tag, "category": "expression"})
-            active_tag_set.add(expr_tag)
+            self._select_tag(selected_tags, seen_tags, active_tag_set, expr_tag, "expression")
 
         # Step 9: Background
         background = config.get("background")
         bg_tag = self._pick_from_category("background", background, excluded)
         if bg_tag:
-            selected_tags.append({"tag": bg_tag, "category": "background"})
-            active_tag_set.add(bg_tag)
+            self._select_tag(selected_tags, seen_tags, active_tag_set, bg_tag, "background")
 
         # Step 10: Style/artist (optional)
         artist = config.get("artist")
@@ -529,12 +687,20 @@ class PromptGenerator:
             artist_tags = self._tag_pool["artist"]
             if artist_tags:
                 chosen = self._rng.choice(artist_tags)
-                selected_tags.append({"tag": chosen["tag"], "category": "artist"})
+                self._append_tag(selected_tags, seen_tags, chosen["tag"], "artist")
 
         style = config.get("style")
         style_tag = self._pick_from_category("style", style, excluded)
         if style_tag:
-            selected_tags.append({"tag": style_tag, "category": "style"})
+            self._append_tag(selected_tags, seen_tags, style_tag, "style")
+
+        # A character slot, outfit set or random pick may ask for more than one
+        # character, in which case the `solo` added in step 2 was the
+        # generator's own contribution and must not contradict the user.
+        if injected_solo and implies_multiple_characters(
+            entry["tag"] for entry in selected_tags
+        ):
+            self._drop_injected_solo(selected_tags, active_tag_set, seen_tags)
 
         # Build prompt string with conventional ordering
         prompt_parts = self._order_tags(selected_tags)
@@ -551,6 +717,13 @@ class PromptGenerator:
         if exclusions_applied:
             for ex in exclusions_applied:
                 warnings.append(f"Tag '{ex}' conflicts with other selected tags")
+
+        # A contradiction the user configured himself (say count_tag `1girl`
+        # with character `2girls`) is reported rather than silently resolved —
+        # dropping one of his own choices would hand him a prompt he did not
+        # ask for.
+        for violation in character_count_violations(prompt_parts):
+            warnings.extend(_violation_suggestions(violation))
 
         return {
             "positive_prompt": positive_prompt,
@@ -607,12 +780,12 @@ class PromptGenerator:
                         "conflicting_tags": conflicting,
                     })
 
-        if violations:
-            for v in violations:
-                for ct in v["conflicting_tags"]:
-                    suggestions.append(
-                        f"Consider removing '{ct}' (conflicts with {', '.join(v['triggering_tags'])} — {v['rule']})"
-                    )
+        # Character-count contradictions are semantic, not rule-table driven:
+        # no exclusion rule can express "solo means exactly one character".
+        violations.extend(character_count_violations(tags))
+
+        for v in violations:
+            suggestions.extend(_violation_suggestions(v))
 
         return {
             "valid": len(violations) == 0,
@@ -620,16 +793,28 @@ class PromptGenerator:
             "suggestions": suggestions,
         }
 
-    def _apply_tag_set(self, tag_set: dict, selected_tags: list, active_set: set):
-        """Apply a tag set, adding required tags and randomly selecting optional ones."""
+    def _apply_tag_set(
+        self,
+        tag_set: dict,
+        selected_tags: list,
+        active_set: set,
+        seen_tags: Optional[Set[str]] = None,
+    ):
+        """Apply a tag set, adding required tags and randomly selecting optional ones.
+
+        ``self._rng.random()`` is drawn for every optional member whether or not
+        the tag is a duplicate, so deduplication cannot shift the seeded
+        sequence and break reproducible generation.
+        """
+        if seen_tags is None:
+            seen_tags = {_normalize_tag_key(entry["tag"]) for entry in selected_tags}
         for member in tag_set["tags"]:
             tag = member["tag"]
             weight = member.get("weight", 1.0)
             required = member.get("required", False)
 
             if required or self._rng.random() < weight:
-                selected_tags.append({"tag": tag, "category": "outfit"})
-                active_set.add(tag)
+                self._select_tag(selected_tags, seen_tags, active_set, tag, "outfit")
 
     def _pick_from_category(
         self,
