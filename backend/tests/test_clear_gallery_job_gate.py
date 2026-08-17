@@ -328,7 +328,7 @@ def test_clear_gallery_rejects_single_aesthetic_score_during_inference(
     score_responses: list[Response] = []
     thread_errors: list[Exception] = []
 
-    def paused_predict_score(path: str) -> float:
+    def paused_predict_score(path: str, **_kwargs) -> float:
         assert path == str(image_path)
         inference_entered.set()
         if not release_inference.wait(timeout=5):

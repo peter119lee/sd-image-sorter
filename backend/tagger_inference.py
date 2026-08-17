@@ -16,7 +16,11 @@ from typing import Any, Dict, List, Literal, Optional, Tuple, overload
 import numpy as np
 from PIL import Image
 
-from ai_runtime_guard import exclusive_ai_runtime
+from ai_runtime_guard import (
+    PRIORITY_BATCH,
+    PRIORITY_NORMAL,
+    exclusive_ai_runtime,
+)
 
 logger = logging.getLogger("tagger")
 
@@ -102,9 +106,16 @@ class _InferenceFlowMixin:
         threshold: Optional[float] = None,
         character_threshold: Optional[float] = None,
         copyright_threshold: Optional[float] = None,
+        priority: int = PRIORITY_NORMAL,
     ) -> Dict[str, Any]:
         """
         Tag a single image.
+
+        ``priority`` is the AI-runtime admission lane and must be supplied by the
+        caller, NOT pinned here: this method serves both ``POST /api/tag/single``
+        (one file, user waiting -> ``PRIORITY_INTERACTIVE``) and Smart Tag's
+        booru phase, which loops it over a whole job. Declaring the interactive
+        lane here would hand that job interactive priority and invert the lane.
 
         Returns:
             {
@@ -115,7 +126,7 @@ class _InferenceFlowMixin:
                 "all_tags": [{"tag": str, "confidence": float}, ...]
             }
         """
-        with exclusive_ai_runtime("wd14-tagger"):
+        with exclusive_ai_runtime("wd14-tagger", priority=priority):
             if not self._loaded:
                 self.load()
 
@@ -237,7 +248,8 @@ class _InferenceFlowMixin:
                 return empty, self._empty_runtime_info()
             return empty
 
-        with exclusive_ai_runtime("wd14-tagger"):
+        # Batch lane: this is the chunk every other AI feature waits behind.
+        with exclusive_ai_runtime("wd14-tagger", priority=PRIORITY_BATCH):
             if not self._loaded:
                 self.load()
 

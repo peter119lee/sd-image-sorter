@@ -15,7 +15,7 @@ from typing import Dict, List
 
 from PIL import Image
 from config import get_nudenet_model_dir
-from ai_runtime_guard import exclusive_ai_runtime
+from ai_runtime_guard import PRIORITY_NORMAL, exclusive_ai_runtime
 from model_download_sources import is_nonempty_model_file
 
 
@@ -172,6 +172,7 @@ class NudeNetDetector:
         image_path: str,
         conf_threshold: float = 0.5,
         exposed_only: bool = True,
+        priority: int = PRIORITY_NORMAL,
     ) -> List[Dict]:
         """
         Run NudeNet detection on an image file.
@@ -180,13 +181,16 @@ class NudeNetDetector:
             image_path: Path to image file.
             conf_threshold: Minimum confidence threshold.
             exposed_only: If True, only return exposed body parts.
+            priority: AI-runtime admission lane. Left at the normal lane unless
+                the caller knows a user is waiting; the single-image detect
+                service passes ``PRIORITY_INTERACTIVE``.
 
         Returns:
             List of detection dicts with keys:
                 class, class_id, confidence, box [x1,y1,x2,y2], label
         """
         detector_input = self._prepare_detector_input(image_path)
-        with exclusive_ai_runtime("nudenet-inference"):
+        with exclusive_ai_runtime("nudenet-inference", priority=priority):
             raw_detections = self.detector.detect(detector_input)
         return self._filter_detections(raw_detections, conf_threshold, exposed_only)
 
@@ -195,11 +199,12 @@ class NudeNetDetector:
         image: Image.Image,
         conf_threshold: float = 0.5,
         exposed_only: bool = True,
+        priority: int = PRIORITY_NORMAL,
     ) -> List[Dict]:
         """Run NudeNet detection on a PIL Image."""
         try:
             detector_input = self._pil_to_detector_input(image)
-            with exclusive_ai_runtime("nudenet-inference"):
+            with exclusive_ai_runtime("nudenet-inference", priority=priority):
                 raw_detections = self.detector.detect(detector_input)
             return self._filter_detections(raw_detections, conf_threshold, exposed_only)
         except Exception as exc:

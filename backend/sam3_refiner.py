@@ -34,7 +34,11 @@ import numpy as np
 from PIL import Image
 
 from config import get_sam3_model_dir
-from ai_runtime_guard import exclusive_ai_runtime
+from ai_runtime_guard import (
+    PRIORITY_INTERACTIVE,
+    PRIORITY_NORMAL,
+    exclusive_ai_runtime,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -356,7 +360,16 @@ class SAM3Refiner:
         score_threshold: float = _DEFAULT_SCORE_FLOOR,
         presence_threshold: float = _DEFAULT_PRESENCE_THRESHOLD,
         max_area_ratio: float = _DEFAULT_MAX_AREA_RATIO,
+        priority: int = PRIORITY_NORMAL,
     ) -> Optional[np.ndarray]:
+        """Shared segmentation core for every SAM3 entry point.
+
+        ``priority`` arrives from the public method rather than being pinned
+        here, because this helper is shared by single-image work the user is
+        waiting on (``segment_by_text``, ``detect_privacy_regions``) AND by
+        ``refine_box``, which ``POST /api/censor/batch-refine-mask`` calls once
+        per item in a sequential loop.
+        """
         if not text and not box:
             return None
         rgb = image.convert("RGB")
@@ -368,7 +381,9 @@ class SAM3Refiner:
 
         import torch
 
-        with exclusive_ai_runtime("sam3-inference"), self._inference_context():
+        with exclusive_ai_runtime(
+            "sam3-inference", priority=priority
+        ), self._inference_context():
             inputs = self.processor(**kwargs).to(self._device())
             with torch.no_grad():
                 out = self.model(**inputs)
@@ -402,6 +417,7 @@ class SAM3Refiner:
         box: List[int],
         text_prompt: Optional[str] = None,
         confidence_threshold: Optional[float] = None,
+        priority: int = PRIORITY_NORMAL,
     ) -> Optional[np.ndarray]:
         """Refine a bounding box into a pixel mask, optionally confidence-gated.
 
@@ -416,6 +432,10 @@ class SAM3Refiner:
 
         ``None`` preserves the historical defaults (score floor 0.05; presence
         gate 0.5 for text prompts).
+
+        ``priority`` defaults to the normal lane on purpose: this is the method
+        ``batch_refine_mask`` drives in a loop, so it must never be the one that
+        claims the interactive lane.
         """
         gate_kwargs: Dict[str, Any] = {}
         if confidence_threshold is not None:
@@ -423,7 +443,9 @@ class SAM3Refiner:
             gate_kwargs["score_threshold"] = max(gate, _DEFAULT_SCORE_FLOOR)
             gate_kwargs["presence_threshold"] = gate
         try:
-            return self._run_segmentation(image, text=text_prompt, box=box, **gate_kwargs)
+            return self._run_segmentation(
+                image, text=text_prompt, box=box, priority=priority, **gate_kwargs
+            )
         except Exception as exc:
             logger.error("SAM3 box refinement failed: %s", exc)
             return None
@@ -445,6 +467,7 @@ class SAM3Refiner:
         image: Image.Image,
         text_prompt: str,
         presence_threshold: Optional[float] = None,
+        priority: int = PRIORITY_INTERACTIVE,
     ) -> Optional[np.ndarray]:
         """Segment an explicit, user-supplied text prompt.
 
@@ -453,6 +476,10 @@ class SAM3Refiner:
         avoid false positives on SFW content), this path is driven by an
         explicit user request, so it defaults to the looser
         ``_DEFAULT_TEXT_PRESENCE_THRESHOLD``. Callers may override per request.
+
+        Being explicitly user-driven is also why the interactive lane is the
+        default here: both callers (Segment Text and Remove Background) serve one
+        image with the user waiting, and no batch loop reaches this method.
         """
         gate = (
             _DEFAULT_TEXT_PRESENCE_THRESHOLD
@@ -460,7 +487,9 @@ class SAM3Refiner:
             else max(0.0, min(1.0, presence_threshold))
         )
         try:
-            return self._run_segmentation(image, text=text_prompt, presence_threshold=gate)
+            return self._run_segmentation(
+                image, text=text_prompt, presence_threshold=gate, priority=priority
+            )
         except Exception as exc:
             logger.error("SAM3 text segmentation failed: %s", exc)
             return None
@@ -470,6 +499,7 @@ class SAM3Refiner:
         image: Image.Image,
         conf_threshold: float = _DEFAULT_PRESENCE_THRESHOLD,
         prompts: Optional[List[Dict[str, str]]] = None,
+        priority: int = PRIORITY_INTERACTIVE,
     ) -> List[Dict]:
         """Run every privacy prompt and collect mask detections.
 
@@ -491,6 +521,7 @@ class SAM3Refiner:
                 text=text,
                 score_threshold=_DEFAULT_SCORE_FLOOR,
                 presence_threshold=conf_threshold,
+                priority=priority,
             )
             if mask is None:
                 continue

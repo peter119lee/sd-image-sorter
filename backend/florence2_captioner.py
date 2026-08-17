@@ -9,7 +9,7 @@ from typing import ContextManager, Protocol, cast
 
 from PIL import Image
 
-from ai_runtime_guard import exclusive_ai_runtime
+from ai_runtime_guard import PRIORITY_BATCH, exclusive_ai_runtime
 from config import get_florence2_model_dir
 from model_download_sources import (
     endpoint_label,
@@ -317,7 +317,9 @@ def caption_image(image_path: str, *, use_gpu: bool) -> str:
     try:
         with Image.open(source_path) as opened:
             source = opened.convert("RGB")
-        with exclusive_ai_runtime("florence2-inference"):
+        # Batch lane: reached only from Smart Tag's caption phase, which runs as
+        # a polled background job rather than a synchronous request.
+        with exclusive_ai_runtime("florence2-inference", priority=PRIORITY_BATCH):
             inputs = _require_batch_inputs(
                 processor(
                     text=FLORENCE2_TASK,

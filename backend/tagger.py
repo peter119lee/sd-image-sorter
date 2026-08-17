@@ -28,7 +28,11 @@ from config import (
     TAGGER_USE_GPU,
     get_wd14_model_dir,
 )
-from ai_runtime_guard import exclusive_ai_runtime, looks_like_cuda_oom
+from ai_runtime_guard import (
+    PRIORITY_NORMAL,
+    exclusive_ai_runtime,
+    looks_like_cuda_oom,
+)
 from model_download_sources import endpoint_label, get_hf_endpoint_order
 from tag_writer_provenance import ModelFileIdentity, model_file_snapshot
 from utils.path_validation import normalize_user_path
@@ -758,6 +762,7 @@ class _ConfiguredTaggerProxy:
         threshold: Optional[float] = None,
         character_threshold: Optional[float] = None,
         copyright_threshold: Optional[float] = None,
+        priority: int = PRIORITY_NORMAL,
     ) -> Dict[str, Any]:
         return self._tagger.tag(
             image_path,
@@ -768,6 +773,7 @@ class _ConfiguredTaggerProxy:
             copyright_threshold=self._copyright_threshold
             if copyright_threshold is None
             else copyright_threshold,
+            priority=priority,
         )
 
     def tag_batch(self, image_paths: List[str], **kwargs: Any) -> Any:

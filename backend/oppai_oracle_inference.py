@@ -24,7 +24,11 @@ import numpy as np
 from PIL import Image
 
 import config
-from ai_runtime_guard import exclusive_ai_runtime, looks_like_cuda_oom
+from ai_runtime_guard import (
+    PRIORITY_BATCH,
+    exclusive_ai_runtime,
+    looks_like_cuda_oom,
+)
 
 logger = logging.getLogger("oppai_oracle_tagger")
 
@@ -268,7 +272,10 @@ class _InferenceMixin:
         threshold: Optional[float] = None,
         character_threshold: Optional[float] = None,
     ) -> Dict[str, Any]:
-        with exclusive_ai_runtime("oppai-oracle-tagger"):
+        # Batch lane: both tag() and tag_batch() are reached only from bulk
+        # tagging (the gallery tag worker and Smart Tag's booru phase), never
+        # from a synchronous single-image request.
+        with exclusive_ai_runtime("oppai-oracle-tagger", priority=PRIORITY_BATCH):
             if not self._loaded:
                 self.load()
             try:
@@ -339,7 +346,7 @@ class _InferenceMixin:
                 }
             return empty
 
-        with exclusive_ai_runtime("oppai-oracle-tagger"):
+        with exclusive_ai_runtime("oppai-oracle-tagger", priority=PRIORITY_BATCH):
             if not self._loaded:
                 self.load()
 

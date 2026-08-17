@@ -4,9 +4,11 @@ Uses LAION Aesthetic Predictor (CLIP + linear head) to score images 1-10.
 """
 import logging
 import threading
+from functools import partial
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 
+from ai_runtime_guard import PRIORITY_INTERACTIVE
 from exceptions import ImageNotFoundError, ServiceError
 from services.aesthetic_service import AestheticService
 from services.gallery_job_gate import gallery_job_activity, gallery_job_transition
@@ -82,7 +84,10 @@ def score_single_image(
         try:
             return service.score_single_image(
                 image_id=image_id,
-                predict_score=predict_score,
+                # One image with the user waiting, so this claims the interactive
+                # lane. Bound here rather than inside predict_score, which the
+                # score-all job below also calls.
+                predict_score=partial(predict_score, priority=PRIORITY_INTERACTIVE),
             )
         except ImageNotFoundError as exc:
             raise HTTPException(status_code=404, detail=exc.message)

@@ -19,6 +19,7 @@ from exceptions import (
 )
 
 import database as db
+from ai_runtime_guard import PRIORITY_INTERACTIVE, PRIORITY_NORMAL
 from artist_identifier import (
     ARTIST_CONFIDENCE_HIGH,
     ARTIST_CONFIDENCE_LOW,
@@ -62,11 +63,14 @@ class _E2EArtistIdentifierStub:
     def __init__(self, *, threshold: float) -> None:
         self.threshold = float(threshold)
 
-    def identify(self, image_path: str, top_k: int = 5) -> Dict[str, Any]:
+    def identify(
+        self, image_path: str, top_k: int = 5, priority: int = PRIORITY_NORMAL
+    ) -> Dict[str, Any]:
         return self.identify_with_threshold(
             image_path=image_path,
             top_k=top_k,
             threshold=self.threshold,
+            priority=priority,
         )
 
     def identify_with_threshold(
@@ -74,6 +78,7 @@ class _E2EArtistIdentifierStub:
         image_path: str,
         top_k: int,
         threshold: float,
+        priority: int = PRIORITY_NORMAL,
     ) -> Dict[str, Any]:
         stem = os.path.splitext(os.path.basename(image_path))[0]
         artist = "fixture_artist"
@@ -360,7 +365,11 @@ class ArtistService:
             model_source=model_source,
             use_gpu=use_gpu,
         )
-        raw_result = identifier.identify_with_threshold(image_path, top_k, threshold)
+        # One image with the user waiting. run_batch_identification below calls
+        # the same method and deliberately does NOT raise the lane.
+        raw_result = identifier.identify_with_threshold(
+            image_path, top_k, threshold, priority=PRIORITY_INTERACTIVE
+        )
         if raw_result.get("error"):
             raise ServiceError(raw_result["error"])
         result = normalize_identification(raw_result)

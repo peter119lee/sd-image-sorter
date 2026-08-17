@@ -12,6 +12,7 @@ from typing import Optional
 from pathlib import Path
 
 from ai_runtime_guard import (
+    PRIORITY_NORMAL,
     clear_torch_cuda_cache,
     cuda_has_headroom,
     exclusive_ai_runtime,
@@ -276,12 +277,21 @@ def _predict_score_loaded(image_path: str) -> float:
     return result
 
 
-def predict_score(image_path: str) -> Optional[float]:
-    """Predict aesthetic score for a single image. Returns float ~1-10 or None on error."""
+def predict_score(
+    image_path: str, priority: int = PRIORITY_NORMAL
+) -> Optional[float]:
+    """Predict aesthetic score for a single image. Returns float ~1-10 or None on error.
+
+    ``priority`` is the AI-runtime admission lane and is supplied by the caller,
+    because this function serves both ``POST /api/aesthetic/score/{id}`` (one
+    image, user waiting) and the ``score-all`` background job, which calls it
+    once per library image. Pinning the interactive lane here would give that job
+    the highest priority in the app.
+    """
     global _force_cpu_after_gpu_failure
 
     try:
-        with exclusive_ai_runtime("aesthetic"), _inference_lock:
+        with exclusive_ai_runtime("aesthetic", priority=priority), _inference_lock:
             _ensure_loaded()
             try:
                 return _predict_score_loaded(image_path)

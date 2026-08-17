@@ -23,6 +23,7 @@ from fastapi import HTTPException
 from PIL import Image
 
 import database as db
+from ai_runtime_guard import PRIORITY_INTERACTIVE
 
 if TYPE_CHECKING:  # annotation-only; never imported at runtime (no facade cycle)
     from services.censor_service import CensorDetectRequest
@@ -256,6 +257,11 @@ class _DetectionMixin:
         - Legacy YOLOv8 ONNX: General segmentation model
         - NudeNet v3: Specialized NSFW body part detection
         - Both: Combine results from both detectors
+
+        Every backend here is asked for at ``PRIORITY_INTERACTIVE``: this is one
+        image with the user watching the censor canvas. The detectors themselves
+        default to the normal lane, so the lane is declared once, here, by the
+        caller that knows the context.
         """
         image = db.get_image_by_id(request.image_id)
         if not image:
@@ -289,6 +295,7 @@ class _DetectionMixin:
                             img,
                             conf_threshold=request.confidence_threshold,
                             prompts=custom_prompts,
+                            priority=PRIORITY_INTERACTIVE,
                         )
                 except RuntimeError as exc:
                     # SAM3 load / CUDA failures surface the real reason (503),
@@ -303,6 +310,7 @@ class _DetectionMixin:
                         image_path,
                         conf_threshold=request.confidence_threshold,
                         exposed_only=request.exposed_only,
+                        priority=PRIORITY_INTERACTIVE,
                     )
                 except RuntimeError as exc:
                     raise HTTPException(status_code=422, detail=str(exc)) from exc
@@ -319,6 +327,7 @@ class _DetectionMixin:
                         image_path,
                         conf_threshold=request.confidence_threshold,
                         exposed_only=request.exposed_only,
+                        priority=PRIORITY_INTERACTIVE,
                     )
                     all_detections.extend({**detection, "source": "nudenet"} for detection in nn_results)
                     successful_backends.append("NudeNet")
@@ -348,6 +357,7 @@ class _DetectionMixin:
                         legacy_results = detector.detect(
                             image_path,
                             request.confidence_threshold,
+                            priority=PRIORITY_INTERACTIVE,
                         )
                         all_detections.extend({**detection, "source": "legacy"} for detection in legacy_results)
                         successful_backends.append("Legacy YOLO")
@@ -390,6 +400,7 @@ class _DetectionMixin:
                 detections = detector.detect(
                     image_path,
                     request.confidence_threshold,
+                    priority=PRIORITY_INTERACTIVE,
                 )
 
             filtered_detections = self._filter_detections_by_targets(detections, request.target_classes)

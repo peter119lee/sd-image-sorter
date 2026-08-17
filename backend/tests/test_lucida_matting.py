@@ -160,7 +160,7 @@ def test_model_load_uses_guard_and_local_only_checkpoint(monkeypatch, tmp_path):
             return FakeModel()
 
     @contextmanager
-    def guard(label):
+    def guard(label, **_kwargs):
         guard_labels.append(label)
         yield
 
@@ -245,7 +245,7 @@ def test_inference_keeps_device_transfer_inside_guard(monkeypatch):
             return object()
 
     @contextmanager
-    def guard(label):
+    def guard(label, **_kwargs):
         nonlocal guard_active
         guard_labels.append(label)
         previous = guard_active
@@ -301,7 +301,7 @@ def test_cuda_failure_retries_generation_on_cpu(monkeypatch):
         return Image.new("L", source.size, color=127)
 
     @contextmanager
-    def guard(label):
+    def guard(label, **_kwargs):
         nonlocal cleanup_guard_active
         guard_labels.append(label)
         previous = cleanup_guard_active

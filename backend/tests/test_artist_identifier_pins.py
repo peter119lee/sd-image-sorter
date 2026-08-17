@@ -441,7 +441,7 @@ class TestIdentifyPaths:
         ident._model = "onnx"
         ident._session = object()  # routes identify() through _run_onnx
         ident._has_class_mapping = False
-        ident._run_onnx = lambda image: np.array([0.1, 0.7, 0.2], dtype=np.float32)
+        ident._run_onnx = lambda image, *_a, **_k: np.array([0.1, 0.7, 0.2], dtype=np.float32)
 
         result = ident.identify(img, top_k=2)
         # Raw class indices must NOT be passed off as artist names.
@@ -455,7 +455,7 @@ class TestIdentifyPaths:
         ident = ai.ArtistIdentifier(artists_list=["a0", "a1", "a2"], threshold=0.5)
         ident._model = "onnx"
         ident._session = object()
-        ident._run_onnx = lambda image: np.array([0.1, 0.7, 0.2], dtype=np.float32)
+        ident._run_onnx = lambda image, *_a, **_k: np.array([0.1, 0.7, 0.2], dtype=np.float32)
 
         above = ident.identify(img, top_k=3)
         assert above["artist"] == "a1"

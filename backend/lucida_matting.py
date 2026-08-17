@@ -9,7 +9,7 @@ from typing import Callable, ContextManager, Protocol, Sequence, cast
 import numpy as np
 from PIL import Image
 
-from ai_runtime_guard import exclusive_ai_runtime
+from ai_runtime_guard import PRIORITY_INTERACTIVE, exclusive_ai_runtime
 from config import get_lucida_model_dir
 from model_download_sources import (
     endpoint_label,
@@ -270,7 +270,9 @@ def _generate_on_device(
 
     try:
         input_tensor = cast(_Tensor, preprocess(rgb)).unsqueeze(0)
-        with exclusive_ai_runtime("lucida-inference"):
+        # Only reached by generate_subject_mask <- mask_service.generate_auto_mask,
+        # a single-image preview the user is waiting on. No batch caller exists.
+        with exclusive_ai_runtime("lucida-inference", priority=PRIORITY_INTERACTIVE):
             input_tensor = input_tensor.to(device)
             with torch_module.inference_mode():
                 outputs = model(input_tensor)
@@ -315,7 +317,9 @@ def generate_subject_mask(source: Image.Image, use_gpu: bool) -> Image.Image:
             "Lucida CUDA execution failed; retrying explicitly on CPU",
             extra={"device": device, "error": str(exc)},
         )
-        with exclusive_ai_runtime("lucida-cleanup"):
+        # Tail of the same interactive operation: the CPU retry the user is
+        # still waiting on, so it keeps the lane rather than dropping to normal.
+        with exclusive_ai_runtime("lucida-cleanup", priority=PRIORITY_INTERACTIVE):
             _model_by_device.pop("cuda", None)
             cuda = getattr(torch, "cuda", None)
             empty_cache = getattr(cuda, "empty_cache", None)

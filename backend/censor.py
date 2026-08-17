@@ -22,7 +22,7 @@ from config import (
     CENSOR_DEFAULT_BLOCK_SIZE,
     CENSOR_DEFAULT_BLUR_RADIUS,
 )
-from ai_runtime_guard import exclusive_ai_runtime
+from ai_runtime_guard import PRIORITY_NORMAL, exclusive_ai_runtime
 
 logger = logging.getLogger(__name__)
 
@@ -200,7 +200,18 @@ class CensorDetector:
             return str(names[class_id])
         return f"class_{class_id}"
 
-    def _detect_with_ultralytics(self, image_source, conf_threshold: float) -> List[Dict]:
+    def _detect_with_ultralytics(
+        self,
+        image_source,
+        conf_threshold: float,
+        priority: int = PRIORITY_NORMAL,
+    ) -> List[Dict]:
+        """Shared ultralytics inference for detect() and detect_from_image().
+
+        ``priority`` comes from the public method so the lane follows the CALLER,
+        not this helper: pinning it here would apply one lane to every entry
+        point regardless of whether a user is waiting on the result.
+        """
         if self.runtime is None:
             raise RuntimeError("Model not loaded. Call load() first.")
 
@@ -213,7 +224,7 @@ class CensorDetector:
             logger.debug("torch/CUDA not available for censor: %s", exc)
             device = "cpu"
 
-        with exclusive_ai_runtime("censor-ultralytics-inference"):
+        with exclusive_ai_runtime("censor-ultralytics-inference", priority=priority):
             results = self.runtime.predict(image_source, conf=conf_threshold, device=device, verbose=False)
         if not results:
             return []
@@ -624,13 +635,24 @@ class CensorDetector:
         
         return keep
     
-    def detect(self, image_path: str, conf_threshold: float = CENSOR_CONFIDENCE_THRESHOLD) -> List[Dict]:
-        """Run detection on an image file."""
+    def detect(
+        self,
+        image_path: str,
+        conf_threshold: float = CENSOR_CONFIDENCE_THRESHOLD,
+        priority: int = PRIORITY_NORMAL,
+    ) -> List[Dict]:
+        """Run detection on an image file.
+
+        ``priority`` defaults to the normal lane; the single-image detect service
+        raises it to ``PRIORITY_INTERACTIVE``. Any bulk caller added later gets
+        the normal lane by simply not asking, which is the behaviour that keeps
+        the interactive lane meaningful.
+        """
         if self.session is None:
             raise RuntimeError("Model not loaded. Call load() first.")
 
         if self.runtime_backend == "ultralytics":
-            return self._detect_with_ultralytics(image_path, conf_threshold)
+            return self._detect_with_ultralytics(image_path, conf_threshold, priority)
 
         # Load and preprocess image
         with Image.open(image_path) as source_image:
@@ -640,7 +662,7 @@ class CensorDetector:
         img_array, scale_info, pad_info = self.preprocess(image)
 
         # Run inference
-        with exclusive_ai_runtime("censor-onnx-inference"):
+        with exclusive_ai_runtime("censor-onnx-inference", priority=priority):
             outputs = self.session.run(None, {self.input_name: img_array})
 
         # Postprocess
@@ -656,18 +678,23 @@ class CensorDetector:
 
         return detections
 
-    def detect_from_image(self, image: Image.Image, conf_threshold: float = CENSOR_CONFIDENCE_THRESHOLD) -> List[Dict]:
+    def detect_from_image(
+        self,
+        image: Image.Image,
+        conf_threshold: float = CENSOR_CONFIDENCE_THRESHOLD,
+        priority: int = PRIORITY_NORMAL,
+    ) -> List[Dict]:
         """Run detection on a PIL Image."""
         if self.session is None:
             raise RuntimeError("Model not loaded. Call load() first.")
 
         if self.runtime_backend == "ultralytics":
-            return self._detect_with_ultralytics(image, conf_threshold)
+            return self._detect_with_ultralytics(image, conf_threshold, priority)
         
         original_size = image.size
         img_array, scale_info, pad_info = self.preprocess(image)
         
-        with exclusive_ai_runtime("censor-onnx-inference"):
+        with exclusive_ai_runtime("censor-onnx-inference", priority=priority):
             outputs = self.session.run(None, {self.input_name: img_array})
         
         proto = outputs[1] if (self._onnx_segmentation and len(outputs) > 1) else None

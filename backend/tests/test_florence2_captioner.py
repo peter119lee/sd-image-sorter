@@ -196,7 +196,7 @@ def test_caption_loads_native_runtime_and_generates_inside_runtime_guard(
             return FakeProcessor()
 
     @contextmanager
-    def guard(label):
+    def guard(label, **_kwargs):
         nonlocal guard_active
         guard_labels.append(label)
         previous = guard_active
@@ -302,7 +302,7 @@ def test_invalid_post_processed_caption_fails_explicitly(monkeypatch, tmp_path):
         yield
 
     @contextmanager
-    def guard(label):
+    def guard(label, **_kwargs):
         yield
 
     monkeypatch.setattr(

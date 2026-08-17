@@ -19,7 +19,11 @@ from typing import Any, Dict, List, Optional
 from PIL import Image
 
 from config import TAGGER_MODELS, get_toriigate_model_dir, read_float_env
-from ai_runtime_guard import cuda_has_headroom, exclusive_ai_runtime
+from ai_runtime_guard import (
+    PRIORITY_BATCH,
+    cuda_has_headroom,
+    exclusive_ai_runtime,
+)
 from model_download_sources import (
     endpoint_label,
     get_hf_endpoint_order,
@@ -539,7 +543,12 @@ class ToriiGateTagger(_CaptionParsingMixin):
 
         if self._use_kv_cache is None:
             self._use_kv_cache = self._decide_kv_cache()
-        with torch.inference_mode(), exclusive_ai_runtime("toriigate-inference"):
+        # Batch lane: reached only from the gallery tag worker and Smart Tag's
+        # caption phase (tag_batch just loops this method), never from a
+        # synchronous single-image request.
+        with torch.inference_mode(), exclusive_ai_runtime(
+            "toriigate-inference", priority=PRIORITY_BATCH
+        ):
             generated = self.model.generate(
                 **inputs,
                 do_sample=False,

@@ -19,7 +19,7 @@ import numpy as np
 from PIL import Image
 
 import config
-from ai_runtime_guard import exclusive_ai_runtime
+from ai_runtime_guard import PRIORITY_BATCH, exclusive_ai_runtime
 from model_download_sources import (
     HF_OFFICIAL_ENDPOINT,
     format_hf_download_error,
@@ -481,7 +481,10 @@ class CLTaggerV2Tagger(_ScoringMixin):
         character_threshold: Optional[float],
         copyright_threshold: Optional[float],
     ) -> dict[str, object]:
-        with exclusive_ai_runtime("cl-tagger-v2-inference"):
+        # Batch lane even though this tags one file: CL Tagger v2 is only ever
+        # selected by the gallery tag worker or Smart Tag's booru phase. The
+        # single-image endpoint (POST /api/tag/single) always uses WD14.
+        with exclusive_ai_runtime("cl-tagger-v2-inference", priority=PRIORITY_BATCH):
             if not self._loaded:
                 self.load()
             try:
@@ -509,7 +512,7 @@ class CLTaggerV2Tagger(_ScoringMixin):
         return_runtime_info: bool,
     ):
         del preferred_batch_size, min_batch_size
-        with exclusive_ai_runtime("cl-tagger-v2-inference"):
+        with exclusive_ai_runtime("cl-tagger-v2-inference", priority=PRIORITY_BATCH):
             if not self._loaded:
                 self.load()
             results: list[dict[str, object]] = [self._build_empty_result() for _ in image_paths]

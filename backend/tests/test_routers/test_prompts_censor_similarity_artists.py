@@ -988,7 +988,7 @@ class TestCensorRouterValidation:
                     counts["loaded"] += 1
                 self.session = object()
 
-            def detect(self, _image_path, _threshold):
+            def detect(self, _image_path, _threshold, **_kwargs):
                 if self.session is None:
                     raise RuntimeError("Model not loaded")
                 return []
@@ -1051,7 +1051,7 @@ class TestCensorRouterValidation:
                     raise RuntimeError("Failed to load legacy test model")
                 self.session = object()
 
-            def detect(self, _image_path, _threshold):
+            def detect(self, _image_path, _threshold, **_kwargs):
                 if self.session is None:
                     raise RuntimeError("Model not loaded")
                 return []
@@ -1188,7 +1188,7 @@ class TestCensorRouterValidation:
                         raise RuntimeError("Timed out releasing model B load")
                     self.session = object()
 
-            def detect(self, image_path, _threshold):
+            def detect(self, image_path, _threshold, **_kwargs):
                 if self.session is None:
                     raise RuntimeError("Model not loaded")
                 return [
@@ -1267,7 +1267,7 @@ class TestCensorRouterValidation:
                 self.session = object()
                 captured["model_path"] = self.model_path
 
-            def detect(self, _image_path, _threshold):
+            def detect(self, _image_path, _threshold, **_kwargs):
                 return [{"class": "breasts", "confidence": 0.9, "box": [0, 0, 16, 16]}]
 
         monkeypatch.setattr(censor_service_module, "get_default_legacy_model_path", lambda: str(tmp_path / "wenaka_yolov8s-seg.onnx"))
@@ -1298,7 +1298,7 @@ class TestCensorRouterValidation:
             def load(self):
                 self.session = object()
 
-            def detect(self, image_path, _threshold):
+            def detect(self, image_path, _threshold, **_kwargs):
                 captured["image_path"] = image_path
                 return [{"class": "breasts", "confidence": 0.9, "box": [0, 0, 16, 16]}]
 
@@ -1420,7 +1420,7 @@ class TestCensorRouterValidation:
             def load(self):
                 self.session = object()
 
-            def detect(self, _image_path, _threshold):
+            def detect(self, _image_path, _threshold, **_kwargs):
                 return [
                     {
                         "class": "breasts",
@@ -1476,7 +1476,7 @@ class TestCensorRouterValidation:
         )
 
         class FailedNudeNet:
-            def detect(self, _image_path, *, conf_threshold, exposed_only):
+            def detect(self, _image_path, *, conf_threshold, exposed_only, **_kwargs):
                 raise RuntimeError(
                     f"nudenet runtime unavailable at threshold={conf_threshold}, exposed_only={exposed_only}"
                 )
@@ -1489,7 +1489,7 @@ class TestCensorRouterValidation:
             def load(self):
                 self.session = object()
 
-            def detect(self, _image_path, _threshold):
+            def detect(self, _image_path, _threshold, **_kwargs):
                 raise RuntimeError("legacy inference session failed")
 
         monkeypatch.setattr(nudenet_module, "get_nudenet_detector", lambda: FailedNudeNet())
@@ -1527,7 +1527,7 @@ class TestCensorRouterValidation:
         )
 
         class FailedNudeNet:
-            def detect(self, _image_path, *, conf_threshold, exposed_only):
+            def detect(self, _image_path, *, conf_threshold, exposed_only, **_kwargs):
                 raise RuntimeError(
                     f"nudenet dependency failed at threshold={conf_threshold}, exposed_only={exposed_only}"
                 )
@@ -1540,7 +1540,7 @@ class TestCensorRouterValidation:
             def load(self):
                 self.session = object()
 
-            def detect(self, _image_path, _threshold):
+            def detect(self, _image_path, _threshold, **_kwargs):
                 return [{"class": "breasts", "confidence": 0.91, "box": [4, 4, 20, 20]}]
 
         monkeypatch.setattr(nudenet_module, "get_nudenet_detector", lambda: FailedNudeNet())
@@ -1585,7 +1585,7 @@ class TestCensorRouterValidation:
         )
 
         class EmptyNudeNet:
-            def detect(self, _image_path, *, conf_threshold, exposed_only):
+            def detect(self, _image_path, *, conf_threshold, exposed_only, **_kwargs):
                 assert conf_threshold == 0.42
                 assert exposed_only is True
                 return []
@@ -1598,7 +1598,7 @@ class TestCensorRouterValidation:
             def load(self):
                 self.session = object()
 
-            def detect(self, _image_path, threshold):
+            def detect(self, _image_path, threshold, **_kwargs):
                 assert threshold == 0.42
                 return []
 
@@ -1634,7 +1634,7 @@ class TestCensorRouterValidation:
         )
 
         class EmptyNudeNet:
-            def detect(self, _image_path, *, conf_threshold, exposed_only):
+            def detect(self, _image_path, *, conf_threshold, exposed_only, **_kwargs):
                 assert conf_threshold == 0.42
                 assert exposed_only is True
                 return []
@@ -1647,7 +1647,7 @@ class TestCensorRouterValidation:
             def load(self):
                 self.session = object()
 
-            def detect(self, _image_path, _threshold):
+            def detect(self, _image_path, _threshold, **_kwargs):
                 raise RuntimeError("legacy model could not run")
 
         monkeypatch.setattr(nudenet_module, "get_nudenet_detector", lambda: EmptyNudeNet())
@@ -1697,7 +1697,7 @@ class TestCensorRouterValidation:
             def load(self):
                 self.session = object()
 
-            def detect(self, _image_path, _threshold):
+            def detect(self, _image_path, _threshold, **_kwargs):
                 return [
                     {
                         "class": "breasts",
@@ -2660,7 +2660,7 @@ class TestArtistsRouterValidation:
             def identify(self, _image_path, top_k=5):
                 return {"error": "Artist model unavailable. Install the required dependencies and restart the app."}
 
-            def identify_with_threshold(self, _image_path, top_k, _threshold):
+            def identify_with_threshold(self, _image_path, top_k, _threshold, **_kwargs):
                 return self.identify(_image_path, top_k=top_k)
 
         monkeypatch.setattr(artists_router, "get_artist_identifier", lambda **kwargs: FakeIdentifier())
@@ -2694,7 +2694,7 @@ class TestArtistsRouterValidation:
                     "model_loaded": True,
                 }
 
-            def identify_with_threshold(self, _image_path, top_k, _threshold):
+            def identify_with_threshold(self, _image_path, top_k, _threshold, **_kwargs):
                 return self.identify(_image_path, top_k=top_k)
 
         def fake_get_identifier(**kwargs):
@@ -2819,7 +2819,7 @@ class TestArtistsRouterValidation:
         )
 
         class ReplacingIdentifier:
-            def identify_with_threshold(self, _image_path, _top_k, _threshold):
+            def identify_with_threshold(self, _image_path, _top_k, _threshold, **_kwargs):
                 with Image.new("RGB", (64, 64), color="black") as replacement:
                     replacement.save(image_path)
                 return {
@@ -2864,7 +2864,7 @@ class TestArtistsRouterValidation:
         identify_calls = []
 
         class UnexpectedIdentifier:
-            def identify_with_threshold(self, *_args):
+            def identify_with_threshold(self, *_args, **_kwargs):
                 identify_calls.append(True)
                 raise AssertionError("Artist inference must not run for a stale library row")
 
@@ -2899,7 +2899,7 @@ class TestArtistsRouterValidation:
         )
 
         class RacingIdentifier:
-            def identify_with_threshold(self, _image_path, _top_k, _threshold):
+            def identify_with_threshold(self, _image_path, _top_k, _threshold, **_kwargs):
                 with test_client.test_db.get_db() as conn:
                     conn.execute(
                         "UPDATE images SET content_fingerprint = ? WHERE id = ?",
@@ -3521,7 +3521,7 @@ class TestDerivedWriterPathResolution:
                     "model_loaded": True,
                 }
 
-            def identify_with_threshold(self, image_path, top_k, _threshold):
+            def identify_with_threshold(self, image_path, top_k, _threshold, **_kwargs):
                 return self.identify(image_path, top_k=top_k)
 
         service = artist_service_module.ArtistService(identifier_getter=lambda **kwargs: FakeIdentifier())
@@ -3556,7 +3556,7 @@ class TestDerivedWriterPathResolution:
         )
 
         class ReplacingIdentifier:
-            def identify_with_threshold(self, _image_path, _top_k, _threshold):
+            def identify_with_threshold(self, _image_path, _top_k, _threshold, **_kwargs):
                 with Image.new("RGB", (64, 64), color="black") as replacement:
                     replacement.save(image_path)
                 return {
@@ -3632,7 +3632,7 @@ class TestArtistServiceConcurrency:
                 identify_barrier.wait(timeout=1)
                 return self._result(self.threshold)
 
-            def identify_with_threshold(self, _image_path, top_k, threshold):
+            def identify_with_threshold(self, _image_path, top_k, threshold, **_kwargs):
                 identify_barrier.wait(timeout=1)
                 return self._result(threshold)
 

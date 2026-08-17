@@ -342,7 +342,9 @@ def test_load_gpu_happy_path_moves_weights_to_cuda_and_marks_loaded(monkeypatch)
             from_pretrained=lambda _d, **k: (captured.update(k), fake_model)[1]
         ),
     )
-    monkeypatch.setattr(tg, "exclusive_ai_runtime", lambda _n: contextlib.nullcontext())
+    monkeypatch.setattr(
+        tg, "exclusive_ai_runtime", lambda _n, **_k: contextlib.nullcontext()
+    )
 
     tagger = _bare(use_gpu=True, device="cuda")
     monkeypatch.setattr(tagger, "_download_model", lambda: "/fake/dir")
@@ -384,7 +386,9 @@ def test_load_gpu_failure_retries_cpu_when_fallback_allowed(monkeypatch):
         "Qwen3_5ForConditionalGeneration",
         SimpleNamespace(from_pretrained=_model_from_pretrained),
     )
-    monkeypatch.setattr(tg, "exclusive_ai_runtime", lambda _n: contextlib.nullcontext())
+    monkeypatch.setattr(
+        tg, "exclusive_ai_runtime", lambda _n, **_k: contextlib.nullcontext()
+    )
 
     tagger = _bare(use_gpu=True, allow_cpu_fallback=True, device="cuda")
     monkeypatch.setattr(tagger, "_download_model", lambda: "/fake/dir")
@@ -739,7 +743,9 @@ def test_generate_text_builds_messages_and_slices_new_tokens(monkeypatch, tmp_pa
     processor = _FakeProcessor()
     model = _FakeModel()
     monkeypatch.setattr(tg, "torch", _fake_torch_gpu())
-    monkeypatch.setattr(tg, "exclusive_ai_runtime", lambda _n: contextlib.nullcontext())
+    monkeypatch.setattr(
+        tg, "exclusive_ai_runtime", lambda _n, **_k: contextlib.nullcontext()
+    )
 
     tagger = _bare(
         use_gpu=False,
@@ -793,7 +799,9 @@ def test_generate_text_forwards_grounding_tags_into_prompt(monkeypatch, tmp_path
 
     processor = _FakeProcessor()
     monkeypatch.setattr(tg, "torch", _fake_torch_gpu())
-    monkeypatch.setattr(tg, "exclusive_ai_runtime", lambda _n: contextlib.nullcontext())
+    monkeypatch.setattr(
+        tg, "exclusive_ai_runtime", lambda _n, **_k: contextlib.nullcontext()
+    )
     tagger = _bare(
         use_gpu=False,
         caption_length="detailed",

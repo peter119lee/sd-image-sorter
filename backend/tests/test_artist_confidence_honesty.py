@@ -39,7 +39,10 @@ def _identifier_returning(probabilities, artists):
     identifier = ai.ArtistIdentifier(artists_list=list(artists))
     identifier._model = "onnx"
     identifier._session = object()
-    identifier._run_onnx = lambda image: np.array(probabilities, dtype=np.float32)
+    # Tolerates the AI-runtime ``priority`` the production path threads through.
+    identifier._run_onnx = lambda image, *_a, **_k: np.array(
+        probabilities, dtype=np.float32
+    )
     return identifier
 
 
@@ -68,7 +71,9 @@ class TestConfidenceTiers:
         # band that used to be written into the library as a fact. Measured
         # precision in this band is 28%.
         identifier = _identifier_returning([0.10, 0.03, 0.87], ["a0", "a1", "a2"])
-        identifier._run_onnx = lambda image: np.array([0.10, 0.03, 0.02], dtype=np.float32)
+        identifier._run_onnx = lambda image, *_a, **_k: np.array(
+            [0.10, 0.03, 0.02], dtype=np.float32
+        )
 
         result = identifier.identify(sample_image, top_k=3)
 

@@ -288,7 +288,12 @@ def test_refine_box_without_confidence_preserves_default_gates(fake_refiner, mon
 
     fake_refiner.refine_box(Image.new("RGB", (8, 8)), [1, 1, 4, 4])
 
-    assert captured["kwargs"] == {}
+    assert "score_threshold" not in captured["kwargs"]
+    assert "presence_threshold" not in captured["kwargs"]
+    # refine_box is what batch_refine_mask loops over, so it must stay in the
+    # normal AI-runtime lane; test_ai_runtime_priority_lanes.py proves the
+    # resulting admission order.
+    assert captured["kwargs"]["priority"] == sam3_refiner.PRIORITY_NORMAL
 
 
 def test_refine_box_confidence_is_clamped_and_score_floored(fake_refiner, monkeypatch):

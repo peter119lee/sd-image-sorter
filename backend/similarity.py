@@ -42,7 +42,11 @@ from model_download_sources import (
 )
 from model_health_paths import CLIP_TEXT_REQUIRED_FILES, CLIP_VISION_REQUIRED_FILES
 from utils.source_paths import resolve_existing_indexed_image_path
-from ai_runtime_guard import exclusive_ai_runtime
+from ai_runtime_guard import (
+    PRIORITY_BATCH,
+    PRIORITY_INTERACTIVE,
+    exclusive_ai_runtime,
+)
 import similarity_ann
 
 
@@ -259,7 +263,9 @@ def embed_text(query: str) -> Optional[np.ndarray]:
         return None
     model = _get_text_embed_model()
     try:
-        with exclusive_ai_runtime("clip-text-inference"):
+        # Only reached by SimilarityIndex.search_by_text, i.e. a user waiting on
+        # a search box, so the lane is safe to declare here.
+        with exclusive_ai_runtime("clip-text-inference", priority=PRIORITY_INTERACTIVE):
             embeddings = list(model.embed([value]))
         if embeddings:
             return np.array(embeddings[0], dtype=np.float32)
@@ -278,11 +284,17 @@ from similarity_math import bytes_to_embedding, cosine_similarity, embedding_to_
 
 
 def embed_image_file(image_path: str, model=None) -> Optional[np.ndarray]:
-    """Generate CLIP embedding for a single image file."""
+    """Generate CLIP embedding for a single image file.
+
+    Despite embedding one file per call, this is the BATCH lane: its only caller
+    is ``SimilarityIndex.embed_batch``, which walks the whole library in the
+    background. The interactive CLIP entry points are ``embed_text`` and
+    ``embed_image_pil``.
+    """
     try:
         model = model or _get_embed_model()
         # FastEmbed accepts file paths
-        with exclusive_ai_runtime("clip-similarity-inference"):
+        with exclusive_ai_runtime("clip-similarity-inference", priority=PRIORITY_BATCH):
             embeddings = list(model.embed([image_path]))
         if embeddings:
             return np.array(embeddings[0], dtype=np.float32)
@@ -306,7 +318,11 @@ def embed_image_pil(pil_image: Image.Image) -> Optional[np.ndarray]:
             tmp.write(buf.getvalue())
             tmp_path = tmp.name
 
-        with exclusive_ai_runtime("clip-similarity-upload"):
+        # Only reached by SimilarityIndex.search_by_upload (Find Similar on an
+        # uploaded file), so the lane is safe to declare here.
+        with exclusive_ai_runtime(
+            "clip-similarity-upload", priority=PRIORITY_INTERACTIVE
+        ):
             embeddings = list(model.embed([tmp_path]))
         if embeddings:
             return np.array(embeddings[0], dtype=np.float32)

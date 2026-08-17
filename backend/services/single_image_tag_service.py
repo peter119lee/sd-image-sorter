@@ -27,11 +27,12 @@ Contract
 Concurrency note
 ----------------
 ``WD14Tagger.tag`` takes the shared ``exclusive_ai_runtime("wd14-tagger")``
-lease internally at ``PRIORITY_NORMAL``, so this endpoint queues behind a
-running batch chunk exactly like every other single-image AI endpoint in the
-app (VLM caption, artist identify, aesthetic score). Giving interactive work
-its own priority lane is a separate, deliberate change — see
-``.plans/sd-image-sorter-release/decisions.md``.
+lease internally, and this endpoint asks for it at ``PRIORITY_INTERACTIVE``.
+That orders it ahead of in-server bulk work queued on the same runtime (Smart
+Tag's booru phase reaches the very same method, which is why the lane is an
+argument here rather than a default inside ``tag``). It does NOT order it ahead
+of the gallery tag job, which runs in a separate process where the file lock
+has no queue; against that, this endpoint still waits for the chunk boundary.
 """
 from __future__ import annotations
 
@@ -43,7 +44,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import HTTPException
 from pydantic import BaseModel, Field
 
-from ai_runtime_guard import AiRuntimeBusyError
+from ai_runtime_guard import PRIORITY_INTERACTIVE, AiRuntimeBusyError
 from config import ALLOWED_IMAGE_EXTENSIONS
 from utils.path_validation import normalize_user_path, validate_file_path
 
@@ -144,7 +145,9 @@ def tag_single_image(request: SingleImageTagRequest) -> Dict[str, Any]:
     started = time.perf_counter()
     try:
         tagger = _load_tagger(**loader_kwargs)
-        result = tagger.tag(str(source), **_thresholds(request))
+        result = tagger.tag(
+            str(source), priority=PRIORITY_INTERACTIVE, **_thresholds(request)
+        )
     except HTTPException:
         raise
     except AiRuntimeBusyError:

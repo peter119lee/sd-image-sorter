@@ -36,7 +36,7 @@ from typing import Dict, List, Optional, Tuple, Any
 
 import numpy as np
 from PIL import Image
-from ai_runtime_guard import exclusive_ai_runtime
+from ai_runtime_guard import PRIORITY_NORMAL, exclusive_ai_runtime
 from config import (
     ARTIST_MODEL_SOURCE_DEFAULT,
     ARTIST_HF_MODEL_ID,
@@ -569,12 +569,14 @@ class ArtistIdentifier:
         self,
         image_path: str,
         top_k: int = 5,
+        priority: int = PRIORITY_NORMAL,
     ) -> Dict[str, Any]:
         """Identify an artist using this instance's configured threshold."""
         return self.identify_with_threshold(
             image_path=image_path,
             top_k=top_k,
             threshold=self.threshold,
+            priority=priority,
         )
 
     def identify_with_threshold(
@@ -582,6 +584,7 @@ class ArtistIdentifier:
         image_path: str,
         top_k: int,
         threshold: float,
+        priority: int = PRIORITY_NORMAL,
     ) -> Dict[str, Any]:
         """
         Identify the artist/style of an image with a request-local threshold.
@@ -590,6 +593,9 @@ class ArtistIdentifier:
             image_path: Path to the image file
             top_k: Number of top predictions to return
             threshold: Minimum confidence for assigning the top artist
+            priority: AI-runtime admission lane. Supplied by the caller because
+                this method serves both the single-image identify endpoint and
+                ``run_batch_identification``, which loops it over a selection.
 
         Returns:
             {
@@ -638,12 +644,12 @@ class ArtistIdentifier:
 
             if self._session is not None:
                 # ONNX inference
-                predictions = self._run_onnx(image)
+                predictions = self._run_onnx(image, priority)
             elif self._backend == "kaloscope":
-                predictions = self._run_kaloscope(image)
+                predictions = self._run_kaloscope(image, priority)
             else:
                 # PyTorch/Transformers inference
-                predictions = self._run_torch_classifier(image)
+                predictions = self._run_torch_classifier(image, priority)
 
             # Get top predictions
             top_indices = np.argsort(predictions)[::-1][:top_k]
@@ -712,7 +718,9 @@ class ArtistIdentifier:
 
         return result
 
-    def _run_onnx(self, image: Image.Image) -> np.ndarray:
+    def _run_onnx(
+        self, image: Image.Image, priority: int = PRIORITY_NORMAL
+    ) -> np.ndarray:
         """Run inference with ONNX model."""
         # Preprocess image
         img_resized = image.resize((224, 224))
@@ -725,7 +733,7 @@ class ArtistIdentifier:
         input_name = self._session.get_inputs()[0].name
 
         # Run inference
-        with exclusive_ai_runtime("artist-onnx-inference"):
+        with exclusive_ai_runtime("artist-onnx-inference", priority=priority):
             outputs = self._session.run(None, {input_name: img_array})
 
         # Apply softmax
@@ -733,7 +741,9 @@ class ArtistIdentifier:
         exp_logits = np.exp(logits - np.max(logits))
         return exp_logits / np.sum(exp_logits)
 
-    def _run_kaloscope(self, image: Image.Image) -> np.ndarray:
+    def _run_kaloscope(
+        self, image: Image.Image, priority: int = PRIORITY_NORMAL
+    ) -> np.ndarray:
         """Run inference with the LSNet/Kaloscope classifier."""
         import torch
 
@@ -743,7 +753,9 @@ class ArtistIdentifier:
         tensor = self._transform(image).unsqueeze(0)
         assert self._model is not None
         device = next(self._model.parameters()).device
-        with torch.no_grad(), exclusive_ai_runtime("artist-kaloscope-inference"):
+        with torch.no_grad(), exclusive_ai_runtime(
+            "artist-kaloscope-inference", priority=priority
+        ):
             logits = self._model(tensor.to(device))
             if isinstance(logits, tuple):
                 logits = logits[0]
@@ -752,7 +764,9 @@ class ArtistIdentifier:
         probs = torch.nn.functional.softmax(logits, dim=0)
         return probs.detach().cpu().numpy()
 
-    def _run_torch_classifier(self, image: Image.Image) -> np.ndarray:
+    def _run_torch_classifier(
+        self, image: Image.Image, priority: int = PRIORITY_NORMAL
+    ) -> np.ndarray:
         """Run inference with a Transformers-compatible image classifier."""
         import torch
 
@@ -762,7 +776,9 @@ class ArtistIdentifier:
         inputs = self._processor(images=image, return_tensors="pt")
 
         assert self._model is not None
-        with torch.no_grad(), exclusive_ai_runtime("artist-transformers-inference"):
+        with torch.no_grad(), exclusive_ai_runtime(
+            "artist-transformers-inference", priority=priority
+        ):
             outputs = self._model(**inputs)
             logits = outputs.logits[0]
 
