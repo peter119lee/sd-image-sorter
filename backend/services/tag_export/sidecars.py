@@ -102,11 +102,33 @@ def _unique_collision_message(sidecar_name: str, taken_by: str) -> str:
 
 
 def _in_run_collision_message(sidecar_name: str, taken_by: str) -> str:
-    """Per-image error text when two batch rows resolve to one sidecar."""
+    """Per-image error text when two batch rows resolve to one sidecar NAME."""
     return (
         f"Sidecar name '{sidecar_name}' already taken (by {taken_by}); "
         "two source images use the same stem, so rename one source image."
     )
+
+
+def _in_run_alias_collision_message(sidecar_name: str, taken_by: str) -> str:
+    """Per-image error text when two destinations are one FILE under two names.
+
+    Kept apart from :func:`_in_run_collision_message` because that one blames
+    the stems, and here nothing is misnamed: the destinations can have entirely
+    different names and still be one file, so telling the user to rename a
+    source image sends them hunting for a duplicate stem that does not exist.
+    """
+    return (
+        f"Sidecar name '{sidecar_name}' already taken (by {taken_by}); "
+        "both destinations are the same file on disk (a hard link or other "
+        "alias), so the second caption would overwrite the first. Delete or "
+        "unlink one of the two sidecar files so each image has its own."
+    )
+
+
+# How a destination matched a claim already in ``used_output_paths``. The two
+# cases need different advice, so the lookup reports which one it found.
+_OWNER_MATCH_PATH = "path"
+_OWNER_MATCH_FILE = "file"
 
 
 def _output_path_key(path: str) -> str:
@@ -114,25 +136,46 @@ def _output_path_key(path: str) -> str:
     return os.path.realpath(os.path.abspath(path))
 
 
-def _output_path_keys(path: str) -> tuple[str, ...]:
-    """Return path and existing-file identity keys for one destination."""
+def _output_path_identities(path: str) -> tuple[tuple[str, str], ...]:
+    """Return (match kind, key) pairs identifying one sidecar destination."""
     path_key = _output_path_key(path)
     try:
         stat_result = os.stat(path)
     except FileNotFoundError:
-        return (path_key,)
+        return ((_OWNER_MATCH_PATH, path_key),)
     file_key = f"file:{stat_result.st_dev}:{stat_result.st_ino}"
-    return (path_key, file_key)
+    return ((_OWNER_MATCH_PATH, path_key), (_OWNER_MATCH_FILE, file_key))
+
+
+def _output_path_keys(path: str) -> tuple[str, ...]:
+    """Return path and existing-file identity keys for one destination."""
+    return tuple(key for _kind, key in _output_path_identities(path))
 
 
 def _find_output_owner(
     path: str, used_output_paths: Dict[str, str]
-) -> tuple[bool, str]:
-    """Find the first batch owner of any equivalent output destination."""
-    for key in _output_path_keys(path):
+) -> tuple[bool, str, str]:
+    """Find the first batch owner of any equivalent output destination.
+
+    Returns ``(found, owner, match_kind)``. ``match_kind`` is
+    ``_OWNER_MATCH_PATH`` when two destinations are the same name and
+    ``_OWNER_MATCH_FILE`` when they are the same file under different names —
+    the difference between "rename an image" and "break the link" being
+    actionable advice.
+    """
+    for kind, key in _output_path_identities(path):
         if key in used_output_paths:
-            return True, used_output_paths[key]
-    return False, ""
+            return True, used_output_paths[key], kind
+    return False, "", ""
+
+
+def _in_run_collision_message_for(
+    match_kind: str, sidecar_name: str, taken_by: str
+) -> str:
+    """Pick the collision text that matches how the destination was claimed."""
+    if match_kind == _OWNER_MATCH_FILE:
+        return _in_run_alias_collision_message(sidecar_name, taken_by)
+    return _in_run_collision_message(sidecar_name, taken_by)
 
 
 def _output_path_claims(path: str, owner: str) -> Dict[str, str]:
@@ -158,6 +201,29 @@ def _in_run_nl_collision_message(sidecar_name: str, taken_by: str) -> str:
         f"NL sidecar name '{sidecar_name}' is already used by another image's "
         f"sidecar (first owner: {taken_by}); rename one source image."
     )
+
+
+def _in_run_nl_alias_collision_message(sidecar_name: str, taken_by: str) -> str:
+    """NL-twin variant of :func:`_in_run_alias_collision_message`.
+
+    Same lie to avoid: an aliased destination is not a naming mistake, so
+    "rename one source image" is not the fix.
+    """
+    return (
+        f"NL sidecar name '{sidecar_name}' is the same file on disk as another "
+        f"image's sidecar (first owner: {taken_by}) — a hard link or other "
+        "alias, not a name clash. Delete or unlink one of the two files so each "
+        "image has its own."
+    )
+
+
+def _in_run_nl_collision_message_for(
+    match_kind: str, sidecar_name: str, taken_by: str
+) -> str:
+    """Pick the NL-twin collision text that matches how it was claimed."""
+    if match_kind == _OWNER_MATCH_FILE:
+        return _in_run_nl_alias_collision_message(sidecar_name, taken_by)
+    return _in_run_nl_collision_message(sidecar_name, taken_by)
 
 
 def _allocate_output_path(
@@ -225,7 +291,9 @@ def _allocate_output_path(
 
     sidecar_name = f"{basename}{extension}"
     primary_path = os.path.join(output_folder, sidecar_name)
-    in_run_taken, taken_by = _find_output_owner(primary_path, used_output_paths)
+    in_run_taken, taken_by, match_kind = _find_output_owner(
+        primary_path, used_output_paths
+    )
 
     if overwrite_policy == "overwrite":
         # A file that predates this batch may be replaced in place. An earlier
@@ -235,7 +303,8 @@ def _allocate_output_path(
             return _SidecarAllocation("write", path=primary_path)
         taken_by = taken_by or "an earlier image in this export"
         return _SidecarAllocation(
-            "error", message=_in_run_collision_message(sidecar_name, taken_by)
+            "error",
+            message=_in_run_collision_message_for(match_kind, sidecar_name, taken_by),
         )
 
     if overwrite_policy == "skip":
@@ -258,7 +327,8 @@ def _allocate_output_path(
         # name — a real data-loss risk → error.
         taken_by = taken_by or "an earlier image in this export"
         return _SidecarAllocation(
-            "error", message=_in_run_collision_message(sidecar_name, taken_by)
+            "error",
+            message=_in_run_collision_message_for(match_kind, sidecar_name, taken_by),
         )
     if os.path.exists(primary_path):
         # The name is taken by a file already on disk. In beside_image mode a
@@ -604,7 +674,7 @@ def export_tags_batch_request(
                     if nl_twin_content:
                         stem_no_ext, sidecar_ext = os.path.splitext(output_path)
                         candidate = f"{stem_no_ext}{nl_sidecar_suffix}{sidecar_ext}"
-                        in_run_taken, taken_by = _find_output_owner(
+                        in_run_taken, taken_by, nl_match_kind = _find_output_owner(
                             candidate, used_output_paths
                         )
                         overlaps_main = _output_paths_overlap(output_path, candidate)
@@ -625,7 +695,7 @@ def export_tags_batch_request(
                             if len(error_messages) < 20:
                                 error_messages.append(
                                     f"Image {image_id}: "
-                                    f"{_in_run_nl_collision_message(os.path.basename(candidate), taken_by)}"
+                                    f"{_in_run_nl_collision_message_for(nl_match_kind, os.path.basename(candidate), taken_by)}"
                                 )
                             elif len(error_messages) == 20:
                                 error_messages.append("... and more errors (total: showing first 20)")

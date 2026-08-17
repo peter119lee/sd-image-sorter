@@ -365,6 +365,79 @@ def test_beside_image_overwrite_rejects_hardlinked_sidecar_aliases(
     assert "already taken" in message
 
 
+def test_hardlinked_alias_rejection_does_not_blame_the_source_filenames(
+    test_client, test_db, tmp_path: Path
+):
+    """The refusal has to name the real cause: the files, not the names.
+
+    ``_find_output_owner`` matches either a canonical path key or an
+    ``st_dev``/``st_ino`` file key, but both matches produced the same message:
+    "two source images use the same stem, so rename one source image". Here the
+    stems are ``one`` and ``two`` — nothing is misnamed, the two destinations are
+    one file under two names — so that sentence sends the user hunting for a
+    duplicate stem that does not exist.
+    """
+    id_a, path_a = _stage_image(tmp_path, "a", "one.png", "alpha_tag")
+    id_b, path_b = _stage_image(tmp_path, "b", "two.png", "beta_tag")
+    sidecar_a = path_a.with_suffix(".txt")
+    sidecar_b = path_b.with_suffix(".txt")
+    sidecar_a.write_text("preexisting caption", encoding="utf-8")
+    os.link(sidecar_a, sidecar_b)
+    assert os.path.samefile(sidecar_a, sidecar_b)
+
+    resp = test_client.post("/api/tags/export-batch", json={
+        "image_ids": [id_a, id_b],
+        "output_folder": "",
+        "output_mode": "beside_image",
+        "content_mode": "tags",
+        "overwrite_policy": "overwrite",
+        "normalize_tag_underscores": False,
+    })
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+
+    # The refusal itself is correct and unchanged.
+    assert data["exported"] == 1
+    assert data["error_count"] == 1
+    message = " ".join(data["error_messages"])
+    assert "already taken" in message
+
+    assert "same stem" not in message, (
+        "the stems are 'one' and 'two'; blaming them sends the user after a "
+        "duplicate name that does not exist"
+    )
+    assert "rename one source image" not in message
+    # What is actually true, and what actually fixes it.
+    assert "same file" in message
+    assert "hard link" in message
+
+
+def test_same_stem_rejection_still_blames_the_stems(
+    test_client, test_db, tmp_path: Path
+):
+    """The path-key match keeps its message: there the stems really do collide."""
+    id_a, _ = _stage_image(tmp_path, "a", "dup.png", "alpha_tag")
+    id_b, _ = _stage_image(tmp_path, "b", "dup.jpg", "beta_tag")
+
+    out = tmp_path / "out"
+    out.mkdir()
+    resp = test_client.post("/api/tags/export-batch", json={
+        "image_ids": [id_a, id_b],
+        "output_folder": str(out),
+        "output_mode": "folder",
+        "content_mode": "tags",
+        "overwrite_policy": "overwrite",
+        "normalize_tag_underscores": False,
+    })
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+
+    assert data["error_count"] == 1
+    message = " ".join(data["error_messages"])
+    assert "same stem" in message
+    assert "hard link" not in message
+
+
 def test_beside_image_overwrite_keeps_hardlinked_aliases_as_one_caption(
     test_client, test_db, tmp_path: Path
 ):
