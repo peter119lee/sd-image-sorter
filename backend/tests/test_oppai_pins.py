@@ -20,7 +20,7 @@ executor`` family + the line-770 deep-read seam, ort/hf lazy-import wiring, the
 singleton rebuild matrix, the ``config.TAG_SCORES_*`` tag_scores seam, and the
 loader / file-resolution / session-helper contracts.
 
-SEAM NOTES a split MUST honor (see claude-oppai-pins-REPORT.md Census):
+SEAM NOTES a split MUST honor:
   * ``tests/test_model_service_pins.py`` replaces sys.modules['oppai_oracle_tagger']
     with a SimpleNamespace exposing ONLY ``OppaiOracleTagger`` + ``DEFAULT_MODEL``,
     then does ``from oppai_oracle_tagger import OppaiOracleTagger, DEFAULT_MODEL``.

@@ -1,7 +1,6 @@
 """Model/tag-table path-resolution mixin for WD14Tagger (split 2026-07).
 
-Methods moved VERBATIM from tagger.py (claude-tagger-pins-REPORT.md section
-6): _validate_model_file / _get_model_paths / _load_tags. Zero manifested
+Methods moved VERBATIM from tagger.py: _validate_model_file / _get_model_paths / _load_tags. Zero manifested
 lines. MODELS is origin-imported from config (the same dict object the
 facade re-exports; no suite patches ``tagger.MODELS``), and
 self._download_model resolves through the class MRO to the download mixin.

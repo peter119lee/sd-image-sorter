@@ -3,8 +3,7 @@
 Moved verbatim from services/image_service.py (decomposition 2026-07).
 services/image_service.py re-imports every name so each stays a facade module
 attribute (tests read image_service.SELECTION_IDS_MAX_RESPONSE /
-SELECTION_TOKEN_VERSION / VALID_SORT_OPTIONS, claude-imgsvc-pins-REPORT.md
-§3). Mixin BODY reads resolve through the facade at call time
+SELECTION_TOKEN_VERSION / VALID_SORT_OPTIONS). Mixin BODY reads resolve through the facade at call time
 (_svc().NAME) so facade-attribute patches keep landing; only def-time
 signature defaults (DEFAULT_PAGE_SIZE / PROMPT_MATCH_MODE_EXACT /
 SELECTION_TOKEN_DEFAULT_CHUNK) import from here directly — binding

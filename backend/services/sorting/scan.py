@@ -2,8 +2,7 @@
 
 Moved verbatim from services/sorting_service.py (decomposition 2026-07).
 The ``scan_folder`` seam and the heartbeat tuning constant resolve through
-the facade module at call time so existing monkeypatches keep landing
-(claude-sortsvc-pins-REPORT.md §3 route A).
+the facade module at call time so existing monkeypatches keep landing.
 """
 
 import logging
@@ -43,9 +42,9 @@ def _svc():
     """Resolve UNSAFE monkeypatch seams through the facade at call time.
 
     Tests patch re-imported names and module-scalar constants on
-    ``services.sorting_service`` (claude-sortsvc-pins-REPORT.md §3); a
-    ``from`` import here would freeze an independent binding those patches
-    silently miss. The lazy import avoids a facade<->mixin load cycle.
+    ``services.sorting_service``; a ``from`` import here would freeze an
+    independent binding those patches silently miss. The lazy import avoids
+    a facade<->mixin load cycle.
     """
     import services.sorting_service as sorting_service
 

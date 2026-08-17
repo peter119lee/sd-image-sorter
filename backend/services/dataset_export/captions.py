@@ -1,7 +1,7 @@
 """Caption assembly for the dataset export service.
 
 Functions moved verbatim from services/dataset_export_service.py
-(decomposition 2026-07, claude-dsexport-pins-REPORT.md §6). The shared
+(decomposition 2026-07). The shared
 caption-engine names (NL_COMPOSE_MODES / build_sidecar_content /
 compose_caption_with_nl / apply_caption_transforms) are origin-imported from
 services.tag_export_service — the same objects the facade re-binds — so both

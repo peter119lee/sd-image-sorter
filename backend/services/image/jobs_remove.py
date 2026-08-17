@@ -29,9 +29,8 @@ logger = logging.getLogger("services.image_service")
 def _svc():
     """Resolve facade-owned seams/constants through services.image_service at call time.
 
-    Tests patch module attributes on the facade (claude-imgsvc-pins-REPORT.md
-    §3); a ``from`` import here would freeze an independent binding those
-    patches silently miss. The lazy import avoids a facade<->mixin load cycle.
+    Tests patch module attributes on the facade; a ``from`` import here would
+    freeze an independent binding those patches silently miss. The lazy import avoids a facade<->mixin load cycle.
     """
     import services.image_service as image_service
 

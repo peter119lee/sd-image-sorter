@@ -1,13 +1,12 @@
 """Download engine + integrity guards for artist model assets.
 
-Moved verbatim from backend/artist_identifier.py (decomposition 2026-07,
-claude-artist-pins-REPORT.md section 6) except the
+Moved verbatim from backend/artist_identifier.py (decomposition 2026-07) except the
 manifest lines: reads of the facade-patched seam family (the _MAX_* caps,
 _EXPECTED_ARTIST_FILE_SHA256, ARTIST_KALOSCOPE_*/ARTIST_HF_MODEL_ID config binds,
 get_hf_endpoint_order/endpoint_label, and every cross-function call) resolve
 through _facade() at call time. ``urllib.request.urlretrieve`` stays a bare
 module-attr access: tests patch the shared urllib.request module singleton, so
-it is split-safe (report section 3). ARTIST_MODELSCOPE_REVISION/_ARTIST_USER_AGENT
+it is split-safe. ARTIST_MODELSCOPE_REVISION/_ARTIST_USER_AGENT
 are unpatched same-module constants (def-time default-arg bind preserved).
 """
 
@@ -27,8 +26,8 @@ logger = logging.getLogger("sd-image-sorter.artist")
 def _facade():
     """Resolve facade-owned seams/constants through artist_identifier at call time.
 
-    Tests patch module attributes on the facade (claude-artist-pins-REPORT.md
-    section 3): ~10 of these free functions are monkeypatched on
+    Tests patch module attributes on the facade: ~10 of these free functions
+    are monkeypatched on
     ``artist_identifier`` and called by the others, and the diagnostics/pin
     suites patch the facade ``__file__`` and its config bindings. A from-import
     here would freeze an independent binding those patches — and the

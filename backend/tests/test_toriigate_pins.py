@@ -19,7 +19,7 @@ ORDERING contract + the allow_cpu_fallback=True retry branch, the download
 supply-chain args, singleton rebuild matrix + kwarg-swallow, tag() fallback
 shapes, _generate_text generation contract, and the isolated string helpers.
 
-SEAM NOTES a split MUST honor (see claude-toriigate-pins-REPORT.md Census):
+SEAM NOTES a split MUST honor:
   * ``_sanitize_nl_text`` is inlined by migrations/019_sanitize_nl_captions.py;
     test_migration_019 asserts byte-parity. It must stay ``ToriiGateTagger.
     _sanitize_nl_text`` and behave identically.

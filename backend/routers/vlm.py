@@ -40,7 +40,7 @@ VLM_SETTINGS_PATH = CONFIG_DIR / "vlm-settings.json"
 # routers/vlm_batch_source.py; the 5 Ollama endpoints (route positions 13-17)
 # + _pull_state + _do_pull in routers/vlm_ollama.py, which registers on THIS
 # module's shared ``router`` at the tail import at the bottom of this file
-# (routers/images_parts precedent; claude-vlmrouter-pins-REPORT.md split map).
+# (routers/images_parts precedent).
 # THIS module stays a real FILE and the single import/monkeypatch surface:
 # the 3 rebind seams (_batch_task/_pull_task/_debug_chat_next_id) +
 # _batch_state(+lock) + the caption-batch accessor quartet + _build_config +

@@ -1,7 +1,6 @@
 """Kaloscope asset location + preparation orchestration.
 
-Moved verbatim from backend/artist_identifier.py (decomposition 2026-07,
-claude-artist-pins-REPORT.md section 6) except the
+Moved verbatim from backend/artist_identifier.py (decomposition 2026-07) except the
 manifest lines: every callee in the dense facade-patch call graph
 (_ensure_kaloscope_*_files, _fetch_artist_file, _hf_download_with_fallback,
 _locate_existing_kaloscope_files, _get_artist_model_root, _project_root,
@@ -24,8 +23,8 @@ logger = logging.getLogger("sd-image-sorter.artist")
 def _facade():
     """Resolve facade-owned seams/constants through artist_identifier at call time.
 
-    Tests patch module attributes on the facade (claude-artist-pins-REPORT.md
-    section 3): ~10 of these free functions are monkeypatched on
+    Tests patch module attributes on the facade: ~10 of these free functions
+    are monkeypatched on
     ``artist_identifier`` and called by the others, and the diagnostics/pin
     suites patch the facade ``__file__`` and its config bindings. A from-import
     here would freeze an independent binding those patches — and the

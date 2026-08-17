@@ -3,7 +3,7 @@ uploads, and folder browsing.
 
 Moved verbatim from services/sorting_service.py (decomposition 2026-07).
 parse_metadata_job / add_images_batch and the facet-limit constants resolve
-through the facade module at call time (report §3 route A); clear_gallery
+through the facade module at call time; clear_gallery
 and get_library_health stay on the facade with the TTL cache they touch.
 """
 
@@ -69,9 +69,9 @@ def _svc():
     """Resolve UNSAFE monkeypatch seams through the facade at call time.
 
     Tests patch re-imported names and module-scalar constants on
-    ``services.sorting_service`` (claude-sortsvc-pins-REPORT.md §3); a
-    ``from`` import here would freeze an independent binding those patches
-    silently miss. The lazy import avoids a facade<->mixin load cycle.
+    ``services.sorting_service``; a ``from`` import here would freeze an
+    independent binding those patches silently miss. The lazy import avoids
+    a facade<->mixin load cycle.
     """
     import services.sorting_service as sorting_service
 

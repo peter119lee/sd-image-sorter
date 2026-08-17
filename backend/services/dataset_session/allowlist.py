@@ -1,8 +1,7 @@
 """Session-path allowlist — the /api/dataset/local-thumbnail security gate.
 
-Moved from services/dataset_session_service.py (decomposition 2026-07,
-claude-dsession-pins-REPORT.md §4). _session_path_cache is the pinned
-in-place CONTAINER (never rebound anywhere — report §2): this module owns the
+Moved from services/dataset_session_service.py (decomposition 2026-07). _session_path_cache is the pinned
+in-place CONTAINER (never rebound anywhere): this module owns the
 one dict object, the facade re-exports the SAME object, and readers
 (tests/test_dataset_session_service.py:439 calls _session_path_cache.clear())
 mutate it in place. _session_path_lock travels with it.
@@ -41,7 +40,7 @@ def _svc():
     """Resolve facade-patched seams through services.dataset_session_service at call time.
 
     The pin suite patches ``_SESSION_PATH_CACHE_MAX`` on the facade module
-    object (claude-dsession-pins-REPORT.md §3b), and
+    object, and
     ``iter_scan_manifest_paths`` must resolve through the facade at call time
     (a module-level import here would cycle with manifest_store). The lazy
     import avoids a facade<->submodule load cycle.

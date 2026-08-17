@@ -1,6 +1,6 @@
 """HuggingFace download mixin for WD14Tagger (split from tagger.py, 2026-07).
 
-Methods moved from tagger.py (claude-tagger-pins-REPORT.md section 6):
+Methods moved from tagger.py:
 _download_model / _download_with_fallback. Manifested lines (the ONLY
 non-verbatim edits): the three not-None assert guards and the
 ``hf_hub_download(**kwargs)`` call resolve ``hf_hub`` through _svc()
@@ -28,9 +28,8 @@ logger = logging.getLogger("tagger")
 def _svc():
     """Resolve facade-owned lazy-import globals through ``tagger`` at call time.
 
-    Tests patch ``tagger.hf_hub`` on the facade (claude-tagger-pins-REPORT.md
-    section 3); a from-import here would freeze an independent binding those
-    patches silently miss. The lazy import avoids a facade<->mixin load cycle.
+    Tests patch ``tagger.hf_hub`` on the facade; a from-import here would
+    freeze an independent binding those patches silently miss. The lazy import avoids a facade<->mixin load cycle.
     """
     import tagger
 

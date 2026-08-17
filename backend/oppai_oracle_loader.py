@@ -1,7 +1,6 @@
 """Loader / file-resolution mixin for OppaiOracleTagger (split 2026-07).
 
-Methods moved from oppai_oracle_tagger.py (claude-oppai-pins-REPORT.md
-section 4): _model_config / _expected_local_paths / _validate_model_file /
+Methods moved from oppai_oracle_tagger.py: _model_config / _expected_local_paths / _validate_model_file /
 _download_with_fallback / _download_model / _get_model_paths /
 _build_session_options / _create_session / _session_uses_gpu /
 set_session_refresh_interval / _load_tags / load. Manifested lines (the
@@ -10,7 +9,7 @@ _svc() at call time (the pin suite patches ``oppai_oracle_tagger.ort`` /
 ``.hf_hub`` on the facade module object), the PAD/UNK/RATING tag constants
 resolve through _svc() (they stay DEFINED on the facade), and the three
 local ``config = self._model_config()`` shadows are renamed ``model_cfg``
-(DB1 in the pins report: the locals shadowed the module-level ``config``
+(the locals shadowed the module-level ``config``
 import). TAGGER_MODELS is origin-imported from config (the same dict
 object the facade binds; no suite patches it on the oppai module), as are
 endpoint_label / get_hf_endpoint_order from model_download_sources. The

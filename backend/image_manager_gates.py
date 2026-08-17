@@ -1,7 +1,6 @@
 """Pure metadata/fingerprint gate helpers for image_manager.
 
-Moved verbatim from image_manager.py (decomposition 2026-07, stage 1;
-claude-imgmanager-pins-REPORT.md §6). Stateless — no DB, no filesystem
+Moved verbatim from image_manager.py (decomposition 2026-07, stage 1). Stateless — no DB, no filesystem
 writes, and no monkeypatch-seam reads: every input is an argument, and
 PARSED_METADATA_VERSION (never patched; pinned by
 tests/test_metadata_parser_pins.py) is imported from its origin module

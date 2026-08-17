@@ -1,7 +1,6 @@
 """Upload/extract entry points for the Dataset Maker session service.
 
-Moved from services/dataset_session_service.py (decomposition 2026-07,
-claude-dsession-pins-REPORT.md §4). The async pair
+Moved from services/dataset_session_service.py (decomposition 2026-07). The async pair
 (upload_files_for_dataset / _extract_rar_into_dataset), the soft rarfile
 import, and the zip/rar decompression-bomb guards move VERBATIM except two
 seam lines:
@@ -37,7 +36,7 @@ def _svc():
 
     The reader suite patches ``_UPLOAD_DIR`` (read back by the facade-homed
     ``_get_upload_dir``) and ``_try_import_rarfile`` on the facade module
-    object (claude-dsession-pins-REPORT.md §3b); bare local calls here would
+    object; bare local calls here would
     make those patches miss. The lazy import avoids a facade<->submodule load
     cycle.
     """

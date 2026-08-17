@@ -1,7 +1,6 @@
 """Folder-scan + path-resolution entry points for the Dataset Maker session.
 
-Moved from services/dataset_session_service.py (decomposition 2026-07,
-claude-dsession-pins-REPORT.md §4). Bodies are VERBATIM except one seam line:
+Moved from services/dataset_session_service.py (decomposition 2026-07). Bodies are VERBATIM except one seam line:
 the page-size clamp inside scan_folder_for_dataset reads MAX_SCAN_RESULTS
 through _svc() at call time because the reader suite patches it on the
 facade module object (tests/test_dataset_session_service.py:299); the
@@ -46,9 +45,9 @@ logger = logging.getLogger("services.dataset_session_service")
 def _svc():
     """Resolve facade-patched seams through services.dataset_session_service at call time.
 
-    The reader suite patches ``MAX_SCAN_RESULTS`` on the facade module object
-    (claude-dsession-pins-REPORT.md §3b); the clamp must read that binding,
-    exactly as the monolith's module-global read did. The lazy import avoids
+    The reader suite patches ``MAX_SCAN_RESULTS`` on the facade module object;
+    the clamp must read that binding, exactly as the monolith's module-global
+    read did. The lazy import avoids
     a facade<->submodule load cycle.
     """
     import services.dataset_session_service as dataset_session_service

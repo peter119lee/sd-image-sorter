@@ -1,7 +1,6 @@
 """Output-path safety, preview/save endpoints, base64 decode, metadata copy.
 
-Methods moved from services/censor_service.py (decomposition 2026-07,
-claude-censorsvc-pins-REPORT.md section 6). Legacy preview/save preserve alpha
+Methods moved from services/censor_service.py (decomposition 2026-07). Legacy preview/save preserve alpha
 and encode truthful formats. The manifest lines in save_data
 and _decode_base64_image resolve MAX_SAVE_DATA_PIXELS / MAX_SAVE_DATA_BYTES
 through _svc() at call time (patched on the facade module object); the three
@@ -72,9 +71,8 @@ def _resolve_censor_output_format(source_format: Optional[str]) -> tuple[CensorO
 def _svc():
     """Resolve facade-owned seams/constants through services.censor_service at call time.
 
-    Tests patch module attributes on the facade (claude-censorsvc-pins-REPORT.md
-    section 3); a from-import here would freeze an independent binding those
-    patches silently miss. The lazy import avoids a facade<->mixin load cycle.
+    Tests patch module attributes on the facade; a from-import here would
+    freeze an independent binding those patches silently miss. The lazy import avoids a facade<->mixin load cycle.
     """
     import services.censor_service as censor_service
 

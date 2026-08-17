@@ -1,7 +1,6 @@
 """Scan-token manifest store for the Dataset Maker session service.
 
-Moved from services/dataset_session_service.py (decomposition 2026-07,
-claude-dsession-pins-REPORT.md §4) with every body VERBATIM except one seam:
+Moved from services/dataset_session_service.py (decomposition 2026-07) with every body VERBATIM except one seam:
 the five _get_scan_dir() call sites resolve through _svc() at call time,
 because the REBIND global pair _SCAN_DIR/_get_scan_dir stays homed on the
 facade FILE and the pin suite patches it there
@@ -11,7 +10,7 @@ hit the real data tree.
 
 iter_scan_manifest_entries keeps its pinned side effect: surfaced paths are
 registered with the thumbnail allowlist ONLY on full consumption of the
-generator (the trailing _register_thumbnail_paths calls; report §7-b) — do
+generator (the trailing _register_thumbnail_paths calls) — do
 not "optimize" them into per-yield calls.
 """
 from __future__ import annotations
@@ -34,9 +33,8 @@ logger = logging.getLogger("services.dataset_session_service")
 def _svc():
     """Resolve facade-patched seams through services.dataset_session_service at call time.
 
-    The pin suite patches ``_get_scan_dir`` on the facade module object
-    (claude-dsession-pins-REPORT.md §3b); a bare local call here would freeze
-    the unpatched binding. The lazy import avoids a facade<->submodule load
+    The pin suite patches ``_get_scan_dir`` on the facade module object; a bare
+    local call here would freeze the unpatched binding. The lazy import avoids a facade<->submodule load
     cycle.
     """
     import services.dataset_session_service as dataset_session_service

@@ -3,8 +3,7 @@
 Moved verbatim from services/image_service.py (decomposition 2026-07).
 services/image_service.py re-imports every name so the facade attributes the
 pin suite calls (image_service._coerce_* / _sanitize_filter_values) keep
-resolving. No test monkeypatches these names (report §3: string-form
-patches NONE; module-object patches are only db / move_file_to_trash /
+resolving. No test monkeypatches these names (string-form patches NONE; module-object patches are only db / move_file_to_trash /
 SELECTION_IDS_MAX_RESPONSE), so sibling mixins import them directly and the
 call sites stay verbatim.
 """

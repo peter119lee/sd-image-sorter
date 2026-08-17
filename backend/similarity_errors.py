@@ -1,7 +1,6 @@
 """Exception hierarchy for the similarity workflow (split from similarity.py, 2026-07).
 
-The 7 classes moved byte-verbatim from similarity.py lines 46-103
-(claude-similarity-pins-REPORT.md section 5). The ``similarity`` facade
+The 7 classes moved byte-verbatim from similarity.py lines 46-103. The ``similarity`` facade
 re-imports every class, so ``similarity.SimilaritySearchWindowTooLargeError``
 (and siblings) resolve to THESE SAME objects -- services.similarity_service
 imports all of them from ``similarity`` and maps them to HTTP codes, and

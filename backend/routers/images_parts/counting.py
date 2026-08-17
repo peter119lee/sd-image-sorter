@@ -1,7 +1,7 @@
 """Query-param count endpoint: GET /images/count (decomposed from routers/images.py).
 
 Verbatim slice of pre-split routers/images.py lines 940-1069 (registration
-position 4 (static, must precede {image_id}) of 9; claude-imgrouter-pins-REPORT.md §6).
+position 4 (static, must precede {image_id}) of 9).
 Registers on the ONE shared ``router`` defined in routers/images.py. Import
 routers.images (the facade), NOT this module: the facade's import sequence
 IS the route registration order (single-segment static GET routes must

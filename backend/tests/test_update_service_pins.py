@@ -3,8 +3,7 @@
 Step-0 pins-first safety net. These lock the CURRENT behavior of the in-app
 updater so a later verbatim split / refactor cannot silently change it. They
 are intentionally behavioral (not aspirational): where the current code has a
-quirk, it is pinned AS-IS and called out in the module docstring below and in
-``claude-updatesvc-pins-REPORT.md``.
+quirk, it is pinned AS-IS and called out in the module docstring below.
 
 SCOPE / NON-DUPLICATION
 -----------------------
@@ -26,7 +25,7 @@ invariants front and center:
   * Restart orchestration (launcher env branch, worker command, pending
     manifest shape).
 
-DORMANT BEHAVIOR PINNED AS-IS (see report §Dormant):
+DORMANT BEHAVIOR PINNED AS-IS:
   * ``_version_is_newer("3.5.0", "3.5.0-beta.1")`` is True: a final release
     outranks its own pre-release (fixed semver precedence) because ``_version_key``
     yields a shorter tuple that sorts first. This is pinned, not fixed.

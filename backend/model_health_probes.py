@@ -1,8 +1,7 @@
 """Torch/runtime probing helpers (split from model_health.py, 2026-07).
 
 _module_available / _module_installed / _probe_loaded_torch_runtime /
-_probe_torch_runtime moved here verbatim (claude-modelhealth-pins-REPORT.md
-SS5). Nothing here runs at import time: the 45s-timeout torch subprocess is
+_probe_torch_runtime moved here verbatim. Nothing here runs at import time: the 45s-timeout torch subprocess is
 forked only when _probe_torch_runtime is CALLED (and torch is not already in
 sys.modules), so importing this module stays light. _probe_torch_runtime
 resolves _probe_loaded_torch_runtime back through _svc() at call time so
@@ -24,9 +23,9 @@ from typing import Any, Dict
 def _svc():
     """Resolve facade-patched seams through model_health at call time.
 
-    Tests monkeypatch seam names on the facade module object
-    (claude-modelhealth-pins-REPORT.md SS3); a ``from`` import here would
-    freeze an independent binding those patches silently miss. The lazy
+    Tests monkeypatch seam names on the facade module object; a ``from``
+    import here would freeze an independent binding those patches silently
+    miss. The lazy
     import avoids a facade<->sibling load cycle.
     """
     import model_health

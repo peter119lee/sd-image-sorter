@@ -155,8 +155,7 @@ class RemoveBackgroundRequest(BaseModel):
 # ---------------------------------------------------------------------------
 # Decomposition (2026-07): the CensorService method bodies live in the
 # services/censor/ package as mixins, assembled below. THIS module remains a
-# real FILE and the single monkeypatch surface (claude-censorsvc-pins-REPORT.md
-# section 3/6 + tests/test_censor_service_pins.py):
+# real FILE and the single monkeypatch surface (tests/test_censor_service_pins.py):
 #   * The module constants above and the two model_health seam names
 #     (get_model_health / get_default_legacy_model_path) stay defined/imported
 #     HERE; mixin bodies resolve them through _svc() at call time so the 11

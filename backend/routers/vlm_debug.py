@@ -1,8 +1,7 @@
 """Pure debug/redaction/coercion helpers for the VLM captioning router.
 
 Decomposed from routers/vlm.py (2026-07): a verbatim slice of the pre-split
-lines 205-250, 271-295 and 326-357 (claude-vlmrouter-pins-REPORT.md split
-map). Import routers.vlm (the facade), NOT this module -- the facade
+lines 205-250, 271-295 and 326-357. Import routers.vlm (the facade), NOT this module -- the facade
 re-imports every helper BY REFERENCE, so callers (_append_debug_chat_event,
 _build_config, _run_batch) resolve them as facade globals and monkeypatches
 on the facade keep biting. Everything here is stateless: no module global

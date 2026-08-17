@@ -1,7 +1,6 @@
 """Vector-cache persistence family of ``SimilarityIndex`` (split from similarity.py, 2026-07).
 
-Methods moved verbatim from similarity.py (claude-similarity-pins-REPORT.md
-section 5): invalidate_vector_cache plus the on-disk persistence block --
+Methods moved verbatim from similarity.py: invalidate_vector_cache plus the on-disk persistence block --
 _get_index_dir / _persist_vector_cache / _load_persisted_vector_cache /
 _delete_persisted_vector_cache / _compute_embedding_signature /
 _ensure_vector_cache / _build_vector_cache / _try_cached_ranked_candidates
@@ -10,12 +9,12 @@ and the _PERSIST_* class constants (lines 994-1335).
 Manifested lines (the ONLY non-verbatim edits, marked ``# decomposition:``):
 ``_get_index_dir`` resolves ``get_state_dir`` through _svc() because
 conftest.py:66 autouse-patches ``similarity.get_state_dir`` for the WHOLE
-suite (report section 6 hazard 1 -- the split-killer; a ``from config import
+suite (the split-killer; a ``from config import
 get_state_dir`` here would leak persistence into the user's real STATE_DIR);
 the ``SIMILARITY_VECTOR_CACHE_ENABLED`` and ``bytes_to_embedding`` reads are
 facade-resolved for the same reason. ``similarity_ann.delete_index`` stays a
 module-qualified call on the real sibling module so patches on that module
-object keep landing (report section 6 hazard 7). The logger keeps the
+object keep landing. The logger keeps the
 historical "similarity" channel.
 """
 

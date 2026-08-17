@@ -3,8 +3,7 @@
 These pins lock the *current observable behavior* of the unified model
 discovery / readiness module ahead of a facade-plus-siblings split. They are a
 safety net, not an aspiration: where the code has a quirk or a latent bug it is
-pinned AS-IS and called out in ``claude-modelhealth-pins-REPORT.md`` §6, never
-"fixed" here.
+pinned AS-IS, never "fixed" here.
 
 Machine-state isolation is the load-bearing constraint. This machine has real
 downloaded models under gitignored ``models/`` / ``data/``; these pins must pass

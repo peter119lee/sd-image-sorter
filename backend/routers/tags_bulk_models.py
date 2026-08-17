@@ -1,8 +1,7 @@
 """Request models + warning types for the bulk tag router.
 
 Decomposed from routers/tags_bulk.py (2026-07): a verbatim slice of the
-pre-split lines 38, 40-56, 129-267 and 308-311
-(claude-tagsbulk-pins-REPORT.md split map). Import routers.tags_bulk (the
+pre-split lines 38, 40-56, 129-267 and 308-311. Import routers.tags_bulk (the
 facade), NOT this module -- the facade re-imports every name here BY
 REFERENCE so the FastAPI endpoint annotations, the pins suite and every
 historical ``routers.tags_bulk.<name>`` read resolve to the SAME objects

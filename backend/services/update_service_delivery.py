@@ -1,7 +1,6 @@
 """Release fetch, status, download integrity, and restart orchestration.
 
-Split out of ``services/update_service.py`` (2026-07) -- see
-claude-updatesvc-pins-REPORT.md. Moved VERBATIM: the version-key family
+Split out of ``services/update_service.py`` (2026-07). Moved VERBATIM: the version-key family
 (_normalize_version / _version_key / _version_is_newer, semver precedence:
 a final release outranks its own pre-release), _safe_version_text (the
 literal-dot-dot-survives quirk is pinned AS-IS), the archive member-name
@@ -140,9 +139,9 @@ def _sha256sum(file_path: Path) -> str:
 def _svc():
     """Resolve facade-patched seams through services.update_service at call time.
 
-    Tests monkeypatch seam names on the facade module object
-    (claude-updatesvc-pins-REPORT.md #3); a ``from`` import here would freeze
-    an independent binding those patches silently miss. The lazy import
+    Tests monkeypatch seam names on the facade module object; a ``from``
+    import here would freeze an independent binding those patches silently
+    miss. The lazy import
     avoids a facade<->submodule load cycle.
     """
     import services.update_service as update_service

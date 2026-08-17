@@ -1,7 +1,7 @@
 """Single-image endpoints: GET /images/{image_id} · PATCH caption (decomposed from routers/images.py).
 
 Verbatim slice of pre-split routers/images.py lines 1072-1151 (registration
-position 5 of 9; claude-imgrouter-pins-REPORT.md §6).
+position 5 of 9).
 Registers on the ONE shared ``router`` defined in routers/images.py. Import
 routers.images (the facade), NOT this module: the facade's import sequence
 IS the route registration order (single-segment static GET routes must

@@ -1,7 +1,7 @@
 """Validation gate, kohya trainer-config writer, and export-manifest writers.
 
 Functions moved verbatim from services/dataset_export_service.py
-(decomposition 2026-07, claude-dsexport-pins-REPORT.md §6). VALID_OUTPUT_MODES
+(decomposition 2026-07). VALID_OUTPUT_MODES
 / VALID_CONTENT_MODES are origin-imported from services.tag_export_service
 (the same objects the facade re-binds); the local enum tuples live in
 services.dataset_export._constants.

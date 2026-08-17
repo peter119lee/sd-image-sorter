@@ -40,7 +40,7 @@ BULK_TAG_ID_CHUNK_SIZE = 500
 # Decomposition (2026-07): the request models + warning types live in
 # routers/tags_bulk_models.py; the op-state singletons and the journal/
 # transaction helpers live in routers/tags_bulk_journal_ops.py
-# (claude-tagsbulk-pins-REPORT.md split map -- the state core moved WITH the
+# (the state core moved WITH the
 # journal/transaction helpers because _commit_tag_updates /
 # _raise_bulk_preparation_error / _bulk_tag_transaction call _record_op_error
 # and _record_journal_if_applied calls _scope_source; one home avoids an

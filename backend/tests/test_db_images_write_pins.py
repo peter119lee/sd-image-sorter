@@ -254,7 +254,7 @@ class TestAddImageUpsert:
 
         # ... but re-adding the same path WITHOUT loras (a lora-less rescan)
         # deletes the index rows and NULLs the column (full-row upsert, no
-        # COALESCE on loras). Pinned as-is; see the report's dormant-bug note.
+        # COALESCE on loras). Pinned as-is: a dormant bug, not desired behaviour.
         _add("/w/lora.png", prompt="1girl")
         assert _loras(image_id) == []
         assert _row(image_id)["loras"] is None

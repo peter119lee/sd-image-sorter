@@ -1,7 +1,6 @@
 """Service layer for model inventory and first-run model preparation.
 
-Compatibility FILE facade since the 2026-07 sibling-module split
-(claude-modelsvc-pins-REPORT.md §5): the download-progress family
+Compatibility FILE facade since the 2026-07 sibling-module split: the download-progress family
 (_download_progress + lock + get/_set + _direct_download_file), the
 download-scheme guard, the WD14/SAM3 runtime-repair helpers,
 _sam3_download_urls, the exception classes, the dependency-result plumbing,
@@ -46,8 +45,7 @@ from model_health import (
 from optional_dependencies import DependencyInstallResult, ensure_group, ensure_group_with_soft_deps
 
 # ---------------------------------------------------------------------------
-# Facade re-imports (sibling-module split 2026-07,
-# claude-modelsvc-pins-REPORT.md §5). Every moved name is re-imported so the
+# Facade re-imports (sibling-module split 2026-07). Every moved name is re-imported so the
 # historical monkeypatch/import surface (services.model_service.<name>) keeps
 # resolving on THIS module object; the moved bodies read patched seams back
 # through _svc() at call time. Unused-looking imports are intentional

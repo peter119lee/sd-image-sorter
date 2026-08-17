@@ -134,9 +134,8 @@ def _ensure_imports() -> None:
 
 # ---------------------------------------------------------------------------
 # Decomposition (2026-07): the pure caption-parsing half of ToriiGateTagger
-# lives in toriigate_caption_parsing as a mixin (claude-toriigate-pins-
-# REPORT.md section 4). THIS module remains a real FILE named
-# ``toriigate_tagger`` and the single monkeypatch surface:
+# lives in toriigate_caption_parsing as a mixin. THIS module remains a real
+# FILE named ``toriigate_tagger`` and the single monkeypatch surface:
 #   * The LAZY-IMPORT quartet stays DEFINED here in one namespace -- the
 #     ``torch`` / ``hf_hub`` / ``AutoProcessor`` /
 #     ``Qwen3_5ForConditionalGeneration`` globals and _ensure_imports --

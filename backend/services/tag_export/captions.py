@@ -1,6 +1,6 @@
 """Caption/sidecar content rendering core (split from services/tag_export_service.py).
 
-Moved verbatim (claude-tagexport-pins-REPORT.md §5.2). THIS module is the
+Moved verbatim. THIS module is the
 single ORIGIN of the identity-shared objects ``NL_COMPOSE_MODES`` /
 ``VALID_CONTENT_MODES`` and of the re-exported callables
 ``build_sidecar_content`` / ``compose_caption_with_nl`` /

@@ -2,7 +2,7 @@
 
 Decomposed from routers/vlm.py (2026-07): a verbatim slice of the pre-split
 lines 34-70, 407-410, 435-461, 491-495, 639-645, 751-771, 1183-1186 and
-1225-1228 (claude-vlmrouter-pins-REPORT.md split map). Import routers.vlm
+1225-1228. Import routers.vlm
 (the facade), NOT this module -- the facade re-imports every name here BY
 REFERENCE so the FastAPI endpoint annotations, the pins suite and every
 historical ``routers.vlm.<name>`` read resolve to the SAME class objects

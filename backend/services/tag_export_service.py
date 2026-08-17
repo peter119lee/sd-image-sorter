@@ -23,8 +23,7 @@ from utils.path_validation import normalize_user_path, sanitize_filename, valida
 # Decomposition (2026-07): every constant and helper below lives in the
 # services/tag_export/ package (selection / captions / sidecars / preview),
 # re-imported here BY REFERENCE. THIS module remains a real FILE and the
-# single import/monkeypatch surface (claude-tagexport-pins-REPORT.md §5/§6 +
-# tests/test_tag_export_pins.py):
+# single import/monkeypatch surface (tests/test_tag_export_pins.py):
 #   * The header import block above is kept verbatim (per-file F401 ignore in
 #     pyproject.toml) so every historical module attribute keeps resolving
 #     here — ``db`` in particular: tests patch tag_export_service.db.<fn>

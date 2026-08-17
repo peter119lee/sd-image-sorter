@@ -60,7 +60,7 @@ def _compute_embedding_content_fingerprint(image_path: str) -> Optional[str]:
 
 
 # Decomposition (2026-07): the exception hierarchy moved byte-verbatim to
-# similarity_errors (claude-similarity-pins-REPORT.md section 5). Re-imported so
+# similarity_errors. Re-imported so
 # every ``similarity.<Error>`` reference -- services.similarity_service's
 # HTTP-code mapping and the pin suite's identity checks -- keeps resolving to
 # the SAME class objects (re-export, not copies).
@@ -269,7 +269,7 @@ def embed_text(query: str) -> Optional[np.ndarray]:
 
 
 # Decomposition (2026-07): the pure byte/cosine helpers moved byte-verbatim to
-# similarity_math (claude-similarity-pins-REPORT.md section 5). Re-imported so
+# similarity_math. Re-imported so
 # ``similarity.embedding_to_bytes`` / ``bytes_to_embedding`` /
 # ``cosine_similarity`` keep resolving here for services.similarity_service,
 # services.duplicate_group_service and the suites that from-import them --
@@ -325,8 +325,7 @@ def embed_image_pil(pil_image: Image.Image) -> Optional[np.ndarray]:
 
 # ---------------------------------------------------------------------------
 # Decomposition (2026-07): the method families of SimilarityIndex live in the
-# similarity_* sibling modules as mixins (claude-similarity-pins-REPORT.md
-# sections 5-6). THIS module remains a real FILE named ``similarity`` at
+# similarity_* sibling modules as mixins. THIS module remains a real FILE named ``similarity`` at
 # backend/ depth and the single monkeypatch surface:
 #   * The MODEL/SINGLETON family stays DEFINED here in one namespace -- the
 #     ``_embed_model`` / ``_text_embed_model`` / ``_index`` lazy globals

@@ -4,7 +4,7 @@ The YOLO describe chain (_list_model_files, _parse_class_mapping,
 _load_yolo_class_names, _infer_yolo_model_profile, _build_yolo_capabilities,
 _describe_yolo_model, _list_yolo_model_files), the CLIP / legacy-YOLO / SAM3
 checkpoint locators, and the Kaloscope/LSNet artist resolvers moved here
-verbatim (claude-modelhealth-pins-REPORT.md SS5). Every facade-family read --
+verbatim. Every facade-family read --
 the config dir getters and constants (get_clip_model_dir, get_yolo_model_dir,
 get_sam3_model_dir, get_artist_model_dir, CLIP_MODEL_NAME,
 ARTIST_KALOSCOPE_CHECKPOINT, ARTIST_KALOSCOPE_CLASS_MAPPING,
@@ -47,9 +47,9 @@ CLIP_TEXT_REQUIRED_FILES = (
 def _svc():
     """Resolve facade-patched seams through model_health at call time.
 
-    Tests monkeypatch seam names on the facade module object
-    (claude-modelhealth-pins-REPORT.md SS3); a ``from`` import here would
-    freeze an independent binding those patches silently miss. The lazy
+    Tests monkeypatch seam names on the facade module object; a ``from``
+    import here would freeze an independent binding those patches silently
+    miss. The lazy
     import avoids a facade<->sibling load cycle.
     """
     import model_health

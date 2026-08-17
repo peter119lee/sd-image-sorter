@@ -94,7 +94,7 @@ def _ensure_imports():
 
 # ---------------------------------------------------------------------------
 # Decomposition (2026-07): the pure method families of WD14Tagger live in the
-# tagger_* sibling modules as mixins (claude-tagger-pins-REPORT.md section 6).
+# tagger_* sibling modules as mixins.
 # THIS module remains a real FILE named ``tagger`` and the single monkeypatch
 # surface:
 #   * The LAZY-IMPORT family stays DEFINED here in one namespace -- the

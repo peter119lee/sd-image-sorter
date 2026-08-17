@@ -1,7 +1,6 @@
 """Pure helpers for the model service (split from services/model_service.py, 2026-07).
 
-Functions moved verbatim from services/model_service.py
-(claude-modelsvc-pins-REPORT.md §5.1): the safe single-root zip extractor,
+Functions moved verbatim from services/model_service.py: the safe single-root zip extractor,
 the existing-file/tree materializers, the artist URL builders, and the two
 Civitai rich-error payload builders. The ONLY non-verbatim edits (see the
 split manifest): reads of facade-bound names (ARTIST_LSNET_RUNTIME_ZIP_URL,
@@ -23,9 +22,9 @@ from typing import Any, Dict
 def _svc():
     """Resolve facade-patched seams through services.model_service at call time.
 
-    Tests monkeypatch seam names on the facade module object
-    (claude-modelsvc-pins-REPORT.md §3); a ``from`` import here would freeze
-    an independent binding those patches silently miss. The lazy import
+    Tests monkeypatch seam names on the facade module object; a ``from``
+    import here would freeze an independent binding those patches silently
+    miss. The lazy import
     avoids a facade<->submodule load cycle.
     """
     import services.model_service as model_service

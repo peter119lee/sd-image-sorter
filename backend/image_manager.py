@@ -66,7 +66,7 @@ _DESTINATION_OPERATION_LOCK = threading.Lock()
 
 # --- Decomposition (2026-07): the executor-lifecycle helpers, pure gate
 # helpers and record builders moved verbatim to stateless sibling modules
-# (claude-imgmanager-pins-REPORT.md §6, stages 1-2). They are re-imported here
+# (stages 1-2). They are re-imported here
 # so every historical attribute keeps resolving at image_manager.<name> —
 # the pin suite imports them from this
 # module and the scan pipeline below reads them as THIS module's globals, so

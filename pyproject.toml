@@ -357,7 +357,7 @@ select = ["F", "E9"]
 # (which resolve their facade seams back through _svc() at call time), but the
 # import is kept so the historical module attribute
 # services.tagging_pipeline_service.ai_job_queue_store keeps resolving
-# (claude-tagpipe-pins-REPORT.md §5; tests/test_tagging_pipeline_pins.py,
+# (tests/test_tagging_pipeline_pins.py,
 # tests/test_tagging_pipeline_service.py patch this module object).
 "backend/services/tagging_pipeline_service.py" = ["F401"]
 # routers/vlm.py is the compatibility FILE facade for the vlm_models /

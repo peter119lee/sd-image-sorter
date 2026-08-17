@@ -1,7 +1,7 @@
 """Gallery listing endpoints: GET /images · /folders · /library-roots (decomposed from routers/images.py).
 
 Verbatim slice of pre-split routers/images.py lines 287-719 (registration
-position 1 of 9; claude-imgrouter-pins-REPORT.md §6).
+position 1 of 9).
 Registers on the ONE shared ``router`` defined in routers/images.py. Import
 routers.images (the facade), NOT this module: the facade's import sequence
 IS the route registration order (single-segment static GET routes must

@@ -9,7 +9,7 @@ import { expect, test, type Page } from '../fixtures/click-ledger'
  * pin the OBSERVABLE behavior of the load-bearing seams so a future split is
  * provably zero-behavior-change — the suite MUST pass before AND after.
  *
- * ASSEMBLY SHAPE (verified, see REPORT §1): scan-diagnostics.js is a classic
+ * ASSEMBLY SHAPE (verified): scan-diagnostics.js is a classic
  * (non-module, no 'use strict') script sharing ONE global lexical environment
  * with app.js and the other app/ parts (index.html loads it BEFORE app.js in
  * original line order). Consequence:
@@ -25,7 +25,7 @@ import { expect, test, type Page } from '../fixtures/click-ledger'
  *     OTHER classic modules (auto-refresh.js, library-roots-ui.js) read them
  *     through window.App. The split must preserve BOTH surfaces.
  *
- * OUT OF SCOPE (documented in the REPORT): the folder-start / 400-path-missing
+ * OUT OF SCOPE (deliberately deferred): the folder-start / 400-path-missing
  * flow (startScan + mapScanPathError) lives in the SIBLING scan-flow.js, not in
  * this file — it belongs to a future scan-flow pins spec.
  *

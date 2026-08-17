@@ -1,7 +1,6 @@
 """The two streaming engine functions: export_dataset + preview_dataset_export.
 
-Moved verbatim from services/dataset_export_service.py (decomposition 2026-07,
-claude-dsexport-pins-REPORT.md §6 stage 3) except the five manifested lines:
+Moved verbatim from services/dataset_export_service.py (decomposition 2026-07) except the five manifested lines:
 the closures read DATASET_EXPORT_RESPONSE_ITEM_LIMIT /
 DATASET_EXPORT_RECENT_ERROR_LIMIT / DATASET_EXPORT_DB_CHUNK_SIZE through
 _svc() at call time because tests patch them on the facade module object

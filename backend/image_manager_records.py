@@ -1,7 +1,6 @@
 """DB record builders for image_manager scans.
 
-Moved verbatim from image_manager.py (decomposition 2026-07, stage 1;
-claude-imgmanager-pins-REPORT.md §6). Stateless. SAFETY invariants pinned
+Moved verbatim from image_manager.py (decomposition 2026-07, stage 1). Stateless. SAFETY invariants pinned
 by tests/test_image_manager_pins.py: the placeholder record preserves
 library_order_time even when the source fingerprint no longer matches,
 and an error record NEVER drops the row. compact_metadata_json is

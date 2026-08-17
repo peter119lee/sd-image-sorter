@@ -75,8 +75,7 @@ from utils.path_validation import normalize_user_path, validate_folder_path
 # Decomposition (2026-07): the constants, Pydantic models, pure helpers, and
 # the two streaming engine functions live in the services/dataset_export/
 # package, re-imported below. THIS module remains a real FILE and the single
-# monkeypatch surface (claude-dsexport-pins-REPORT.md §2/§3/§6 +
-# tests/test_dataset_export_pins.py):
+# monkeypatch surface (tests/test_dataset_export_pins.py):
 #   * Synchronous export dependencies remain available through this facade for
 #     tests that patch export_service.shutil.copy2, des.db.update_image_path,
 #     des.render_stem, and des.DATASET_EXPORT_RESPONSE_ITEM_LIMIT. The engine

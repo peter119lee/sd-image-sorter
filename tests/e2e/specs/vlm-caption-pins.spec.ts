@@ -6,7 +6,7 @@ import { expect, test, type Page } from '../fixtures/click-ledger'
  * app.js -> app/*.js, image-reader, similar, smart-tag, censor, dataset, autosep,
  * manual-sort, prompt-lab, v321-ui, artist-ident splits).
  *
- * ASSEMBLY-SHAPE VERDICT (evidence in claude-vlmcaption-pins-REPORT.md §2):
+ * ASSEMBLY-SHAPE VERDICT:
  *   vlm-caption.js is a single object LITERAL —
  *       `const VLMCaption = { ...~1060 lines... };`  (line 6)
  *       `window.VLMCaption = VLMCaption;`            (line 1073, EOF publish)

@@ -1,7 +1,6 @@
 """Pydantic request/response models for the dataset export service.
 
-Moved verbatim from services/dataset_export_service.py (decomposition 2026-07,
-claude-dsexport-pins-REPORT.md §6). Defined ONCE here and re-exported by the
+Moved verbatim from services/dataset_export_service.py (decomposition 2026-07). Defined ONCE here and re-exported by the
 facade so the from-import bindings in routers/dataset.py keep class identity for
 FastAPI response_model coercion and request validation. No duplicate definition
 of these classes may ever exist.

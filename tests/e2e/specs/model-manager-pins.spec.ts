@@ -24,7 +24,7 @@ import { expect, test, type Page } from '../fixtures/click-ledger'
  *     singleton cleanup, Escape/backdrop close + focus restore,
  *   - openModelManager's setup-pulse/localStorage side effect + failure summary.
  *
- * ASSEMBLY SHAPE (verified, see REPORT §1): model-manager.js is a classic
+ * ASSEMBLY SHAPE (verified): model-manager.js is a classic
  * (non-module, no 'use strict') script sharing ONE global lexical environment
  * with app.js and the other app/ parts (index.html line 7117 loads it BEFORE
  * app.js in original line order). Consequence:

@@ -1,11 +1,9 @@
 """Step-0 characterization pins for ``backend/config.py``.
 
 These lock the *observable* behavior of the config namespace AS-IS so a future
-split (or a decision to exempt the file) cannot silently change it. See
-``claude-config-pins-REPORT.md`` for the file map, derivation chains, the
-two-census patch surface, and the split judgment these pins support.
+split (or a decision to exempt the file) cannot silently change it.
 
-Design constraints honored here (report section 6 hazards):
+Design constraints honored here:
 
 * ``config`` is the single most origin-imported namespace in the backend and
   every module constant is evaluated at IMPORT time. Reloading the real

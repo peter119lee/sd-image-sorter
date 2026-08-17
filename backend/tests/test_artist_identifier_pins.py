@@ -237,7 +237,7 @@ class TestReloadContract:
 
         assert isinstance(ai._model_lock, type(threading.Lock()))
         assert hasattr(ai, "_identifier")
-        # Declared-but-write-dead globals (documented in the report): present so a
+        # Declared-but-write-dead globals: present so a
         # `global _model, _processor, _model_source` in load() still binds.
         for name in ("_model", "_processor", "_model_source"):
             assert hasattr(ai, name)

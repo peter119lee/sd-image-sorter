@@ -1,7 +1,6 @@
 """DEFAULT_ARTISTS — sample artist-label data (pure data).
 
-Moved verbatim from backend/artist_identifier.py (decomposition 2026-07,
-claude-artist-pins-REPORT.md section 6). The facade re-exports DEFAULT_ARTISTS;
+Moved verbatim from backend/artist_identifier.py (decomposition 2026-07). The facade re-exports DEFAULT_ARTISTS;
 ArtistIdentifier.__init__ reads it as a facade global.
 """
 

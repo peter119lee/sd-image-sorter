@@ -1,13 +1,12 @@
 """Metadata-executor lifecycle helpers for image_manager scans.
 
-Moved verbatim from image_manager.py (decomposition 2026-07, stage 2;
-claude-imgmanager-pins-REPORT.md §6) except the manifested facade-resolved
+Moved verbatim from image_manager.py (decomposition 2026-07, stage 2) except the manifested facade-resolved
 read-sites (marked ``# decomposition:``). The tunable constants
 (SCAN_METADATA_EXECUTOR_MODE, SCAN_METADATA_BACKLOG_PER_WORKER,
 SCAN_METADATA_MIN_BACKLOG, SCAN_DB_BATCH_SIZE) and the executor classes
 (ThreadPoolExecutor / ProcessPoolExecutor) are read through the facade
 module object at call time because the existing suite monkeypatches them
-on ``image_manager`` (report §3) — a ``from`` import here would freeze
+on ``image_manager`` — a ``from`` import here would freeze
 independent bindings those patches silently miss (the sorting/scan.py
 ``image_manager_module.CONST`` precedent)."""
 

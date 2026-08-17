@@ -1,7 +1,6 @@
 """Mask cache/encode, mask-bounds coercion, and combined-mask builders.
 
-Methods moved verbatim from services/censor_service.py (decomposition 2026-07,
-claude-censorsvc-pins-REPORT.md section 6) except the lines listed in the split
+Methods moved verbatim from services/censor_service.py (decomposition 2026-07) except the lines listed in the split
 manifest: the facade-owned constants MASK_CACHE_TTL_SECONDS
 (_cleanup_mask_cache) and MASK_INLINE_DATA_PIXEL_THRESHOLD (_build_mask_payload)
 resolve through _svc() at call time because tests patch them on the facade
@@ -31,9 +30,8 @@ logger = logging.getLogger("services.censor_service")
 def _svc():
     """Resolve facade-owned seams/constants through services.censor_service at call time.
 
-    Tests patch module attributes on the facade (claude-censorsvc-pins-REPORT.md
-    section 3); a from-import here would freeze an independent binding those
-    patches silently miss. The lazy import avoids a facade<->mixin load cycle.
+    Tests patch module attributes on the facade; a from-import here would
+    freeze an independent binding those patches silently miss. The lazy import avoids a facade<->mixin load cycle.
     """
     import services.censor_service as censor_service
 

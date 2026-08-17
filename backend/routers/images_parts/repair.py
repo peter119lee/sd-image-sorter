@@ -1,7 +1,7 @@
 """Reconnect/repair endpoints: reconnect-missing/* · repair-candidates · repair-confirm (decomposed from routers/images.py).
 
 Verbatim slice of pre-split routers/images.py lines 804-937 (registration
-position 3 of 9; claude-imgrouter-pins-REPORT.md §6).
+position 3 of 9).
 Registers on the ONE shared ``router`` defined in routers/images.py. Import
 routers.images (the facade), NOT this module: the facade's import sequence
 IS the route registration order (single-segment static GET routes must

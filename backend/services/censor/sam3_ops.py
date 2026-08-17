@@ -1,7 +1,6 @@
 """SAM3 mask refinement, text segmentation, background removal, batch refine.
 
-Methods moved verbatim from services/censor_service.py (decomposition 2026-07,
-claude-censorsvc-pins-REPORT.md section 6) except the manifest lines: all four
+Methods moved verbatim from services/censor_service.py (decomposition 2026-07) except the manifest lines: all four
 methods resolve get_model_health through _svc() at call time. The seam is
 patched on the facade module object across the reader suites, so a bare
 re-import here would make those patches silently miss. The lazy
@@ -30,9 +29,8 @@ logger = logging.getLogger("services.censor_service")
 def _svc():
     """Resolve facade-owned seams/constants through services.censor_service at call time.
 
-    Tests patch module attributes on the facade (claude-censorsvc-pins-REPORT.md
-    section 3); a from-import here would freeze an independent binding those
-    patches silently miss. The lazy import avoids a facade<->mixin load cycle.
+    Tests patch module attributes on the facade; a from-import here would
+    freeze an independent binding those patches silently miss. The lazy import avoids a facade<->mixin load cycle.
     """
     import services.censor_service as censor_service
 

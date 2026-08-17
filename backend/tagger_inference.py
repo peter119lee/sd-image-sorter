@@ -1,7 +1,6 @@
 """Inference-flow mixin for WD14Tagger (split from tagger.py, 2026-07).
 
-Methods moved VERBATIM from tagger.py (claude-tagger-pins-REPORT.md section
-6): _run_inference / _finalize_processed_images / _session_uses_gpu /
+Methods moved VERBATIM from tagger.py: _run_inference / _finalize_processed_images / _session_uses_gpu /
 release_session / set_session_refresh_interval / tag / _runtime_chunk_size /
 _empty_runtime_info / _merge_runtime_info / tag_batch. Zero manifested lines
 -- these methods read no facade module globals (exclusive_ai_runtime is

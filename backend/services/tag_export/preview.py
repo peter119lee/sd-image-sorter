@@ -1,6 +1,6 @@
 """Export preview rendering (split from services/tag_export_service.py).
 
-Moved verbatim (claude-tagexport-pins-REPORT.md §5.4). Import through
+Moved verbatim. Import through
 services.tag_export_service. ``import database as db`` keeps the shared
 patch seam (tag_export_service.db.<fn> mutates the SHARED database module
 object); the lazy in-function imports (services.export_template_engine,

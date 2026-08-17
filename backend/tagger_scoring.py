@@ -1,7 +1,6 @@
 """Scoring / rating mixin for WD14Tagger (split from tagger.py, 2026-07).
 
-Methods moved VERBATIM from tagger.py (claude-tagger-pins-REPORT.md section
-6): _build_empty_result / _normalize_output_probs / _process_probs /
+Methods moved VERBATIM from tagger.py: _build_empty_result / _normalize_output_probs / _process_probs /
 _derive_fallback_rating -- the pure probs-to-payload half of WD14Tagger.
 Zero manifested lines. TAG_SCORES_ENABLED / TAG_SCORES_FLOOR stay read
 through the ``config`` module object at call time (the origin the suites

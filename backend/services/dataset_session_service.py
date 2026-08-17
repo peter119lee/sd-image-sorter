@@ -73,7 +73,7 @@ logger = logging.getLogger(__name__)
 # store, the session-path allowlist, and the scan/upload entry points live in
 # the services/dataset_session/ package, re-imported below. THIS module
 # remains a real FILE and the single monkeypatch surface
-# (claude-dsession-pins-REPORT.md §2/§3/§6 + tests/test_dataset_session_pins.py):
+# (tests/test_dataset_session_pins.py):
 #   * The two REBIND global pairs stay DEFINED here — _SCAN_DIR with
 #     _get_scan_dir, and _UPLOAD_DIR with _get_upload_dir. A ``global``
 #     rebind only affects the defining module's binding, and both seams are

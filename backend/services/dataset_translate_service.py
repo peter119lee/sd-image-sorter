@@ -41,7 +41,7 @@ from __future__ import annotations
 # DEFAULT_CACHE_DIR) are NOT re-imported by value; the module-class swap at the
 # bottom live-forwards get/set on this module to dataset_translate_cache, so a
 # facade-side monkeypatch and a cache-side ``global`` rebind stay one storage
-# location (the #1 way this split could silently break — see the pins report).
+# location (the #1 way this split could silently break).
 
 import json
 import sys

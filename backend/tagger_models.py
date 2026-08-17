@@ -1,7 +1,7 @@
 """WD14/ONNX tagger-model catalog (split from config.py, 2026-07).
 
 ``TAGGER_MODELS`` moved VERBATIM from config.py lines 455-637
-(claude-config-pins-REPORT.md section 4, split leaf #1): a pure literal with
+(split leaf #1): a pure literal with
 zero config dependencies. config.py re-exports it BY REFERENCE
 (``from tagger_models import TAGGER_MODELS``) so the ~20 historical
 ``from config import TAGGER_MODELS`` consumers (three alias it as ``MODELS``)

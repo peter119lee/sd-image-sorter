@@ -1,7 +1,6 @@
 """Caption-to-tag parsing + sanitize mixin for ToriiGateTagger (split 2026-07).
 
-Code moved verbatim from toriigate_tagger.py (claude-toriigate-pins-REPORT.md
-section 4): the pure parsing half of the class (_strip_reasoning through
+Code moved verbatim from toriigate_tagger.py: the pure parsing half of the class (_strip_reasoning through
 _build_result plus _resize_for_inference) and the caption tables it reads
 (RATING_TAGS / EXPLICIT_HINT_TAGS / CAPTION_*). The ONLY non-verbatim edits:
 _resize_for_inference resolves TORIIGATE_MAX_IMAGE_PIXELS (5 read sites),

@@ -3,7 +3,7 @@ plus the by-path preview its UI uses for not-yet-indexed candidate files.
 
 Methods moved verbatim from services/image_service.py (decomposition
 2026-07). get_thumbnail_async resolves through the facade at call time
-(latent bare-import seam, claude-imgsvc-pins-REPORT.md §3).
+(latent bare-import seam).
 """
 
 import io
@@ -24,9 +24,8 @@ from utils.path_validation import ALLOWED_IMAGE_EXTENSIONS, normalize_user_path,
 def _svc():
     """Resolve facade-owned seams/constants through services.image_service at call time.
 
-    Tests patch module attributes on the facade (claude-imgsvc-pins-REPORT.md
-    §3); a ``from`` import here would freeze an independent binding those
-    patches silently miss. The lazy import avoids a facade<->mixin load cycle.
+    Tests patch module attributes on the facade; a ``from`` import here would
+    freeze an independent binding those patches silently miss. The lazy import avoids a facade<->mixin load cycle.
     """
     import services.image_service as image_service
 

@@ -1,7 +1,7 @@
 """Pure planning / path-safety helpers for the dataset export service.
 
 Functions moved verbatim from services/dataset_export_service.py
-(decomposition 2026-07, claude-dsexport-pins-REPORT.md §6) except the one
+(decomposition 2026-07) except the one
 manifested line: _plan_single_rename resolves render_stem through _svc() at
 call time because the pin suite patches it on the facade module object
 (tests/test_dataset_export_pins.py monkeypatch.setattr(des, "render_stem",
@@ -45,9 +45,9 @@ logger = logging.getLogger("services.dataset_export_service")
 def _svc():
     """Resolve facade-patched seams through services.dataset_export_service at call time.
 
-    The pin suite patches ``render_stem`` on the facade module object
-    (claude-dsexport-pins-REPORT.md §3); a ``from`` import here would freeze
-    an independent binding that patch silently misses. The lazy import avoids
+    The pin suite patches ``render_stem`` on the facade module object; a
+    ``from`` import here would freeze an independent binding that patch
+    silently misses. The lazy import avoids
     a facade<->submodule load cycle.
     """
     import services.dataset_export_service as dataset_export_service

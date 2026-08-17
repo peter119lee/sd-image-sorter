@@ -1,7 +1,6 @@
 """Update-channel resolution + SSRF host allowlist for the update service.
 
-Split out of ``services/update_service.py`` (2026-07) -- see
-claude-updatesvc-pins-REPORT.md. The SSRF allowlist block (the host tables
+Split out of ``services/update_service.py`` (2026-07). The SSRF allowlist block (the host tables
 plus _host_from_url / _host_is_github / _host_is_internal /
 _is_safe_proxy_prefix / _is_safe_channel_url) moved VERBATIM: the
 exact-or-subdomain boundary in _host_is_github and the 172.16-31 numeric
@@ -145,9 +144,9 @@ def _is_safe_channel_url(url: str) -> bool:
 def _svc():
     """Resolve facade-patched seams through services.update_service at call time.
 
-    Tests monkeypatch seam names on the facade module object
-    (claude-updatesvc-pins-REPORT.md #3); a ``from`` import here would freeze
-    an independent binding those patches silently miss. The lazy import
+    Tests monkeypatch seam names on the facade module object; a ``from``
+    import here would freeze an independent binding those patches silently
+    miss. The lazy import
     avoids a facade<->submodule load cycle.
     """
     import services.update_service as update_service

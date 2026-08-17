@@ -1,8 +1,7 @@
 """Ollama local-model management endpoints for the VLM captioning router.
 
 Decomposed from routers/vlm.py (2026-07): a verbatim slice of the pre-split
-lines 1154-1182, 1187-1224 and 1229-1247 (claude-vlmrouter-pins-REPORT.md
-split map, vlm_local_models row). Import routers.vlm (the facade), NOT
+lines 1154-1182, 1187-1224 and 1229-1247 (vlm_local_models row). Import routers.vlm (the facade), NOT
 this module: the facade imports this module LAST, so the five @router
 endpoints here register at route-table positions 13-17 on the ONE shared
 ``router`` defined in routers/vlm.py (routers/images_parts precedent; the

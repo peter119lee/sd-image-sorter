@@ -182,7 +182,7 @@ def preprocess_image(
 # ---------------------------------------------------------------------------
 # Decomposition (2026-07): the loader / inference method families of
 # OppaiOracleTagger live in the oppai_oracle_loader / oppai_oracle_inference
-# sibling modules as mixins (claude-oppai-pins-REPORT.md section 4). THIS
+# sibling modules as mixins. THIS
 # module remains a real FILE named ``oppai_oracle_tagger`` and the single
 # monkeypatch surface:
 #   * The LAZY-IMPORT family stays DEFINED here in one namespace -- the

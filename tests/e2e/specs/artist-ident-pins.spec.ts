@@ -6,7 +6,7 @@ import { expect, test, type Page } from '../fixtures/click-ledger'
  * app.js -> app/*.js, image-reader, similar, smart-tag, censor, dataset, autosep,
  * manual-sort, prompt-lab, v321-ui splits).
  *
- * ASSEMBLY-SHAPE VERDICT (evidence in claude-artistident-pins-REPORT.md §2):
+ * ASSEMBLY-SHAPE VERDICT:
  *   artist-ident.js is a single object LITERAL —
  *       `const ArtistIdent = { ...~1160 lines... };`  (line 6)
  *       `window.ArtistIdent = ArtistIdent;`           (line 1168)

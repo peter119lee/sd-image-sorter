@@ -1,7 +1,6 @@
 """Device/provider toggles for artist identification (pure helpers).
 
-Moved verbatim from backend/artist_identifier.py (decomposition 2026-07,
-claude-artist-pins-REPORT.md section 6). Zero facade-owned reads: both functions
+Moved verbatim from backend/artist_identifier.py (decomposition 2026-07). Zero facade-owned reads: both functions
 take everything as arguments and probe torch lazily at call time. The facade
 re-exports them; the gpu-toggle suite calls them as facade attributes.
 """

@@ -1,7 +1,6 @@
 """ANN top-k bypass family of ``SimilarityIndex`` (split from similarity.py, 2026-07).
 
-Methods moved verbatim from similarity.py (claude-similarity-pins-REPORT.md
-section 5): _ensure_ann_index / top_k_similar / _stream_top_k (lines
+Methods moved verbatim from similarity.py: _ensure_ann_index / top_k_similar / _stream_top_k (lines
 1337-1469), routing through the EXISTING ``similarity_ann`` sibling module.
 
 Manifested line (the ONLY non-verbatim edit, marked ``# decomposition:``):
@@ -9,7 +8,7 @@ the ``SIMILARITY_ANN_ENABLED`` read resolves through _svc() at call time
 because test_similarity_ann.py patches it on the ``similarity`` module
 object. ``similarity_ann.hnswlib_available`` / ``load_index`` /
 ``build_index`` stay module-qualified calls on the real sibling module so
-patches on that module object keep landing (report section 6 hazard 7).
+patches on that module object keep landing.
 """
 
 from typing import Any, Dict, List, Optional, Set, Tuple

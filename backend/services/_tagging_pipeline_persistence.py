@@ -1,7 +1,6 @@
 """Write-through persistence + restore surface of the tagging pipeline.
 
-Split out of ``services/tagging_pipeline_service.py`` (2026-07) -- see
-claude-tagpipe-pins-REPORT.md section 5. ``_TaggingPipelinePersistenceMixin``
+Split out of ``services/tagging_pipeline_service.py`` (2026-07). ``_TaggingPipelinePersistenceMixin``
 is assembled into ``TaggingPipelineService`` by the facade; the serialize
 helpers (_serialize_payload / _deserialize_payload / _serialize_queue_entry)
 moved here with their only callers.
@@ -11,7 +10,7 @@ of facade module-scope names -- ``_start_lock`` (the ONE shared
 cross-service start lock), the KIND_* constants, ``_utc_now_iso``,
 ``_fingerprint`` and the ``_QueuedPipelineJob`` dataclass -- resolve
 through ``_svc()`` at call time, so the shared-lock identity and the
-facade monkeypatch surface (claude-tagpipe-pins-REPORT.md section 6) are
+facade monkeypatch surface are
 preserved with a single definition each and no facade<->submodule load
 cycle. Behavior invariants stay verbatim: best-effort persistence NEVER
 raises into a queue mutation, and the function-local lazy
@@ -36,8 +35,7 @@ logger = logging.getLogger("services.tagging_pipeline_service")  # historical ch
 def _svc():
     """Resolve facade module-scope seams through services.tagging_pipeline_service at call time.
 
-    ``_start_lock`` must stay ONE object at the facade module scope
-    (claude-tagpipe-pins-REPORT.md section 6.1); resolving it -- and the
+    ``_start_lock`` must stay ONE object at the facade module scope; resolving it -- and the
     KIND_* constants, _utc_now_iso, _fingerprint, _QueuedPipelineJob --
     lazily keeps a single definition on the facade module (the historical
     patch surface) and avoids a facade<->submodule load cycle.

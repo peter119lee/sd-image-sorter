@@ -1,7 +1,6 @@
 """Search/ranking method family of ``SimilarityIndex`` (split from similarity.py, 2026-07).
 
-Methods moved verbatim from similarity.py (claude-similarity-pins-REPORT.md
-section 5): the progress trio get_progress / _record_issue / request_cancel
+Methods moved verbatim from similarity.py: the progress trio get_progress / _record_issue / request_cancel
 (lines 360-384) and the search/ranking core search_by_id / search_by_upload /
 search_by_text / find_duplicates / _normalize_similarity_window /
 _rank_candidate_rows / _iter_embedding_candidate_chunks /
@@ -16,11 +15,11 @@ every read of a name the suites patch on the ``similarity`` module object --
 constants DUPLICATE_SYNC_MAX_EMBEDDINGS / DUPLICATE_CHUNK_SIZE /
 SIMILARITY_SEARCH_MAX_WINDOW / SIMILARITY_SEARCH_CHUNK_SIZE -- resolves
 through _svc() at call time; a from-import here would freeze independent
-bindings those patches silently miss (report section 6). The exception
+bindings those patches silently miss. The exception
 classes are imported from their defining module ``similarity_errors``
 (identity is preserved by the facade re-export; they are raise sites, not
 patch surfaces), and the def-time default constants come from ``config``
-exactly as the original module bound them (report section 6 hazard 5). The
+exactly as the original module bound them. The
 logger keeps the historical "similarity" channel.
 """
 

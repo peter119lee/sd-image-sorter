@@ -44,8 +44,7 @@ set_image_service = _image_service_provider.set
 # ---------------------------------------------------------------------------
 # Decomposition (2026-07): the 40 endpoint registrations and the request/
 # response models live in the routers/images_parts/ package, all registering
-# on THIS module's single shared ``router`` (claude-imgrouter-pins-REPORT.md
-# §6 + tests/test_images_router_pins.py). THIS module remains a real FILE and
+# on THIS module's single shared ``router`` (tests/test_images_router_pins.py). THIS module remains a real FILE and
 # the single import/monkeypatch surface:
 #   * ``router`` / ``_image_service_provider`` / ``get_image_service`` /
 #     ``set_image_service`` stay DEFINED here — main.py mounts images.router,

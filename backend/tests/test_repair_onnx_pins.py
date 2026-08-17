@@ -11,9 +11,9 @@ the ``_detect_gpu_vendor`` cross-module seam consumed by
 
 These are CHARACTERIZATION pins: they lock in what the code does *today* so a
 later verbatim split / refactor cannot silently change behaviour. Where a pin
-documents a dormant edge (see the module map in the report), it pins the
-current behaviour AS-IS and the report flags it — the pin is not an assertion
-that the behaviour is desirable.
+documents a dormant edge it pins the current behaviour AS-IS and says so in
+the test docstring — the pin is not an assertion that the behaviour is
+desirable.
 
 Hermetic: every subprocess / pip / metadata / probe seam is stubbed; no real
 installs, no real network, no real nvidia-smi. Only temp files created here are

@@ -1,8 +1,7 @@
 """Op-state singletons + journal/transaction helpers for the bulk tag router.
 
 Decomposed from routers/tags_bulk.py (2026-07): a verbatim slice of the
-pre-split lines 57-128, 455-483 and 500-681
-(claude-tagsbulk-pins-REPORT.md split map). Import routers.tags_bulk (the
+pre-split lines 57-128, 455-483 and 500-681. Import routers.tags_bulk (the
 facade), NOT this module -- the facade re-imports every name here BY
 REFERENCE, so ``_op_lock`` / ``_op_run_lock`` / ``_op_state`` stay single
 shared objects on both modules (tests/test_tags_bulk_pins.py

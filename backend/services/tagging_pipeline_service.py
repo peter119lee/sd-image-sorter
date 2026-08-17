@@ -46,7 +46,7 @@ from services.service_provider import ServiceProvider
 
 # Facade split (2026-07): the write-through persistence/restore surface lives
 # in services/_tagging_pipeline_persistence.py (mixin assembled into the class
-# below). Every module-scope seam in claude-tagpipe-pins-REPORT.md section 5
+# below). Every module-scope seam listed below
 # -- the shared _start_lock, _server_loop + accessors, smart_tag_service,
 # _start_queued_vlm_batch, KIND_*, and the provider tail -- stays in THIS file.
 from services._tagging_pipeline_persistence import _TaggingPipelinePersistenceMixin

@@ -1,7 +1,6 @@
 """Pure embedding byte/cosine helpers (split from similarity.py, 2026-07).
 
-Moved byte-verbatim from similarity.py lines 260-276
-(claude-similarity-pins-REPORT.md section 5). The ``similarity`` facade
+Moved byte-verbatim from similarity.py lines 260-276. The ``similarity`` facade
 re-imports all three, so ``similarity.embedding_to_bytes`` /
 ``bytes_to_embedding`` / ``cosine_similarity`` keep resolving there for
 services.similarity_service, services.duplicate_group_service, embed_batch's

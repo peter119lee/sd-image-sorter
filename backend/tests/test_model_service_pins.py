@@ -2,9 +2,8 @@
 
 These pins lock the *current observable behavior* of the model inventory /
 preparation service ahead of a facade-plus-package split. They are the safety
-net, not an aspiration: where the code has a quirk or a latent bug it is pinned
-AS-IS and called out in ``claude-modelsvc-pins-REPORT.md`` §6, never "fixed"
-here.
+net, not an aspiration: where the code has a quirk or a latent bug it is
+pinned AS-IS, never "fixed" here.
 
 Machine-state isolation is the load-bearing constraint. This machine has real
 downloaded models under gitignored ``models/`` / ``data/``; these pins must pass
@@ -520,7 +519,7 @@ def test_wd14_repair_skips_on_unsupported_platform(monkeypatch):
 
 def test_wd14_repair_reports_ok_when_no_discrete_gpu_expected(monkeypatch):
     # A CPU-only box with no discrete GPU vendor reports ok=True even though the
-    # repaired provider list has no CUDA/DML entry — pinned AS-IS (see report §6).
+    # repaired provider list has no CUDA/DML entry — pinned AS-IS, not fixed here.
     monkeypatch.setattr(model_service.platform, "system", lambda: "Windows")
     monkeypatch.setitem(
         sys.modules,

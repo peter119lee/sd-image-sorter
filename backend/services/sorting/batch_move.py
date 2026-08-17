@@ -2,7 +2,7 @@
 
 Moved verbatim from services/sorting_service.py (decomposition 2026-07).
 The verify_image_readable seam and BATCH_MOVE_FETCH_CHUNK resolve through
-the facade module at call time (report §3 route A).
+the facade module at call time.
 """
 
 import logging
@@ -33,9 +33,9 @@ def _svc():
     """Resolve UNSAFE monkeypatch seams through the facade at call time.
 
     Tests patch re-imported names and module-scalar constants on
-    ``services.sorting_service`` (claude-sortsvc-pins-REPORT.md §3); a
-    ``from`` import here would freeze an independent binding those patches
-    silently miss. The lazy import avoids a facade<->mixin load cycle.
+    ``services.sorting_service``; a ``from`` import here would freeze an
+    independent binding those patches silently miss. The lazy import avoids
+    a facade<->mixin load cycle.
     """
     import services.sorting_service as sorting_service
 

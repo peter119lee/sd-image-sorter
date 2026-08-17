@@ -1,7 +1,6 @@
 """Detection dispatch, target-family filtering, model listing, and error mapping.
 
-Methods moved verbatim from services/censor_service.py (decomposition 2026-07,
-claude-censorsvc-pins-REPORT.md section 6) except the manifest lines: detect()
+Methods moved verbatim from services/censor_service.py (decomposition 2026-07) except the manifest lines: detect()
 and list_models() resolve get_model_health, and _resolve_legacy_model_path
 resolves get_default_legacy_model_path, through _svc() at call time. Both names
 are patched on the facade module object across the reader suites, so a bare
@@ -42,9 +41,8 @@ class DetectionBackendFailure(TypedDict):
 def _svc():
     """Resolve facade-owned seams/constants through services.censor_service at call time.
 
-    Tests patch module attributes on the facade (claude-censorsvc-pins-REPORT.md
-    section 3); a from-import here would freeze an independent binding those
-    patches silently miss. The lazy import avoids a facade<->mixin load cycle.
+    Tests patch module attributes on the facade; a from-import here would
+    freeze an independent binding those patches silently miss. The lazy import avoids a facade<->mixin load cycle.
     """
     import services.censor_service as censor_service
 

@@ -6,7 +6,7 @@ the model doesn't tie it to individually-tagged features. The audit mandated
 a reviewable checklist, never silent deletion — this service only COMPUTES
 candidates; the user picks which ones feed the export blacklist.
 
-Two signals, both from the report's spec:
+Two signals:
 - a stay-list heuristic keeps candidates to innate-trait families (clothing /
   pose / composition tags are never offered);
 - a learned intersection keeps only tags present in >= ``min_ratio`` of the

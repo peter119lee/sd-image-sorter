@@ -53,7 +53,7 @@ logger = logging.getLogger("sd-image-sorter.artist")
 
 
 # ---------------------------------------------------------------------------
-# Decomposition re-imports (2026-07, claude-artist-pins-REPORT.md section 6).
+# Decomposition re-imports (2026-07).
 # artist_identifier stays a FILE facade: tests/test_artist_gpu_toggle.py
 # importlib.reload()s THIS module expecting the `from config import ...` block,
 # `_model_lock = threading.Lock()`, `_identifier = None`, and the def-time

@@ -32,8 +32,8 @@ off-event-loop count resolution. This file locks the currently-UNCOVERED
 *structural* seams a split must keep identical, plus a compact self-standing HTTP
 layer so the pins stand on their own. It DELIBERATELY does NOT re-implement the
 reader net's full batch-execution / persistence-rollback matrix (that would
-duplicate ~15 monkeypatch tests for no split-safety gain — deferred, cited in
-the report's DRAFT-REVIEW section). The structural seams pinned here:
+duplicate ~15 monkeypatch tests for no split-safety gain — deferred by
+design). The structural seams pinned here:
 
 1. Route-table identity — the exact (path, sorted(methods), name, endpoint)
    tuples in REGISTRATION order. Decorator order == OpenAPI order; a split that
@@ -347,8 +347,8 @@ class TestBatchTaskRebindSeam:
         'cancelled' status. In practice ``_run_batch``'s finally sets
         running=False before the task settles, so the ``if running`` guard is
         usually False and this is inert — hence dormant. Locked so a split cannot
-        silently change either the guard or the label; see the report's
-        dormant-bug section."""
+        silently change either the guard or the label. A dormant bug pinned
+        AS-IS, not desired behaviour."""
         with vlm._batch_state_lock:
             vlm._batch_state["running"] = True
         vlm._on_batch_task_done(_FakeTask(cancelled=True, exception=None))

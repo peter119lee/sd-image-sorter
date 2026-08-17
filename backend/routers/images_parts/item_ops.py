@@ -1,7 +1,7 @@
 """Per-image operation endpoints: reparse · rating (decomposed from routers/images.py).
 
 Verbatim slice of pre-split routers/images.py lines 1547-1605 (registration
-position 8 of 9; claude-imgrouter-pins-REPORT.md §6).
+position 8 of 9).
 Registers on the ONE shared ``router`` defined in routers/images.py. Import
 routers.images (the facade), NOT this module: the facade's import sequence
 IS the route registration order (single-segment static GET routes must

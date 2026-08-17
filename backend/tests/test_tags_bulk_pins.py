@@ -13,8 +13,8 @@ split into a ``routers/tags_bulk_parts/`` family (all registering on the SAME
 self-standing behavior layer (sections 7-8) that drives every endpoint
 end-to-end so the pins stand on their own. It DELIBERATELY does NOT re-implement
 the reader net's fault-injection rollback / journal-truncation matrix (that
-would duplicate 15+ monkeypatch tests for no split-safety gain — deferred and
-cited in the report's DRAFT-REVIEW section). The structural seams:
+would duplicate 15+ monkeypatch tests for no split-safety gain — deferred by
+design). The structural seams:
 
 1. Route-table identity — the exact (path, methods, name, endpoint) tuples in
    REGISTRATION order. Decorator order == OpenAPI order; a split that re-imports
@@ -52,7 +52,7 @@ Behavior layer (HTTP, standard test_client temp DB, sections 7-8):
 DORMANT BUG PINNED AS-IS (see test_tagmode_uppercase_rejected_...): ``tagMode``'s
 field-level ``pattern="^(and|or)$"`` pre-empts the model_validator's ``.lower()``
 normalization, so ``"OR"`` 422s while the sibling ``promptMatchMode`` accepts
-``"CONTAINS"``. Flagged in the report; locked here so a split can't mask it.
+``"CONTAINS"``. A known inconsistency, locked here so a split can't mask it.
 
 Machine-state isolation: structural + model pins touch no DB and mutate no
 global; HTTP pins use the standard ``test_client`` (its own temp DB). No real
@@ -389,8 +389,8 @@ class TestFilterContractContracts:
         it. The adjacent ``promptMatchMode`` has NO field pattern, so its
         identical-intent normalizer DOES lowercase ``"CONTAINS"``. Two sibling
         fields, same normalization comment, opposite behavior. Locked here so a
-        decomposition cannot quietly change either side; see the report's
-        dormant-bug section for the fix options."""
+        decomposition cannot quietly change either side. A dormant bug pinned
+        AS-IS; see the sibling promptMatchMode field for the fix options."""
         with pytest.raises(ValidationError):
             tb.BulkTagFilterContract(tagMode="OR")
         # Sibling field with the same intent behaves the opposite way:

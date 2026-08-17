@@ -10,8 +10,7 @@ test_backend_file_argument_resolves_to_the_backend_root pin locks). The
 bare-import seams (resolve_existing_indexed_image_path,
 reparse_image_metadata, save_and_reconcile_checked, verify_image_readable,
 parse_image, get_thumbnail_async) resolve through the facade so module-object
-monkeypatches on services.image_service keep landing
-(claude-imgsvc-pins-REPORT.md §3).
+monkeypatches on services.image_service keep landing.
 """
 
 import io
@@ -62,9 +61,8 @@ logger = logging.getLogger("services.image_service")
 def _svc():
     """Resolve facade-owned seams/constants through services.image_service at call time.
 
-    Tests patch module attributes on the facade (claude-imgsvc-pins-REPORT.md
-    §3); a ``from`` import here would freeze an independent binding those
-    patches silently miss. The lazy import avoids a facade<->mixin load cycle.
+    Tests patch module attributes on the facade; a ``from`` import here would
+    freeze an independent binding those patches silently miss. The lazy import avoids a facade<->mixin load cycle.
     """
     import services.image_service as image_service
 
@@ -77,22 +75,22 @@ def resolve_existing_indexed_image_path(*args, **kwargs):
 
 
 def reparse_image_metadata(*args, **kwargs):
-    """Facade-seam proxy (latent seam, claude-imgsvc-pins-REPORT.md §3)."""
+    """Facade-seam proxy (latent seam)."""
     return _svc().reparse_image_metadata(*args, **kwargs)
 
 
 def save_and_reconcile_checked(*args, **kwargs):
-    """Facade-seam proxy (latent seam, claude-imgsvc-pins-REPORT.md §3)."""
+    """Facade-seam proxy (latent seam)."""
     return _svc().save_and_reconcile_checked(*args, **kwargs)
 
 
 def verify_image_readable(*args, **kwargs):
-    """Facade-seam proxy (latent seam, claude-imgsvc-pins-REPORT.md §3)."""
+    """Facade-seam proxy (latent seam)."""
     return _svc().verify_image_readable(*args, **kwargs)
 
 
 def parse_image(*args, **kwargs):
-    """Facade-seam proxy (latent seam, claude-imgsvc-pins-REPORT.md §3)."""
+    """Facade-seam proxy (latent seam)."""
     return _svc().parse_image(*args, **kwargs)
 
 

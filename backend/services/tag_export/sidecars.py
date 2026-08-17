@@ -1,6 +1,6 @@
 """Sidecar allocation + batch/combined export writers (split from services/tag_export_service.py).
 
-Moved verbatim (claude-tagexport-pins-REPORT.md §5.3) except the ONE
+Moved verbatim except the ONE
 documented anchor recompute in ``_get_combined_export_dir`` (see the
 function body). Import through services.tag_export_service — the facade
 is the monkeypatch surface.
@@ -12,7 +12,7 @@ Seams kept verbatim:
     here too. Never switch to ``from database import <fn>``.
   * ``_allocate_output_path`` MUTATES its ``image`` argument (pops the
     ``_sidecar_stem_override`` that export_tags_batch_request seeds per
-    row) — do not "fix" this to an immutable copy (report §6.5).
+    row) — do not "fix" this to an immutable copy.
   * The identity-shared objects are origin-imported from
     services.tag_export.captions by reference (never re-declared).
 """
@@ -592,7 +592,6 @@ def _get_combined_export_dir() -> Path:
     # (services/tag_export_service.py -> services/tag_export/sidecars.py),
     # so the backend-root anchor is parents[2] instead of parent.parent.
     # Target stays backend/data/combined-exports
-    # (claude-tagexport-pins-REPORT.md §5 note + §6.4).
     target = Path(__file__).resolve().parents[2] / "data" / "combined-exports"
     target.mkdir(parents=True, exist_ok=True)
     return target

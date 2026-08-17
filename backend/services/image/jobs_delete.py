@@ -6,7 +6,7 @@ except the lines listed in the split manifest: the facade-owned
 DELETE_FETCH_CHUNK resolves through _svc() at call time. move_file_to_trash
 resolves through the facade so the six existing
 monkeypatch(image_service.move_file_to_trash) tests keep landing
-(claude-imgsvc-pins-REPORT.md §3, UNSAFE-class seam).
+(UNSAFE-class seam).
 """
 
 import logging
@@ -31,9 +31,8 @@ logger = logging.getLogger("services.image_service")
 def _svc():
     """Resolve facade-owned seams/constants through services.image_service at call time.
 
-    Tests patch module attributes on the facade (claude-imgsvc-pins-REPORT.md
-    §3); a ``from`` import here would freeze an independent binding those
-    patches silently miss. The lazy import avoids a facade<->mixin load cycle.
+    Tests patch module attributes on the facade; a ``from`` import here would
+    freeze an independent binding those patches silently miss. The lazy import avoids a facade<->mixin load cycle.
     """
     import services.image_service as image_service
 

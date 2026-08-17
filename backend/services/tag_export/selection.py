@@ -1,13 +1,13 @@
 """Selection-token decode + filtered-ID fan-out (split from services/tag_export_service.py).
 
-Moved verbatim (claude-tagexport-pins-REPORT.md §5.1). Import through
+Moved verbatim. Import through
 services.tag_export_service: routers/vlm lazy-imports
 ``count_selection_token_ids`` from the facade at call time and
 tests/test_routers/test_vlm.py monkeypatches it THERE, so external callers
 must keep resolving these names on the facade module object.
 
-``EXPORT_DB_CHUNK_SIZE`` lives HERE (not in sidecars.py as the report map
-sketched) because it is a def-time default argument of
+``EXPORT_DB_CHUNK_SIZE`` lives HERE (not in sidecars.py, where the original
+split map placed it) because it is a def-time default argument of
 ``_iter_id_list_chunks`` / ``iter_selection_token_id_chunks`` below and
 sidecars.py already imports from this module — defining it in sidecars
 would create a selection<->sidecars import cycle.

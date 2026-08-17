@@ -13,7 +13,7 @@ single-line / Anima category sections). This file adds direct helper-unit
 coverage, template-render edge cases, consumer identity seams, and a value-parity
 guard, so a split that renames or relocates a name fails loudly here.
 
-DORMANT behaviors are pinned AS-IS and flagged in the report, not fixed:
+DORMANT behaviors are pinned AS-IS, not fixed:
   * ``process_tags`` sorts a ``confidence`` of exactly ``0.0`` as if it were the
     ``1.0`` default (``t.get("confidence") or 1.0`` treats 0.0 as falsy).
   * ``is_kaomoji_tag`` classifies any underscore tag whose every segment is

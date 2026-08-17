@@ -1,6 +1,6 @@
 """Preprocess + session-metadata mixin for WD14Tagger (split 2026-07).
 
-Methods moved from tagger.py (claude-tagger-pins-REPORT.md section 6):
+Methods moved from tagger.py:
 _refresh_session_metadata / _preprocess_paths / _preprocess. Manifested
 line (the ONLY non-verbatim edit): _preprocess_paths resolves
 _get_preprocess_executor through _svc() at call time -- the executor pair

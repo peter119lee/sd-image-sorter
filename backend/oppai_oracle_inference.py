@@ -1,7 +1,6 @@
 """Inference mixin for OppaiOracleTagger (split from oppai_oracle_tagger.py, 2026-07).
 
-Methods moved from oppai_oracle_tagger.py (claude-oppai-pins-REPORT.md
-section 4): _process_probs / _build_empty_result / _run_inference /
+Methods moved from oppai_oracle_tagger.py: _process_probs / _build_empty_result / _run_inference /
 _recreate_gpu_session / _run_batch_inference_adaptive /
 _maybe_refresh_session / tag / _preprocess_paths / tag_batch. Manifested
 lines (the ONLY non-verbatim edits): _preprocess_paths resolves

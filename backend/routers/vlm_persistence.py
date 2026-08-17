@@ -1,7 +1,7 @@
 """VLM result persistence -- the vocab-gated caption/tag store writers.
 
 Decomposed from routers/vlm.py (2026-07): a verbatim slice of the pre-split
-lines 546-633 (claude-vlmrouter-pins-REPORT.md split map). Import
+lines 546-633. Import
 routers.vlm (the facade), NOT this module -- the facade re-imports
 _persist_vlm_result/_persist_tags BY REFERENCE, so their callers
 (caption_single, _run_batch) resolve them as facade globals and

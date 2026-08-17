@@ -6,8 +6,7 @@ from __future__ import annotations
 
 # Split (2026-07) into two sibling mixin modules + this facade, every moved
 # line VERBATIM except the documented _svc() seam reads (contract:
-# tests/test_update_service_pins.py 49 pins + the update family suites;
-# claude-updatesvc-pins-REPORT.md):
+# tests/test_update_service_pins.py 49 pins + the update family suites):
 #
 #   * update_service_channel  -- SSRF host allowlist + channel resolution
 #                                (_UpdateChannelMixin)

@@ -72,8 +72,7 @@ from utils.source_paths import resolve_existing_indexed_image_path
 # ---------------------------------------------------------------------------
 # Decomposition (2026-07): the ImageService method bodies live in the
 # services/image/ package as mixins, assembled below. THIS module remains a
-# real FILE and the single monkeypatch surface (claude-imgsvc-pins-REPORT.md
-# §3/§6 + tests/test_image_service_pins.py):
+# real FILE and the single monkeypatch surface (tests/test_image_service_pins.py):
 #   * move_file_to_trash stays DEFINED here (module-global UNSAFE seam,
 #     patched six times by tests/test_routers/test_images.py); the
 #     jobs_delete mixin calls it through this module at call time so those

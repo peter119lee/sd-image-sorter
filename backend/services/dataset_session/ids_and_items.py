@@ -1,9 +1,9 @@
 """Item builders + thumbnail/id helpers for the Dataset Maker session.
 
 Constants and bodies moved VERBATIM from services/dataset_session_service.py
-(decomposition 2026-07, claude-dsession-pins-REPORT.md §4). Pure leaf: no
+(decomposition 2026-07). Pure leaf: no
 module state and no facade-patched seams — every name here is unpatched in
-the test tree (report §3b census), so sibling modules origin-import these by
+the test tree (whole-tree patch census), so sibling modules origin-import these by
 name and the facade re-exports them.
 
 The ds_id producers are coupling-pinned (tests/test_dataset_session_pins.py

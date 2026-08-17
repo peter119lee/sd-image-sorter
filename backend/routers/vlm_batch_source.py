@@ -1,7 +1,7 @@
 """Batch image-source builders for the VLM captioning router.
 
 Decomposed from routers/vlm.py (2026-07): a verbatim slice of the pre-split
-lines 634-638 and 646-750 (claude-vlmrouter-pins-REPORT.md split map).
+lines 634-638 and 646-750.
 Import routers.vlm (the facade), NOT this module -- the facade re-imports
 every name BY REFERENCE, so _start_claimed_caption_batch resolves
 _build_batch_image_source as a facade global and monkeypatches on the

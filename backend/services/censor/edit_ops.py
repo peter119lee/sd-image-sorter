@@ -1,7 +1,6 @@
 """Non-destructive edit-operation appliers and save_operations.
 
-Methods moved verbatim from services/censor_service.py (decomposition 2026-07,
-claude-censorsvc-pins-REPORT.md section 6) except the manifest lines:
+Methods moved verbatim from services/censor_service.py (decomposition 2026-07) except the manifest lines:
 _apply_mask_effect_operation resolves MAX_INLINE_OPERATION_MASK_PIXELS through
 _svc() at call time (facade-patched constant family), and save_operations
 passes the facade _BACKEND_FILE as backend_file= (this module sits one level
@@ -39,9 +38,8 @@ logger = logging.getLogger("services.censor_service")
 def _svc():
     """Resolve facade-owned seams/constants through services.censor_service at call time.
 
-    Tests patch module attributes on the facade (claude-censorsvc-pins-REPORT.md
-    section 3); a from-import here would freeze an independent binding those
-    patches silently miss. The lazy import avoids a facade<->mixin load cycle.
+    Tests patch module attributes on the facade; a from-import here would
+    freeze an independent binding those patches silently miss. The lazy import avoids a facade<->mixin load cycle.
     """
     import services.censor_service as censor_service
 

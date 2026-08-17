@@ -64,8 +64,7 @@ from utils.source_paths import resolve_existing_indexed_image_path
 # ---------------------------------------------------------------------------
 # Decomposition (2026-07): the SortingService method bodies live in the
 # services/sorting/ package as mixins, assembled below. THIS module remains a
-# real FILE and the single monkeypatch surface (claude-sortsvc-pins-REPORT.md
-# §3/§6 + tests/test_sorting_service_pins.py):
+# real FILE and the single monkeypatch surface (tests/test_sorting_service_pins.py):
 #   * UNSAFE re-imported seams (verify_image_readable, scan_folder,
 #     move_image, copy_image, parse_metadata_job, add_images_batch) and
 #     module-scalar constants (SCAN_LOG_HEARTBEAT_SECONDS,

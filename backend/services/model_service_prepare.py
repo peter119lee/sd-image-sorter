@@ -1,7 +1,6 @@
 """prepare_model routing table (split from services/model_service.py, 2026-07).
 
-_prepare_model is ModelService.prepare_model's body moved here
-(claude-modelsvc-pins-REPORT.md §5.1). Lazy in-function imports (tagger,
+_prepare_model is ModelService.prepare_model's body moved here. Lazy in-function imports (tagger,
 toriigate_tagger, oppai_oracle_tagger, similarity, artist_identifier,
 nudenet_detector, aesthetic, config) stay in-function -- they re-resolve per
 call, so sys.modules stubs keep working and startup stays light. Every
@@ -28,9 +27,9 @@ from model_download_sources import log_model_artifact_status
 def _svc():
     """Resolve facade-patched seams through services.model_service at call time.
 
-    Tests monkeypatch seam names on the facade module object
-    (claude-modelsvc-pins-REPORT.md §3); a ``from`` import here would freeze
-    an independent binding those patches silently miss. The lazy import
+    Tests monkeypatch seam names on the facade module object; a ``from``
+    import here would freeze an independent binding those patches silently
+    miss. The lazy import
     avoids a facade<->submodule load cycle.
     """
     import services.model_service as model_service

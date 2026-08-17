@@ -1,7 +1,6 @@
 """Model-inventory branch table (split from services/model_service.py, 2026-07).
 
-_build_inventory is ModelService.build_model_inventory's body moved here
-(claude-modelsvc-pins-REPORT.md §5.1): the facade method fetches
+_build_inventory is ModelService.build_model_inventory's body moved here: the facade method fetches
 ``health = get_model_health()`` (facade-bound seam) and delegates; every
 remaining facade-family read (PROJECT_ROOT, TAGGER_MODELS, the config dir
 getters, PRIVACY_YOLO_PAGE_URL, SAM3_MODELSCOPE_URL, RECOMMENDED_MODEL_IDS)
@@ -21,9 +20,9 @@ from typing import Any, Dict, List
 def _svc():
     """Resolve facade-patched seams through services.model_service at call time.
 
-    Tests monkeypatch seam names on the facade module object
-    (claude-modelsvc-pins-REPORT.md §3); a ``from`` import here would freeze
-    an independent binding those patches silently miss. The lazy import
+    Tests monkeypatch seam names on the facade module object; a ``from``
+    import here would freeze an independent binding those patches silently
+    miss. The lazy import
     avoids a facade<->submodule load cycle.
     """
     import services.model_service as model_service

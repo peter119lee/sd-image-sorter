@@ -1,8 +1,7 @@
 """Mask/geometry rendering primitives for the censor edit-operation engine.
 
 Methods moved verbatim from services/censor/edit_ops.py (mixin re-split
-2026-07; originally extracted from services/censor_service.py, see
-claude-censorsvc-pins-REPORT.md section 6). SAFETY INVARIANT kept
+2026-07; originally extracted from services/censor_service.py). SAFETY INVARIANT kept
 byte-verbatim here: _apply_mask_crop_style routes unrecognized styles to the
 mosaic default, so a mistyped or future style still censors the masked region
 instead of exposing raw pixels (never-fallback-to-uncensored).

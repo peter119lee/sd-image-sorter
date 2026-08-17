@@ -1,7 +1,7 @@
 """Settings-file IO for SD Image Sorter (split from config.py, 2026-07).
 
 Bodies moved VERBATIM from config.py lines 169-280
-(claude-config-pins-REPORT.md section 4, split leaf #2):
+(split leaf #2):
 DEFAULT_THUMBNAIL_CACHE_MAX_MB / MAX_THUMBNAIL_CACHE_MAX_MB, VALID_MIRRORS,
 get_download_mirror / save_download_mirror, _read_app_settings /
 _write_app_settings, _normalize_thumbnail_cache_max_mb,
@@ -22,7 +22,7 @@ report forbids (config imports this module mid-file).
 ``DEFAULT_THUMBNAIL_CACHE_MAX_MB`` / ``MAX_THUMBNAIL_CACHE_MAX_MB`` are
 OWNED here (not facade-resolved) because
 ``_normalize_thumbnail_cache_max_mb``'s def-time default argument cannot be
-resolved lazily; the report's two-census sweep shows nothing patches them
+resolved lazily; a full patch-surface census showed nothing patches them
 and nothing in config.py's remaining body reads them.
 """
 import json
