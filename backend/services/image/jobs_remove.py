@@ -140,11 +140,38 @@ class RemoveJobsMixin:
             return self._remove_progress.copy()
 
     def reset_remove_progress(self) -> Dict[str, Any]:
+        """Reset a stuck remove-from-gallery job back to idle (refused while running).
+
+        ``cancel_remove`` publishes ``cancelling`` and leaves the terminal state
+        to the worker. A worker that died first strands the status there, and
+        ``start_remove_selected_job`` then rejects every later remove with HTTP
+        409 until the app restarts. Bumping the run id neutralizes an abandoned
+        worker that later wakes up, so it cannot overwrite what this reset just
+        published.
+
+        This job is a clone of the delete job, so it follows
+        ``reset_delete_progress`` exactly: 409 on a genuinely running job,
+        "Nothing to reset" only when it really was already idle, and a distinct
+        success answer otherwise. It previously reported "Nothing to reset" even
+        when it had just cleared a stranded ``cancelling`` state, and refused a
+        running job with a 200 dict its three siblings raise 409 for.
+        """
         with self._remove_lock:
-            if self._remove_progress["status"] == "running":
-                return {"status": "running", "message": "Cannot reset a running job"}
-            self._remove_progress = self._build_default_remove_progress_state()
-            return {"status": self._remove_progress["status"], "message": "Nothing to reset"}
+            status = self._remove_progress["status"]
+            if status == "running":
+                raise HTTPException(status_code=409, detail="Cannot reset remove while it is still running")
+            if status == "idle":
+                return {"status": "idle", "message": "Nothing to reset"}
+            self._remove_run_id += 1
+            if self._remove_cancel_event is not None:
+                self._remove_cancel_event.set()
+                self._remove_cancel_event = None
+            self._remove_progress = {
+                **self._build_default_remove_progress_state(),
+                "message": "Reset by user",
+                "updated_at": time.time(),
+            }
+            return {"status": "reset", "message": "Remove progress reset to idle"}
 
     def cancel_remove(self) -> Dict[str, Any]:
         with self._remove_lock:

@@ -15,9 +15,11 @@ diagnosis away all over again.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
+from fastapi import BackgroundTasks
 
 import services.sorting_service as ss
 from exceptions import FileOperationError
@@ -123,3 +125,61 @@ class TestMoveFailureReporting:
 
         assert "another process" in result["error"]
         assert str(library) not in result["error"]
+
+
+class TestBatchMoveFailureReporting:
+    """Auto-Separate is the third move surface and needs the same treatment.
+
+    It never lost the cause the way the other two did, but it reported
+    ``str(exc)`` verbatim: the FileOperationError preamble duplicated, the
+    message spread over the lines the OS put in it, and every absolute path
+    intact. That is precisely the shape the frontend formatter throws away.
+    """
+
+    def test_batch_move_failure_reports_a_cause_the_frontend_can_show(
+        self, test_db, tmp_path, svc, monkeypatch
+    ):
+        library = tmp_path / "library"
+        library.mkdir()
+        original = _write_png(library / "00042.png", "blue")
+        destination = tmp_path / "keepers"
+
+        test_db.add_image(
+            path=str(original),
+            filename="00042.png",
+            generator="unknown",
+            metadata_json="{}",
+        )
+
+        def _denied(**_kwargs):
+            raise FileOperationError(
+                "Permission denied: [WinError 5] Access is denied:\n"
+                f"'{original}' -> '{destination / '00042.png'}'",
+                path=str(original),
+                operation="move",
+            )
+
+        monkeypatch.setattr(svc, "_apply_file_operation", _denied)
+
+        background_tasks = BackgroundTasks()
+        svc.batch_move_images(
+            ss.BatchMoveRequest(
+                destination_folder=str(destination),
+                generators=["unknown"],
+            ),
+            background_tasks,
+        )
+        background_tasks.tasks[0].func()
+
+        progress = svc.get_batch_move_progress()
+        assert progress["errors"] == 1
+        reported = progress["recent_errors"][0]["error"]
+
+        assert "Permission denied" in reported
+        assert "00042.png" in reported
+        # The three rules frontend/js/modules/utils/errors.js:122 applies before
+        # it discards a message and substitutes a canned sentence.
+        assert str(library) not in reported
+        assert re.search(r"[A-Za-z]:\\", reported) is None
+        assert "\n" not in reported
+        assert len(reported) < 180

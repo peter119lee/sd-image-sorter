@@ -1,12 +1,14 @@
-"""A stuck move / batch-move / delete job must be recoverable without a restart.
+"""A stuck move / batch-move / delete / remove job must be recoverable without
+a restart.
 
-``cancel_move``, ``cancel_batch_move`` and ``cancel_delete`` all publish a
-``cancelling`` status and leave the terminal state to the worker. When the
-worker is gone, that status is permanent — and it is inside the busy set that
-``start_move_job`` / ``batch_move_images`` / ``start_delete_selected_job``
-reject with HTTP 409. The three "reset a stuck job" endpoints existed for
-exactly that situation but never assigned their progress state, so they
-answered successfully while the feature stayed blocked until the app restarted.
+``cancel_move``, ``cancel_batch_move``, ``cancel_delete`` and ``cancel_remove``
+all publish a ``cancelling`` status and leave the terminal state to the worker.
+When the worker is gone, that status is permanent — and it is inside the busy
+set that ``start_move_job`` / ``batch_move_images`` /
+``start_delete_selected_job`` / ``start_remove_selected_job`` reject with HTTP
+409. The "reset a stuck job" endpoints existed for exactly that situation but
+never assigned their progress state, so they answered successfully while the
+feature stayed blocked until the app restarted.
 
 Each test therefore asserts the job is *runnable again*, not merely that reset
 returned something.
@@ -83,6 +85,37 @@ class TestStuckJobReset:
             == "started"
         )
 
+    def test_reset_remove_progress_makes_a_stranded_remove_runnable_again(self):
+        from services.image_service import ImageService
+
+        service = ImageService()
+        request = SimpleNamespace(image_ids=[999999], selection_token=None)
+        service._remove_progress["status"] = "cancelling"
+
+        with pytest.raises(HTTPException) as excinfo:
+            service.start_remove_selected_job(request, BackgroundTasks())
+        assert excinfo.value.status_code == 409
+
+        outcome = service.reset_remove_progress()
+
+        assert service.get_remove_progress()["status"] == "idle"
+        # A reset that really reset must not tell the user it did nothing.
+        assert outcome["message"] != "Nothing to reset"
+        assert (
+            service.start_remove_selected_job(request, BackgroundTasks())["status"]
+            == "started"
+        )
+
+    def test_reset_remove_progress_reports_nothing_to_reset_only_when_idle(self):
+        from services.image_service import ImageService
+
+        service = ImageService()
+
+        assert service.reset_remove_progress() == {
+            "status": "idle",
+            "message": "Nothing to reset",
+        }
+
     def test_reset_move_progress_still_refuses_a_running_job(self, svc):
         svc._move_progress["status"] = "running"
 
@@ -112,6 +145,34 @@ class TestStuckJobReset:
 
         assert excinfo.value.status_code == 409
         assert service.get_delete_progress()["status"] == "running"
+
+    def test_reset_remove_progress_still_refuses_a_running_job(self):
+        from services.image_service import ImageService
+
+        service = ImageService()
+        service._remove_progress["status"] = "running"
+
+        with pytest.raises(HTTPException) as excinfo:
+            service.reset_remove_progress()
+
+        assert excinfo.value.status_code == 409
+        assert service.get_remove_progress()["status"] == "running"
+
+    def test_reset_remove_progress_abandons_a_stale_worker(self):
+        """A zombie worker must not be able to write over the reset state."""
+        from services.image_service import ImageService
+
+        service = ImageService()
+        service._remove_progress["status"] = "cancelling"
+        stale_run_id = service._remove_run_id
+
+        service.reset_remove_progress()
+
+        assert (
+            service._update_remove_progress_if_current(stale_run_id, status="running")
+            is False
+        )
+        assert service.get_remove_progress()["status"] == "idle"
 
     def test_reset_move_progress_abandons_a_stale_worker(self, svc):
         """A zombie worker must not be able to write over the reset state."""

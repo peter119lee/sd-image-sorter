@@ -433,9 +433,10 @@ class TestIdNormalizationAsymmetry:
 
 
 # ---------------------------------------------------------------------------
-# 8. Cancel / reset idle+running branches for the two singleton jobs. Note the
-#    deliberate asymmetry: reset-delete RAISES 409 while running, but
-#    reset-remove RETURNS a dict.
+# 8. Cancel / reset idle+running branches for the two singleton jobs. Reset
+#    raises 409 on a genuinely running job for BOTH: remove used to answer 200
+#    with a dict instead, which read as success to any caller checking the
+#    status code (see test_stuck_job_reset.py).
 # ---------------------------------------------------------------------------
 class TestCancelResetBranches:
     def test_cancel_delete_idle_is_noop(self):
@@ -466,14 +467,20 @@ class TestCancelResetBranches:
             svc.reset_delete_progress()
         assert ei.value.status_code == 409
 
-    def test_reset_remove_while_running_returns_dict_not_raise(self):
-        # Asymmetry vs delete: remove reset does not raise, it reports refusal.
+    def test_reset_remove_idle_is_nothing_to_reset(self):
+        svc = ImageService()
+        assert svc.reset_remove_progress() == {
+            "status": "idle",
+            "message": "Nothing to reset",
+        }
+
+    def test_reset_remove_while_running_raises_409(self):
+        # Matches delete: a running job is refused with 409, not a 200 dict.
         svc = ImageService()
         svc._remove_progress["status"] = "running"
-        assert svc.reset_remove_progress() == {
-            "status": "running",
-            "message": "Cannot reset a running job",
-        }
+        with pytest.raises(HTTPException) as ei:
+            svc.reset_remove_progress()
+        assert ei.value.status_code == 409
 
     def test_cancel_delete_running_sets_cancelling_and_event(self):
         import threading

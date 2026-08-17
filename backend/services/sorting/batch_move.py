@@ -365,7 +365,14 @@ class BatchMoveMixin:
                                         )
                                         moved += 1
                                     except Exception as e:
-                                        error_message = str(e)
+                                        # Same descriptor gallery move and
+                                        # Manual Sort use: str(e) here kept the
+                                        # duplicated FileOperationError preamble,
+                                        # the OS line breaks and every absolute
+                                        # path, which is the exact shape
+                                        # frontend/js/modules/utils/errors.js
+                                        # throws away.
+                                        error_message = self._describe_operation_failure(operation, e)
 
                             if error_message:
                                 errors.append({"image_id": image_id, "filename": filename, "error": error_message})
