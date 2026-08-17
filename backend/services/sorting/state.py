@@ -80,6 +80,43 @@ class SortingStateMixin:
         }
 
     @staticmethod
+    def _build_default_batch_move_progress_state() -> Dict[str, Any]:
+        """Return the canonical idle batch-move progress payload."""
+        return {
+            "status": "idle",
+            "step": "idle",
+            "current": 0,
+            "total": 0,
+            "message": "",
+            "errors": 0,
+            "moved": 0,
+            "current_item": None,
+            "recent_errors": [],
+            "operation": "move",
+            "started_at": None,
+            "updated_at": None,
+        }
+
+    @staticmethod
+    def _build_default_move_progress_state() -> Dict[str, Any]:
+        """Return the canonical idle gallery move/copy job progress payload."""
+        return {
+            "status": "idle",
+            "step": "idle",
+            "current": 0,
+            "total": 0,
+            "message": "",
+            "errors": 0,
+            "moved": 0,
+            "current_item": None,
+            "recent_errors": [],
+            "operation": "move",
+            "results": [],
+            "started_at": None,
+            "updated_at": None,
+        }
+
+    @staticmethod
     def _build_default_sort_session_state() -> Dict[str, Any]:
         """Return the canonical inactive manual-sort session payload."""
         return {
@@ -427,11 +464,35 @@ class SortingStateMixin:
             return self._batch_move_progress.copy()
 
     def reset_batch_move_progress(self) -> Dict[str, Any]:
-        """Reset batch move progress to idle."""
+        """Reset a stuck batch-move task back to idle (refused while running).
+
+        ``cancel_batch_move`` publishes ``cancelling`` and relies on the worker
+        to write the terminal state. When that worker is gone the status is
+        stuck there forever, and ``batch_move_images`` rejects every later
+        Auto-Separate run with HTTP 409 until the app restarts. Bumping the run
+        id neutralizes an abandoned worker that later wakes up, so it cannot
+        overwrite the state this reset just published.
+        """
         with self._batch_move_lock:
-            if self._batch_move_progress["status"] == "running":
+            status = self._batch_move_progress["status"]
+            if status == "running":
                 raise HTTPException(status_code=409, detail="Cannot reset batch move while it is still running")
-            return {"status": self._batch_move_progress["status"], "message": "Nothing to reset"}
+            if status == "idle":
+                return {"status": "idle", "message": "Nothing to reset"}
+            self._reset_batch_move_progress_locked()
+            return {"status": "reset", "message": "Batch move progress reset to idle"}
+
+    def _reset_batch_move_progress_locked(self) -> None:
+        """Publish idle batch-move progress and abandon the current run."""
+        self._batch_move_run_id += 1
+        if self._batch_move_cancel_event is not None:
+            self._batch_move_cancel_event.set()
+            self._batch_move_cancel_event = None
+        self._batch_move_progress = {
+            **self._build_default_batch_move_progress_state(),
+            "message": "Reset by user",
+            "updated_at": time.time(),
+        }
 
     def cancel_batch_move(self) -> Dict[str, Any]:
         """Request cooperative cancellation of the active batch-move task.
@@ -498,11 +559,33 @@ class SortingStateMixin:
             return self._move_progress.copy()
 
     def reset_move_progress(self) -> Dict[str, Any]:
-        """Reset move job progress to idle (refused while still running)."""
+        """Reset a stuck gallery move/copy job back to idle (refused while running).
+
+        Same trap as :meth:`reset_batch_move_progress`: ``cancel_move`` leaves
+        the status at ``cancelling`` for the worker to finish, and a dead
+        worker never does, so ``start_move_job`` rejects every later move with
+        HTTP 409 until the app restarts.
+        """
         with self._move_lock:
-            if self._move_progress["status"] == "running":
+            status = self._move_progress["status"]
+            if status == "running":
                 raise HTTPException(status_code=409, detail="Cannot reset move while it is still running")
-            return {"status": self._move_progress["status"], "message": "Nothing to reset"}
+            if status == "idle":
+                return {"status": "idle", "message": "Nothing to reset"}
+            self._reset_move_progress_locked()
+            return {"status": "reset", "message": "Move progress reset to idle"}
+
+    def _reset_move_progress_locked(self) -> None:
+        """Publish idle move progress and abandon the current run."""
+        self._move_run_id += 1
+        if self._move_cancel_event is not None:
+            self._move_cancel_event.set()
+            self._move_cancel_event = None
+        self._move_progress = {
+            **self._build_default_move_progress_state(),
+            "message": "Reset by user",
+            "updated_at": time.time(),
+        }
 
     def cancel_move(self) -> Dict[str, Any]:
         """Request cooperative cancellation of the active gallery move/copy job."""

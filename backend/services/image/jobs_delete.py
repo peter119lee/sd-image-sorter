@@ -87,11 +87,30 @@ class DeleteJobsMixin:
             return self._delete_progress.copy()
 
     def reset_delete_progress(self) -> Dict[str, Any]:
-        """Reset a stuck delete job (refused while it is still running)."""
+        """Reset a stuck delete job back to idle (refused while it is still running).
+
+        ``cancel_delete`` publishes ``cancelling`` and waits for the worker to
+        write the terminal state. A worker that died first leaves the status
+        there permanently, and ``start_delete_selected_job`` then rejects every
+        later delete with HTTP 409 until the app restarts. Bumping the run id
+        neutralizes an abandoned worker that later wakes up.
+        """
         with self._delete_lock:
-            if self._delete_progress["status"] == "running":
+            status = self._delete_progress["status"]
+            if status == "running":
                 raise HTTPException(status_code=409, detail="Cannot reset delete while it is still running")
-            return {"status": self._delete_progress["status"], "message": "Nothing to reset"}
+            if status == "idle":
+                return {"status": "idle", "message": "Nothing to reset"}
+            self._delete_run_id += 1
+            if self._delete_cancel_event is not None:
+                self._delete_cancel_event.set()
+                self._delete_cancel_event = None
+            self._delete_progress = {
+                **self._build_default_delete_progress_state(),
+                "message": "Reset by user",
+                "updated_at": time.time(),
+            }
+            return {"status": "reset", "message": "Delete progress reset to idle"}
 
     def cancel_delete(self) -> Dict[str, Any]:
         """Request cooperative cancellation of the active delete-to-trash job."""

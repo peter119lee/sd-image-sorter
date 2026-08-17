@@ -215,20 +215,7 @@ class SortingService(
         self._sort_session_proxy = MutableStateProxy(self.get_sort_session, self.set_sort_session)
         
         # Batch move progress
-        self._batch_move_progress: Dict[str, Any] = {
-            "status": "idle",
-            "step": "idle",
-            "current": 0,
-            "total": 0,
-            "message": "",
-            "errors": 0,
-            "moved": 0,
-            "current_item": None,
-            "recent_errors": [],
-            "operation": "move",
-            "started_at": None,
-            "updated_at": None,
-        }
+        self._batch_move_progress: Dict[str, Any] = self._build_default_batch_move_progress_state()
         self._batch_move_lock = threading.Lock()
         self._batch_move_run_id = 0
         # Cooperative cancellation for the active batch-move worker.
@@ -247,21 +234,7 @@ class SortingService(
         # batch-move run-id epoch + cancel-event pattern exactly. The final
         # progress payload embeds the per-id ``results`` list so the frontend
         # success/failure mapping is identical to the sync endpoint.
-        self._move_progress: Dict[str, Any] = {
-            "status": "idle",
-            "step": "idle",
-            "current": 0,
-            "total": 0,
-            "message": "",
-            "errors": 0,
-            "moved": 0,
-            "current_item": None,
-            "recent_errors": [],
-            "operation": "move",
-            "results": [],
-            "started_at": None,
-            "updated_at": None,
-        }
+        self._move_progress: Dict[str, Any] = self._build_default_move_progress_state()
         self._move_lock = threading.Lock()
         self._move_run_id = 0
         self._move_cancel_event: Optional[threading.Event] = None
