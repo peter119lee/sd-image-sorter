@@ -21,6 +21,11 @@ _MAX_SIDECAR_BYTES = 256 * 1024
 _MAX_SIDECAR_DIRECTORY_CACHE_ENTRIES = 4096
 _MAX_SIDECAR_DIRECTORY_CACHE_FILENAMES = 50_000
 SIDECAR_EXTENSIONS = (".txt", ".json", ".xmp")
+# Metadata key a sidecar loader uses for plain caption text (a Danbooru-style
+# tag list or a written description). Deliberately NOT "prompt": no generator
+# claimed this text as the prompt it rendered from, so it must not reach the
+# SD-prompt field. Only sidecar loaders ever emit this key.
+SIDECAR_CAPTION_METADATA_KEY = "sidecar_caption"
 _sidecar_directory_cache: Dict[str, Tuple[Tuple[int, int], Optional[Set[str]]]] = {}
 WEBP_SIGNATURE = b"RIFF"
 WEBP_FOURCC = b"WEBP"

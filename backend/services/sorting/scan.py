@@ -434,10 +434,10 @@ class ScanMixin:
                     and missing_prompt >= prompt_total * SCAN_MISSING_PROMPT_NOTICE_RATIO
                 ):
                     summary += (
-                        f" {missing_prompt}/{prompt_total} 张没有提示词，"
-                        "可在设置中运行「重新解析缺失提示词」/ "
-                        f"{missing_prompt} of {prompt_total} images have no prompt "
-                        "stored — run Re-parse Missing Prompts in Settings."
+                        f" {missing_prompt}/{prompt_total} 张没有生成提示词，"
+                        "可在设置中运行「找回缺失文字」/ "
+                        f"{missing_prompt} of {prompt_total} images have no generation "
+                        "prompt — run Recover Missing Text in Settings."
                     )
                 recent_errors = result.get("recent_errors") or []
                 if recent_errors:

@@ -32,6 +32,7 @@ FULL_SCHEMA_STATEMENTS: tuple[str, ...] = (
         embedding BLOB,
         ai_caption TEXT,
         nl_caption TEXT,
+        sidecar_caption TEXT,
         model_hash TEXT,
         aesthetic_score REAL,
         is_readable INTEGER DEFAULT 1,
@@ -227,6 +228,11 @@ LEGACY_IMAGE_COLUMNS: tuple[tuple[str, str], ...] = (
     # ai_caption so the dataset maker can show / export booru tags and the
     # natural-language sentence independently (point 1/2/3).
     ("nl_caption", "TEXT"),
+    # v3.5.x: caption text lifted from a .txt/.json sidecar next to the image.
+    # Kept apart from `prompt` (the SD generation prompt) because sidecar text
+    # is usually a human/tagger tag list, and apart from ai_caption/nl_caption
+    # because nothing in this app generated it (migration 042).
+    ("sidecar_caption", "TEXT"),
     ("model_hash", "TEXT"),
     ("aesthetic_score", "REAL"),
     ("is_readable", "INTEGER DEFAULT 1"),

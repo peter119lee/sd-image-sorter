@@ -39,6 +39,7 @@ from .constants import (
     _MAX_SIDECAR_BYTES,
     _MAX_SIDECAR_DIRECTORY_CACHE_ENTRIES,
     _MAX_SIDECAR_DIRECTORY_CACHE_FILENAMES,
+    SIDECAR_CAPTION_METADATA_KEY,
     SIDECAR_EXTENSIONS,
     _sidecar_directory_cache,
     WEBP_SIGNATURE,
@@ -713,8 +714,10 @@ class ParserRuntimeMixin:
             key_aliases = {
                 "prompt": "prompt",
                 "positive_prompt": "prompt",
-                "caption": "prompt",
-                "text": "prompt",
+                # "caption"/"text" are what dataset tooling writes; the author
+                # is describing the image, not naming the prompt it came from.
+                "caption": SIDECAR_CAPTION_METADATA_KEY,
+                "text": SIDECAR_CAPTION_METADATA_KEY,
                 "negative_prompt": "negative_prompt",
                 "negative prompt": "negative_prompt",
                 "uc": "negative_prompt",
@@ -737,18 +740,25 @@ class ParserRuntimeMixin:
             return metadata
 
         if isinstance(payload, list):
-            metadata["prompt"] = self._flatten_text_value(payload)
+            metadata[SIDECAR_CAPTION_METADATA_KEY] = self._flatten_text_value(payload)
             return {key: value for key, value in metadata.items() if value}
 
         return self._parse_text_sidecar(str(payload), sidecar_path)
 
     def _parse_text_sidecar(self, text: str, sidecar_path: Path) -> Dict[str, Any]:
-        """Parse a plain text sidecar as WebUI params or a caption prompt."""
+        """Parse a plain text sidecar as WebUI params or a caption.
+
+        A sidecar holding real generation parameters ("Steps:" / "Sampler:")
+        is an SD prompt and keeps going down the WebUI route. Anything else is
+        free text a human or a tagger wrote next to the image — it is routed to
+        the caption key so it can never be mistaken for the prompt that
+        rendered the image.
+        """
         metadata: Dict[str, Any] = {"sidecar_path": os.fspath(sidecar_path)}
         if "Steps:" in text and "Sampler:" in text:
             metadata["parameters"] = text
         else:
-            metadata["prompt"] = text
+            metadata[SIDECAR_CAPTION_METADATA_KEY] = text
         return metadata
 
     # Soft cap for the C2PA byte-signature fallback. The C2PA / JUMBF

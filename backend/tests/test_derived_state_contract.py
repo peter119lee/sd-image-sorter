@@ -57,8 +57,11 @@ EXPECTED_DERIVED_IMAGE_UPDATE_STATEMENTS = Counter({
         # Metadata L3 (v3.5.0): the scan upsert also maintains the
         # raw_metadata_gz invariant (raw envelopes only live on rows whose
         # prompt is missing) — same statement, no new fingerprint writer.
+        # Migration 042 added `sidecar_caption` to the same SET list: it is a
+        # parsed text field written from the scan record like `prompt`, not a
+        # derived-state field, so this stays one writer with one owner.
         "db_images_write.py",
-        "UPDATE images SET filename = ?, generator = ?, prompt = ?, negative_prompt = ?, "
+        "UPDATE images SET filename = ?, generator = ?, prompt = ?, sidecar_caption = ?, negative_prompt = ?, "
         "metadata_json = ?, width = ?, height = ?, file_size = ?, checkpoint = ?, "
         "checkpoint_normalized = ?, loras = ?, model_hash = COALESCE(?, model_hash), "
         "is_readable = ?, read_error = ?, source_mtime_ns = COALESCE(?, source_mtime_ns), "
@@ -91,8 +94,13 @@ EXPECTED_DERIVED_IMAGE_UPDATE_STATEMENTS = Counter({
     (
         # Metadata L3 (v3.5.0): file-based re-parse clears the stored raw
         # envelope once a prompt is recovered (same invariant as above).
+        # Migration 042: `sidecar_caption` is rewritten only when the caller
+        # actually re-parsed the file (the CASE guard), so a caller that knows
+        # nothing about captions cannot silently drop one. Still one writer.
         "db_images_write.py",
-        "UPDATE images SET generator = ?, prompt = ?, negative_prompt = ?, metadata_json = ?, "
+        "UPDATE images SET generator = ?, prompt = ?, "
+        "sidecar_caption = CASE WHEN ? = 1 THEN ? ELSE sidecar_caption END, "
+        "negative_prompt = ?, metadata_json = ?, "
         "width = ?, height = ?, file_size = ?, checkpoint = ?, checkpoint_normalized = ?, "
         "loras = ?, model_hash = COALESCE(?, model_hash), is_readable = COALESCE(?, is_readable), "
         "read_error = ?, source_mtime_ns = COALESCE(?, source_mtime_ns), "

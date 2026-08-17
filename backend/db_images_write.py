@@ -56,6 +56,7 @@ def _active_library_id_for_write(record: Optional[Dict[str, Any]] = None) -> str
     except Exception:
         return "main"
 from db_core import (
+    KEEP_EXISTING_SIDECAR_CAPTION,
     get_db,
     _invalidate_facet_caches,
     _invalidate_tags_cache,
@@ -257,6 +258,7 @@ def _upsert_image_record(
             SET filename = ?,
                 generator = ?,
                 prompt = ?,
+                sidecar_caption = ?,
                 negative_prompt = ?,
                 metadata_json = ?,
                 width = ?,
@@ -287,6 +289,7 @@ def _upsert_image_record(
                 record["filename"],
                 record.get("generator", "unknown"),
                 record.get("prompt"),
+                record.get("sidecar_caption"),
                 record.get("negative_prompt"),
                 record.get("metadata_json"),
                 record.get("width"),
@@ -321,17 +324,18 @@ def _upsert_image_record(
         cursor.execute(
             """
             INSERT INTO images
-            (path, filename, generator, prompt, negative_prompt, metadata_json,
+            (path, filename, generator, prompt, sidecar_caption, negative_prompt, metadata_json,
              width, height, file_size, checkpoint, checkpoint_normalized, loras, model_hash, is_readable, read_error,
              source_mtime_ns, source_size, metadata_status, content_fingerprint,
              library_order_time, source_file_mtime, created_at, raw_metadata_gz, indexed_at, library_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?)
             """,
             (
                 path,
                 record["filename"],
                 record.get("generator", "unknown"),
                 record.get("prompt"),
+                record.get("sidecar_caption"),
                 record.get("negative_prompt"),
                 record.get("metadata_json"),
                 record.get("width"),
@@ -462,9 +466,11 @@ def update_image_metadata(
     metadata_status: Optional[str] = None,
     content_fingerprint: Optional[str] = None,
     preserve_derived_state: bool = False,
+    sidecar_caption: Any = KEEP_EXISTING_SIDECAR_CAPTION,
 ):
     """Update parsed metadata fields for an existing image without replacing the row."""
     metadata_json = _compact_persisted_metadata_json(metadata_json)
+    rewrite_sidecar_caption = sidecar_caption is not KEEP_EXISTING_SIDECAR_CAPTION
     with get_db() as conn:
         cursor = conn.cursor()
         serialized_loras = _serialize_loras(loras)
@@ -519,6 +525,7 @@ def update_image_metadata(
             UPDATE images
             SET generator = ?,
                 prompt = ?,
+                sidecar_caption = CASE WHEN ? = 1 THEN ? ELSE sidecar_caption END,
                 negative_prompt = ?,
                 metadata_json = ?,
                 width = ?,
@@ -544,6 +551,8 @@ def update_image_metadata(
             (
                 generator,
                 prompt,
+                1 if rewrite_sidecar_caption else 0,
+                sidecar_caption if rewrite_sidecar_caption else None,
                 negative_prompt,
                 metadata_json,
                 width,
@@ -578,15 +587,16 @@ def update_reparsed_prompt_fields(
     checkpoint: Optional[str] = None,
     loras: Optional[List[str]] = None,
     generator: Optional[str] = None,
+    sidecar_caption: Optional[str] = None,
 ) -> None:
     """Targeted write for the metadata re-parse job (L3).
 
     Unlike ``update_image_metadata`` this touches ONLY prompt-derived
     fields, so a replay from the stored raw envelope can never wipe
     width/height/source bookkeeping it knows nothing about. Checkpoint,
-    loras, negative prompt and generator only fill in when the replay
-    produced them (scan-time values may already be correct). Clears
-    ``raw_metadata_gz`` — a recovered row no longer needs repair.
+    loras, negative prompt, generator and the sidecar caption only fill in
+    when the replay produced them (scan-time values may already be correct).
+    Clears ``raw_metadata_gz`` — a recovered row no longer needs repair.
     """
     with get_db() as conn:
         cursor = conn.cursor()
@@ -600,6 +610,7 @@ def update_reparsed_prompt_fields(
                 checkpoint = COALESCE(?, checkpoint),
                 checkpoint_normalized = COALESCE(?, checkpoint_normalized),
                 loras = COALESCE(?, loras),
+                sidecar_caption = COALESCE(?, sidecar_caption),
                 raw_metadata_gz = NULL,
                 indexed_at = CURRENT_TIMESTAMP
             WHERE id = ?
@@ -611,6 +622,7 @@ def update_reparsed_prompt_fields(
                 checkpoint,
                 normalize_checkpoint_name(checkpoint) if checkpoint else None,
                 serialized_loras,
+                sidecar_caption,
                 image_id,
             ),
         )
@@ -631,6 +643,25 @@ def update_reparsed_prompt_fields(
         _sync_image_prompt_tokens(cursor, image_id, final_prompt)
     _invalidate_tags_cache()
     _invalidate_facet_caches()
+
+def update_reparsed_sidecar_caption(image_id: int, sidecar_caption: str) -> None:
+    """Store caption text the re-parse job recovered from a sidecar.
+
+    Deliberately narrower than :func:`update_reparsed_prompt_fields`: the row
+    still has no SD generation prompt, so ``prompt`` stays empty, the prompt
+    token index is untouched, and ``raw_metadata_gz`` is KEPT so a future
+    parser upgrade can still try to find a real prompt in the same bytes.
+    """
+    with get_db() as conn:
+        conn.execute(
+            """
+            UPDATE images
+            SET sidecar_caption = ?,
+                indexed_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+            """,
+            (sidecar_caption, image_id),
+        )
 
 # --- Split re-exports (2026-07) --------------------------------------------
 # Deliberately at the BOTTOM: the sibling modules from-import the shared

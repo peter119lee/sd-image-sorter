@@ -33,7 +33,11 @@ from pathlib import Path
 from types import ModuleType
 from typing import Optional, Dict, Any, TypedDict
 from PIL import Image
-from .constants import PARSED_METADATA_VERSION, SIDECAR_EXTENSIONS
+from .constants import (
+    PARSED_METADATA_VERSION,
+    SIDECAR_CAPTION_METADATA_KEY,
+    SIDECAR_EXTENSIONS,
+)
 
 from . import _runtime
 from ._runtime import ParserRuntimeMixin, verify_image_readable
@@ -57,6 +61,9 @@ _SIDECAR_FALLBACK_FIELDS = (
     "negative_prompt",
     "checkpoint",
     "loras",
+    # Appended last so the recorded provenance field order of the four
+    # historical fields stays byte-identical.
+    SIDECAR_CAPTION_METADATA_KEY,
 )
 _SIDECAR_FIELD_SOURCE_KEYS = "_sidecar_field_source_keys"
 
@@ -124,9 +131,16 @@ def _with_sidecar_field_source_keys(
     parsed: Mapping[str, object],
     source_keys: Mapping[str, str],
 ) -> dict[str, object]:
+    # Caption text has no per-generator source key: it is carried verbatim by
+    # the raw metadata key that only a sidecar loader emits, so every route
+    # traces it back to the same key.
+    resolved_source_keys = {
+        SIDECAR_CAPTION_METADATA_KEY: SIDECAR_CAPTION_METADATA_KEY,
+        **source_keys,
+    }
     material_sources = {
         field: source_key
-        for field, source_key in source_keys.items()
+        for field, source_key in resolved_source_keys.items()
         if field in _SIDECAR_FALLBACK_FIELDS
         and _is_material_sidecar_field(field, parsed.get(field))
     }
@@ -277,7 +291,8 @@ class MetadataParser(
         Returns:
             {
                 "generator": str,  # comfyui, nai, webui, forge, others, unknown
-                "prompt": str or None,
+                "prompt": str or None,   # the SD generation prompt, nothing else
+                "sidecar_caption": str or None,  # caption text from a .txt/.json sidecar
                 "negative_prompt": str or None,
                 "checkpoint": str or None,
                 "loras": list of str,
@@ -292,6 +307,7 @@ class MetadataParser(
         result: Dict[str, Any] = {
             "generator": "unknown",
             "prompt": None,
+            "sidecar_caption": None,
             "negative_prompt": None,
             "checkpoint": None,
             "loras": [],
@@ -377,6 +393,7 @@ class MetadataParser(
                         sidecar_parsed.get("negative_prompt"),
                         sidecar_parsed.get("checkpoint"),
                         sidecar_parsed.get("loras"),
+                        sidecar_parsed.get(SIDECAR_CAPTION_METADATA_KEY),
                     ))
                 ):
                     metadata["metadata"] = combined_metadata
@@ -389,6 +406,7 @@ class MetadataParser(
                     )
             result["generator"] = parsed["generator"]
             result["prompt"] = parsed["prompt"]
+            result["sidecar_caption"] = parsed.get(SIDECAR_CAPTION_METADATA_KEY)
             result["negative_prompt"] = parsed["negative_prompt"]
             result["checkpoint"] = parsed["checkpoint"]
             result["loras"] = parsed["loras"]
@@ -564,6 +582,11 @@ class MetadataParser(
         base: Dict[str, Any] = {
             "generator": "unknown",
             "prompt": None,
+            # Carried through every detector branch untouched: no generator
+            # route may promote sidecar caption text into ``prompt``.
+            SIDECAR_CAPTION_METADATA_KEY: self._flatten_text_value(
+                metadata.get(SIDECAR_CAPTION_METADATA_KEY)
+            ),
             "negative_prompt": None,
             "checkpoint": None,
             "loras": [],

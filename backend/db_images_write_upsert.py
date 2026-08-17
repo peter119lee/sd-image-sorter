@@ -63,6 +63,7 @@ def add_image(
     metadata_status: str = "complete",
     content_fingerprint: Optional[str] = None,
     raw_metadata_gz: Optional[bytes] = None,
+    sidecar_caption: Optional[str] = None,
     return_status: bool = False,
 ) -> Union[int, Tuple[int, str]]:
     """Add an image to the database.
@@ -78,6 +79,7 @@ def add_image(
         "filename": filename,
         "generator": generator,
         "prompt": prompt,
+        "sidecar_caption": sidecar_caption,
         "negative_prompt": negative_prompt,
         "metadata_json": metadata_json,
         "width": width,
@@ -131,7 +133,7 @@ def _get_existing_images_by_paths(
             continue
         cursor.execute(
             f"""
-                    SELECT id, path, filename, generator, prompt, negative_prompt, metadata_json,
+                    SELECT id, path, filename, generator, prompt, sidecar_caption, negative_prompt, metadata_json,
                    width, height, file_size, checkpoint, checkpoint_normalized, loras, model_hash,
                    library_order_time, source_file_mtime, created_at,
                    is_readable, read_error, source_mtime_ns, source_size, metadata_status,

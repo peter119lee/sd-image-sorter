@@ -1246,6 +1246,7 @@ def reparse_image_metadata(
         image_id=image_id,
         generator=metadata["generator"],
         prompt=metadata["prompt"],
+        sidecar_caption=metadata.get("sidecar_caption"),
         negative_prompt=metadata["negative_prompt"],
         metadata_json=metadata_json,
         width=metadata["width"],

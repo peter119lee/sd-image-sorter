@@ -194,9 +194,17 @@ def _apply_lora_filter(conditions: List[str], params: List[Any],
 
 def _apply_search_filter(conditions: List[str], params: List[Any],
                          search_query: Optional[str]) -> tuple:
-    """Apply prompt search filtering with normalization.
+    """Apply free-text search over filename, checkpoint, prompt and caption.
 
     Normalizes: lowercase and replace underscore with space.
+
+    Sidecar captions (migration 042) live in their own column precisely so
+    they are NOT counted as generation prompts, but the user still needs to
+    find those images by the words in them — so the search box matches both
+    ``prompt`` (through the token index) and ``sidecar_caption`` (a
+    normalized substring match, the same shape ``_apply_prompt_terms_filter``
+    uses in "contains" mode). Underscore folding matters here: sidecar
+    captions are usually Danbooru tags like ``silver_hair``.
 
     Args:
         conditions: Current WHERE conditions list
@@ -230,11 +238,21 @@ def _apply_search_filter(conditions: List[str], params: List[Any],
     if prompt_clause:
         prompt_clause = f" OR ({prompt_clause})"
 
+    caption_clause = ""
+    caption_params: List[Any] = []
+    if normalized_search:
+        caption_clause = (
+            " OR LOWER(REPLACE(COALESCE(i.sidecar_caption, ''), '_', ' ')) "
+            "LIKE ? ESCAPE '\\'"
+        )
+        caption_params.append(f"%{escape_like_pattern(normalized_search)}%")
+
     conditions.append(
         "("
         "LOWER(i.filename) LIKE ? ESCAPE '\\' "
         "OR LOWER(COALESCE(i.checkpoint_normalized, '')) LIKE ? ESCAPE '\\'"
         f"{prompt_clause}"
+        f"{caption_clause}"
         ")"
     )
     params.extend(
@@ -244,6 +262,7 @@ def _apply_search_filter(conditions: List[str], params: List[Any],
         ]
     )
     params.extend(token_params)
+    params.extend(caption_params)
 
     return conditions, params
 

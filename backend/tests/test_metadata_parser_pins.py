@@ -232,7 +232,9 @@ def test_sidecar_fallback_marker_is_compact_and_does_not_persist_raw_data(tmp_pa
                 "method": "sidecar_fallback",
                 "confidence": "high",
                 "parser_version": PARSED_METADATA_VERSION,
-                "fields": ["prompt"],
+                # Plain sidecar text is caption text, not the generation
+                # prompt (migration 042) — the provenance names what it filled.
+                "fields": ["sidecar_caption"],
             }
         ],
     }

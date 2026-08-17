@@ -1969,7 +1969,10 @@ class TestEdgeCases:
 
         result = parse_image(str(image_path))
 
-        assert result["prompt"] == "text sidecar prompt"
+        # The .txt holds plain text, so it is caption material, not the SD
+        # prompt (migration 042); the .json still contributes real fields.
+        assert result["sidecar_caption"] == "text sidecar prompt"
+        assert result["prompt"] is None
         assert result["negative_prompt"] == "json negative"
         assert result["checkpoint"] == "json_model.safetensors"
         assert result["loras"] == ["json_lora"]
@@ -1977,7 +1980,7 @@ class TestEdgeCases:
             _sidecar_fallback_evidence(
                 "txt",
                 "multiple-sidecars.jpg.txt",
-                ["prompt"],
+                ["sidecar_caption"],
             ),
             _sidecar_fallback_evidence(
                 "json",
@@ -2033,7 +2036,16 @@ class TestEdgeCases:
 
         assert result["prompt"] == "shared prompt"
         assert result["negative_prompt"] == f"{expected_carrier} negative"
+        # The plain .txt contributes caption text (migration 042) and owns that
+        # field; the later carrier still owns the same-valued prompt/negative
+        # the final parse actually consumed.
+        assert result["sidecar_caption"] == "shared prompt"
         assert result["metadata"]["_parsed"]["sidecar_fallback"]["evidence"] == [
+            _sidecar_fallback_evidence(
+                "txt",
+                "same-value-overwrite.jpg.txt",
+                ["sidecar_caption"],
+            ),
             _sidecar_fallback_evidence(
                 expected_carrier,
                 later_sidecar_path.name,
@@ -2133,11 +2145,14 @@ class TestEdgeCases:
 
         assert result["prompt"] == "shared prompt"
         assert result["generator"] == "nai"
+        # The .txt caption text survives to the json carrier's merged parse, so
+        # the carrier that the final parse consumed owns both fields.
+        assert result["sidecar_caption"] == "shared prompt"
         assert result["metadata"]["_parsed"]["sidecar_fallback"]["evidence"] == [
             _sidecar_fallback_evidence(
                 "json",
                 "comment-priority.json",
-                ["prompt"],
+                ["prompt", "sidecar_caption"],
             ),
         ]
 
@@ -2327,14 +2342,14 @@ class TestEdgeCases:
         image_path = tmp_path / "huge-dir.jpg"
         sidecar_path = tmp_path / "huge-dir.jpg.txt"
         Image.new("RGB", (64, 64), color="white").save(image_path, "JPEG")
-        sidecar_path.write_text("cached prompt", encoding="utf-8")
+        sidecar_path.write_text("cached caption", encoding="utf-8")
 
         metadata_parser_module._sidecar_directory_cache.clear()
         monkeypatch.setattr(metadata_parser_module, "_MAX_SIDECAR_DIRECTORY_CACHE_FILENAMES", 1)
 
         result = parse_image(str(image_path))
 
-        assert result["prompt"] == "cached prompt"
+        assert result["sidecar_caption"] == "cached caption"
         assert any(value[1] is None for value in metadata_parser_module._sidecar_directory_cache.values())
 
     def test_parse_webp(self, tmp_path: Path):

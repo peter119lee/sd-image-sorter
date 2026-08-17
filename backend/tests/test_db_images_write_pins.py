@@ -57,7 +57,7 @@ from db_images_write import _normalize_indexed_image_path
 
 
 # The exact name set the ``database`` facade re-exports from ``db_images_write``
-# (database.py ``from db_images_write import (...)``, 27 names). This list IS the
+# (database.py ``from db_images_write import (...)``, 28 names). This list IS the
 # public re-export contract a split must preserve; ``image_manager`` and
 # ``sorting_service`` do ``from database import add_images_batch/update_image_path``,
 # so the facade binding must stay identical to the origin object.
@@ -85,6 +85,7 @@ _REEXPORTED_WRITE_NAMES = [
     "update_image_path",
     "update_image_metadata",
     "update_reparsed_prompt_fields",
+    "update_reparsed_sidecar_caption",
     "mark_image_unreadable",
     "mark_image_unreadable_by_path",
     "mark_image_readable",
@@ -141,7 +142,7 @@ def _tag_count(image_id):
 class TestReExportIdentityUnion:
     def test_write_module_owns_every_reexported_name(self):
         """db_images_write must define every name the facade re-exports."""
-        assert len(_REEXPORTED_WRITE_NAMES) == 27
+        assert len(_REEXPORTED_WRITE_NAMES) == 28
         for name in _REEXPORTED_WRITE_NAMES:
             assert hasattr(db_images_write, name), f"db_images_write lost {name}"
 

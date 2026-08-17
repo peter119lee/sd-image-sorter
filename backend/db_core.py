@@ -31,6 +31,13 @@ PROMPT_MATCH_MODE_EXACT = "exact"
 PROMPT_MATCH_MODE_CONTAINS = "contains"
 VALID_PROMPT_MATCH_MODES = {PROMPT_MATCH_MODE_EXACT, PROMPT_MATCH_MODE_CONTAINS}
 
+# Default for ``update_image_metadata(sidecar_caption=...)``. Distinguishes
+# "the caller re-parsed the file and knows the caption (possibly None)" from
+# "the caller is rewriting unrelated fields and must leave the caption alone",
+# which plain None cannot express. Lives here rather than in db_images_write
+# so that module keeps its stateless no-top-level-assignment contract.
+KEEP_EXISTING_SIDECAR_CAPTION = object()
+
 
 def _adapt_datetime_for_sqlite(value: datetime) -> str:
     """Serialize datetimes explicitly; Python 3.12 deprecates sqlite3's default adapter."""

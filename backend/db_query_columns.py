@@ -59,6 +59,10 @@ _IMAGE_COLUMNS_BASE_FIELDS = (
     "tagged_at",
     "ai_caption",
     "nl_caption",
+    # Caption text lifted from a .txt/.json sidecar (migration 042). Neither a
+    # generation prompt nor something this app generated, so it is its own
+    # field rather than a variant of prompt / ai_caption / nl_caption.
+    "sidecar_caption",
     "aesthetic_score",
     # v3.3.2 user star rating (FF-2): INTEGER 0-5, NOT NULL DEFAULT 0 (0 = unrated).
     "user_rating",
