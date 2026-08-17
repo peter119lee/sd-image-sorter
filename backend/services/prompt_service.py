@@ -47,17 +47,12 @@ REASON_NOT_ENOUGH_SCORED_PER_CHECKPOINT = "not_enough_scored_images_per_checkpoi
 # folder he does not have.
 ACTION_SCAN_GENERATED_IMAGES = "scan_generated_images_folder"
 
-# Generator ids the metadata parser records when no SD tool claimed the image:
-# "unknown" means nothing was found, "others" means text was found but no
-# detector recognized it (metadata_parser/__init__.py:1031-1033). Prompt text
-# on such a row is therefore not evidence of an SD generation prompt.
-_UNATTRIBUTED_GENERATORS = ("unknown", "others")
-
-# "Some generator claimed this image." Takes _UNATTRIBUTED_GENERATORS as params.
-_ATTRIBUTED_GENERATOR_CLAUSE = (
-    "generator IS NOT NULL AND TRIM(generator) != '' "
-    f"AND LOWER(TRIM(generator)) NOT IN ({','.join('?' * len(_UNATTRIBUTED_GENERATORS))})"
-)
+# "Some generator claimed this image", so prompt text on the row is evidence of
+# an SD generation prompt and an empty checkpoint is a real gap. Shared with the
+# library-health facets (db_helpers.SD_ATTRIBUTED_GENERATOR_SQL): both layers
+# answer "did Stable Diffusion make this", and a second spelling is how two
+# layers drift into reporting different things.
+_ATTRIBUTED_GENERATOR_CLAUSE = db.SD_ATTRIBUTED_GENERATOR_SQL
 
 
 def _is_useful_recipe_token(token: str) -> bool:
@@ -615,8 +610,7 @@ class PromptService:
             prompt_length["sd_attributed_sample"] = cursor.execute(
                 "SELECT COUNT(*) FROM images "
                 "WHERE prompt IS NOT NULL AND prompt != '' "
-                f"AND {_usable_clause()} AND {_ATTRIBUTED_GENERATOR_CLAUSE}",
-                _UNATTRIBUTED_GENERATORS,
+                f"AND {_usable_clause()} AND {_ATTRIBUTED_GENERATOR_CLAUSE}"
             ).fetchone()[0]
 
             # Whether ANY usable image came from a generator, prompt text or
@@ -624,8 +618,7 @@ class PromptService:
             # here" from "they are indexed and recorded no model name", and the
             # two deserve different offers.
             sd_attributed_images = cursor.execute(
-                f"SELECT COUNT(*) FROM images WHERE {_usable_clause()} AND {_ATTRIBUTED_GENERATOR_CLAUSE}",
-                _UNATTRIBUTED_GENERATORS,
+                f"SELECT COUNT(*) FROM images WHERE {_usable_clause()} AND {_ATTRIBUTED_GENERATOR_CLAUSE}"
             ).fetchone()[0]
 
             # Migration 042 is additive and writes no row, so a database can

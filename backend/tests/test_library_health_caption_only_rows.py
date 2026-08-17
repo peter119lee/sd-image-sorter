@@ -279,10 +279,10 @@ class TestIssueSamples:
     ):
         """Rows listed for another reason must still be describable.
 
-        No image in the owner's library carries a checkpoint, so every row is
-        sampled on that axis whatever its text. A consumer reading only ``prompt``
-        can then say nothing but "missing prompt" about a row that does carry
-        text — which is the same false report in a third shape.
+        Nothing in this fixture is AI-tagged, so every row is sampled on that
+        axis whatever its text. A consumer reading only ``prompt`` can then say
+        nothing but "missing prompt" about a row that does carry text — which is
+        the same false report in a third shape.
         """
         samples = {
             int(item["id"]): item for item in _report(sample_limit=25)["issue_samples"]

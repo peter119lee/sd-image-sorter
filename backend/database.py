@@ -71,6 +71,8 @@ from db_helpers import (
     MISSING_TEXT_SQL,
     NO_PROMPT_SQL,
     NO_SIDECAR_CAPTION_SQL,
+    SD_ATTRIBUTED_GENERATOR_SQL,
+    UNATTRIBUTED_GENERATORS,
     _normalize_indexed_image_path,
     _path_query_match_clause,
     _folder_scope_query_match_clause,

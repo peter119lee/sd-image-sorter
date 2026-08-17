@@ -292,9 +292,10 @@ def _ensure_content_fingerprint_value(
 # was a panel reporting thousands of permanent problems with a repair that could
 # not clear them.
 #
-# Bare column tests with NO population guard: each caller adds its own, because
-# the populations genuinely differ (the facets and the repair job restrict to
-# COALESCE(is_readable, 1) = 1; the per-generator health row counts every row).
+# Bare column tests with NO population guard: every caller adds its own, so the
+# guard stays visible at the call site. All of them use COALESCE(is_readable, 1)
+# = 1 today, but keeping it out of these constants is what lets a caller state
+# its population once, next to the query, instead of inheriting one invisibly.
 NO_PROMPT_SQL = "(prompt IS NULL OR TRIM(prompt) = '')"
 NO_SIDECAR_CAPTION_SQL = "(sidecar_caption IS NULL OR TRIM(sidecar_caption) = '')"
 # "No text at all": neither an SD generation prompt nor a sidecar caption. This
@@ -302,6 +303,24 @@ NO_SIDECAR_CAPTION_SQL = "(sidecar_caption IS NULL OR TRIM(sidecar_caption) = ''
 # NO_PROMPT_SQL — is what may be reported as a problem to fix. A missing prompt
 # legitimately stays missing forever for an image Stable Diffusion never made.
 MISSING_TEXT_SQL = f"{NO_PROMPT_SQL} AND {NO_SIDECAR_CAPTION_SQL}"
+
+# Generator ids the metadata parser records when no SD tool claimed the image:
+# "unknown" means nothing was found, "others" means text was found but no
+# detector recognized it (metadata_parser/__init__.py). The distinction decides
+# whether an empty SD column is a gap or simply the truth: a checkpoint is
+# missing from a WebUI render, but an image Stable Diffusion never made has no
+# checkpoint to miss. Defined here because two layers must agree — Prompt Lab's
+# empty-panel reasons (services/prompt_service.py) and the library-health
+# facets — and a second spelling is how those two drift apart.
+UNATTRIBUTED_GENERATORS = ("unknown", "others")
+# "Some generator claimed this image." Literal-interpolated rather than
+# parameterized so any query can drop it in without threading params through;
+# the values are this module's own constants, never user input.
+SD_ATTRIBUTED_GENERATOR_SQL = (
+    "(generator IS NOT NULL AND TRIM(generator) != '' "
+    "AND LOWER(TRIM(generator)) NOT IN "
+    f"({', '.join(repr(name) for name in UNATTRIBUTED_GENERATORS)}))"
+)
 
 
 def normalize_prompt_token(token: str) -> str:
