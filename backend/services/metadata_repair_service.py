@@ -32,8 +32,11 @@ logger = logging.getLogger(__name__)
 REPARSE_CHUNK_SIZE = 100
 
 # Missing-prompt rows must still be readable to be worth retrying; unreadable
-# rows are the scanner's problem, not the parser's.
-_MISSING_PROMPT_WHERE = "(prompt IS NULL OR TRIM(prompt) = '') AND is_readable = 1"
+# rows are the scanner's problem, not the parser's. COALESCE matches the guard
+# used everywhere else: is_readable was added later and NULL means "never
+# assessed", not "unreadable" (see migrations/003_legacy_backfills.py). A bare
+# ``is_readable = 1`` silently drops those rows from the repair job.
+_MISSING_PROMPT_WHERE = "(prompt IS NULL OR TRIM(prompt) = '') AND COALESCE(is_readable, 1) = 1"
 
 _active_lock = threading.Lock()
 _active_job_id: Optional[str] = None
