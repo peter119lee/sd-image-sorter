@@ -335,7 +335,10 @@
 
         _translateArtist: function () {
             this._setTextAll('#artist-stats .stat-label', ['artist.totalImages', 'artist.identified', 'artist.undefined', 'artist.artistsFound']);
-            this._setTextAll('#view-artist .control-section h3', ['artist.modelSettings', 'artist.identification', 'artist.actions']);
+            // The section headings are NOT set here. Each <h3> holds a sprite icon
+            // plus its own `data-i18n` label span, so applyToDOM already
+            // translates them; writing the heading's textContent would delete
+            // the icon on every re-apply.
             this._setTextAll('#view-artist .control-section label:not(.artist-threshold-label)', ['artist.modelSource', 'artist.localModelPath']);
             this._setText('.artist-threshold-label [data-i18n="artist.confidenceThreshold"]', 'artist.confidenceThreshold');
             this._setOptionText('#artist-model-source', {
@@ -349,12 +352,10 @@
             this._setButton('#btn-identify-selected', 'artist.identifySelected', 'i-target', 'artist.identifySelected');
             this._setButton('#btn-refresh-artist-stats', 'artist.refreshStats', 'i-refresh', 'artist.refreshStats');
             this._setButton('#btn-clear-artist-data', 'artist.clearPredictions', 'i-trash', 'artist.clearPredictions');
-            this._setText('#view-artist .results-header h3', 'artist.topArtists');
             this._setViewToggle('#view-artist .toggle-btn[data-view="grid"]', 'artist.grid');
             this._setViewToggle('#view-artist .toggle-btn[data-view="list"]', 'artist.list');
             this._setText('#artist-results-grid .empty-state p', 'artist.noArtists');
             this._setText('#artist-results-grid .empty-hint', 'artist.noArtistsHint');
-            this._setText('#view-artist .artist-details h3', 'artist.details');
             this._setText('#artist-detail-content .detail-placeholder', 'artist.selectArtist');
         },
 
@@ -428,10 +429,10 @@
             this._setButton('#btn-cancel-tag', 'modal.tagCancel');
             this._setButton('#btn-start-tag', 'modal.tagStart');
 
-            this._setText('#analytics-modal h3', 'modal.analytics');
+            // The label span, not the <h3>: the heading also holds the sprite icon.
+            this._setText('#analytics-title-text', 'modal.analytics');
             this._setTextAll('#analytics-modal h4', ['modal.topCheckpoints', 'modal.topLoras', 'modal.topTags']);
 
-            // The label span, not the <h3>: the heading also holds the sprite icon.
             this._setText('#export-title-text', 'modal.exportPrompts');
             this._setButton('#btn-export-tags-alt', 'modal.exportTagsAlt');
             this._setButton('#btn-copy-export', 'modal.copyToClipboard');
@@ -447,7 +448,7 @@
         },
 
         _translateLibraryAndExport: function () {
-            this._setText('#batch-export-modal h3', 'batchExport.title');
+            this._setText('#batch-export-title-text', 'batchExport.title');
             this._setText('#batch-export-folder + .helper-text', 'batchExport.outputFolderHelper');
             this._setText('label[for="batch-export-content-mode"]', 'batchExport.contentMode');
             this._setText('#batch-export-content-mode + .helper-text', 'batchExport.contentModeHelper');
@@ -461,7 +462,8 @@
             this._setButton('#btn-cancel-batch-export', 'batchExport.cancel');
             this._setButton('#btn-start-batch-export', 'batchExport.exportFiles');
 
-            this._setText('#rename-modal h3', 'rename.title');
+            // #rename-modal-title and the Save-Options heading are icon + label-span
+            // pairs translated by applyToDOM; writing the <h3> would drop the icon.
             this._setText('#rename-modal .modal-description', 'rename.description');
             this._setText('#rename-modal .checkbox-text', 'rename.useOriginal');
             this._setText('#rename-modal .helper-text', 'rename.useOriginalHelper');
@@ -472,7 +474,6 @@
             this._setButton('#btn-cancel-rename', 'rename.cancel');
             this._setButton('#btn-apply-rename', 'rename.apply');
 
-            this._setText('#save-options-modal h3', 'save.title');
             this._setText('#save-options-modal .modal-description', 'save.description');
             this._setTextAll('#save-options-modal label', ['save.outputFolder', 'save.metadataHandling', 'save.outputFormat']);
             this._setPlaceholder('#save-output-folder', 'save.outputFolder');

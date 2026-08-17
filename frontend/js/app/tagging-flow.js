@@ -255,7 +255,7 @@ async function loadTaggerModels() {
         const _vg = window.I18n?.t?.('modal.tagGroupVlm');
         const vlmGroupLabel = (_vg && _vg !== 'modal.tagGroupVlm') ? _vg : 'VLM Captioning (Natural Language)';
         const _vm = window.I18n?.t?.('modal.tagModelVlm');
-        const vlmOptionLabel = (_vm && _vm !== 'modal.tagModelVlm') ? _vm : '🧠 VLM (Cloud API or Local Ollama)';
+        const vlmOptionLabel = (_vm && _vm !== 'modal.tagModelVlm') ? _vm : 'VLM (Cloud API or Local Ollama)';
         options.push(
             `<optgroup label="${escapeHtml(vlmGroupLabel)}">` +
             `<option value="vlm">${escapeHtml(vlmOptionLabel)}</option>` +

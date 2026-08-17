@@ -10,6 +10,7 @@ import re
 import shutil
 import subprocess
 import sys
+from html.parser import HTMLParser
 from pathlib import Path
 
 
@@ -2136,3 +2137,149 @@ def test_review_cockpit_loads_typed_issue_queue_without_replacing_tag_tools():
     ):
         assert key in en_source
         assert key in zh_source
+
+
+# ``i18n.applyToDOM`` assigns ``el.textContent = t(key)``. Any element that
+# carries data-i18n and also holds an inline sprite therefore loses the sprite
+# the first time translations are applied. The house pattern keeps the icon as a
+# sibling and puts the label in its own span (see #export-title-text).
+class _IconInsideI18nScanner(HTMLParser):
+    VOID = {
+        "area", "base", "br", "col", "embed", "hr", "img", "input", "link",
+        "meta", "param", "source", "track", "wbr",
+    }
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self._stack: list[dict] = []
+        self.offenders: list[tuple[str, int, str]] = []
+
+    def _open(self, tag: str, attrs) -> dict:
+        mapping = dict(attrs)
+        return {
+            "tag": tag,
+            "key": mapping.get("data-i18n") or mapping.get("data-i18n-html"),
+            "line": self.getpos()[0],
+            "id": mapping.get("id", ""),
+        }
+
+    def handle_starttag(self, tag, attrs):
+        frame = self._open(tag, attrs)
+        if tag == "svg":
+            for ancestor in self._stack:
+                if ancestor["key"]:
+                    self.offenders.append(
+                        (ancestor["key"], ancestor["line"], ancestor["id"] or ancestor["tag"])
+                    )
+                    break
+        if tag not in self.VOID:
+            self._stack.append(frame)
+
+    def handle_startendtag(self, tag, attrs):
+        self.handle_starttag(tag, attrs)
+        if tag in self.VOID or tag == "svg":
+            return
+        if self._stack and self._stack[-1]["tag"] == tag:
+            self._stack.pop()
+
+    def handle_endtag(self, tag):
+        for index in range(len(self._stack) - 1, -1, -1):
+            if self._stack[index]["tag"] == tag:
+                del self._stack[index:]
+                return
+
+
+def test_no_data_i18n_element_wraps_a_sprite_icon():
+    repo_root = Path(__file__).resolve().parents[2]
+    html = (repo_root / "frontend" / "index.html").read_text(encoding="utf-8")
+
+    scanner = _IconInsideI18nScanner()
+    scanner.feed(html)
+
+    assert scanner.offenders == [], (
+        "these elements carry data-i18n and an inline <svg>, so applyToDOM will "
+        "delete the icon; move the label into a child span instead: "
+        + ", ".join(f"{key} @ line {line} ({where})" for key, line, where in scanner.offenders)
+    )
+
+
+def test_locale_values_carry_no_emoji():
+    """Graphite replaced emoji with the sprite sheet; locale values must follow.
+
+    A locale value that still holds an emoji does not merely look dated - it is
+    what ``applyToDOM`` writes over the sprite, so the emoji and the icon are the
+    same defect. Text-presentation notation the product actually uses (the star
+    rating, and the check/cross that mirror the English DO/DON'T rule list) is
+    not emoji and stays.
+    """
+    repo_root = Path(__file__).resolve().parents[2]
+    allowed = {"\u2605", "\u2713", "\u2715"}
+    emoji_re = re.compile(
+        "["
+        "\U0001f000-\U0001faff"
+        "\u2600-\u27bf"
+        "\u2b05-\u2b07\u2b1b\u2b1c\u2b50\u2b55"
+        "\u2139\u2194-\u21aa\u2328\u23e9-\u23fa"
+        "\u25aa\u25ab\u25b6\u25c0\u25fb-\u25fe"
+        "\ufe0f"
+        "]"
+    )
+    value_re = re.compile(
+        r"""^\s*(?:'[^']+'|"[^"]+")\s*:\s*(?P<value>.+?),?\s*$""", re.MULTILINE
+    )
+
+    offenders: list[str] = []
+    for name in ("en.js", "zh-CN.js"):
+        source = (repo_root / "frontend" / "js" / "lang" / name).read_text(
+            encoding="utf-8"
+        )
+        for line_number, line in enumerate(source.splitlines(), start=1):
+            match = value_re.match(line)
+            if match is None:
+                continue
+            found = {
+                char
+                for char in match.group("value")
+                if emoji_re.match(char) and char not in allowed
+            }
+            if found:
+                offenders.append(f"{name}:{line_number} {''.join(sorted(found))}")
+
+    assert offenders == [], "emoji left in locale values: " + "; ".join(offenders)
+
+
+def test_icon_bearing_headings_are_translated_through_their_label_span():
+    """ui-refresh must not write textContent onto a heading that holds a sprite.
+
+    ``_setText`` is a second writer, so retargeting only ``applyToDOM`` is not
+    enough - the 120ms/500ms re-applies and the MutationObserver would delete the
+    icon again.
+    """
+    repo_root = Path(__file__).resolve().parents[2]
+    html = (repo_root / "frontend" / "index.html").read_text(encoding="utf-8")
+    ui_refresh = (repo_root / "frontend" / "js" / "ui-refresh.js").read_text(
+        encoding="utf-8"
+    )
+
+    for span_id, key in (
+        ("export-title-text", "modal.exportPrompts"),
+        ("analytics-title-text", "modal.analytics"),
+        ("batch-export-title-text", "batchExport.title"),
+    ):
+        assert f'id="{span_id}" data-i18n="{key}"' in html
+        assert f"this._setText('#{span_id}', '{key}');" in ui_refresh
+
+    # These headings are icon + label-span pairs already, so applyToDOM owns
+    # them; a _setText on the heading itself is what erased their icons.
+    for selector in (
+        "#analytics-modal h3",
+        "#batch-export-modal h3",
+        "#rename-modal h3",
+        "#save-options-modal h3",
+        "#view-artist .control-section h3",
+        "#view-artist .results-header h3",
+        "#view-artist .artist-details h3",
+    ):
+        assert f"'{selector}'" not in ui_refresh, (
+            f"ui-refresh still writes textContent to {selector}, which holds a sprite icon"
+        )

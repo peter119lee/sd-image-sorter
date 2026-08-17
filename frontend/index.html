@@ -923,7 +923,7 @@
                             <div class="selection-panel-section selection-panel-section-scope">
                                 <span class="selection-panel-section-title" data-i18n="selection.scopeSection">Choose images</span>
                                 <div class="selection-panel-actions selection-panel-pick-actions" aria-label="Selection tools">
-                                    <button id="btn-select-all" class="btn btn-primary full-width" title="Select all images matching current filters"><span><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg></span> <span data-i18n="selection.selectAllFiltered">Select all matching</span></button>
+                                    <button id="btn-select-all" class="btn btn-primary full-width" title="Select all images matching current filters"><span><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg></span> <span data-i18n="selection.selectAllFiltered">Select all matching</span></button>
                                     <button id="btn-invert-selection-filtered" class="btn btn-secondary full-width" title="Invert selection among filtered images"><span>⇄</span> <span data-i18n="selection.invertAllFiltered">Invert matching</span></button>
                                 </div>
                                 <span class="selection-panel-helper" data-i18n="selection.selectAllFilteredHelp">Uses the current Gallery filters, including images not scrolled into view.</span>
@@ -1265,7 +1265,7 @@
                                     </div>
                                 </li>
                             </ol>
-                            <p class="onboarding-tip" data-i18n="onboarding.tipHelp">Tip: click the <em><svg class="icon" aria-hidden="true"><use href="#i-help"/></svg></em> in the top-right at any time for a context-aware guide.</p>
+                            <p class="onboarding-tip"><svg class="icon" aria-hidden="true"><use href="#i-help"/></svg> <span data-i18n="onboarding.tipHelp">Tip: click Help in the top-right at any time for a guide to the current tab.</span></p>
                         </div>
                     </div>
                     <div class="gallery-load-more" id="gallery-load-more" style="display:none">
@@ -1555,8 +1555,8 @@
                                 <button class="btn btn-ghost btn-small obfuscate-settings-toggle" id="obfuscate-settings-toggle" title="Advanced settings" type="button"><svg class="icon" aria-hidden="true"><use href="#i-settings"/></svg></button>
                             </div>
                             <div class="obfuscate-action-group">
-                                <button id="obfuscate-btn-encode" class="btn btn-primary" data-i18n="tools.encode"><svg class="icon" aria-hidden="true"><use href="#i-lock"/></svg> Protect</button>
-                                <button id="obfuscate-btn-decode" class="btn btn-secondary" data-i18n="tools.decode"><svg class="icon" aria-hidden="true"><use href="#i-unlock"/></svg> Restore</button>
+                                <button id="obfuscate-btn-encode" class="btn btn-primary"><svg class="icon" aria-hidden="true"><use href="#i-lock"/></svg> <span data-i18n="tools.encode">Protect</span></button>
+                                <button id="obfuscate-btn-decode" class="btn btn-secondary"><svg class="icon" aria-hidden="true"><use href="#i-unlock"/></svg> <span data-i18n="tools.decode">Restore</span></button>
                                 <button id="obfuscate-btn-clear" class="btn btn-ghost" data-i18n="tools.clearQueue">Clear</button>
                             </div>
                         </div>
@@ -1587,7 +1587,7 @@
 
                         <!-- Batch download -->
                         <div class="obfuscate-batch-bar" id="obfuscate-batch-bar" style="display: none;">
-                            <button id="obfuscate-btn-download-all" class="btn btn-secondary btn-small" data-i18n="tools.downloadAll">⬇️ Download All (.zip)</button>
+                            <button id="obfuscate-btn-download-all" class="btn btn-secondary btn-small"><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg> <span data-i18n="tools.downloadAll">Download All (.zip)</span></button>
                         </div>
                     </div>
 
@@ -1601,7 +1601,7 @@
                             </div>
                             <div style="display: flex; gap: 8px; justify-content: center; padding: 12px;">
                                 <button class="btn btn-primary btn-small" id="obfuscate-preview-copy"><svg class="icon" aria-hidden="true"><use href="#i-clipboard"/></svg> <span data-i18n="tools.copyImage">Copy</span></button>
-                                <button class="btn btn-secondary btn-small" id="obfuscate-preview-download">⬇️ <span data-i18n="tools.downloadImage">Download</span></button>
+                                <button class="btn btn-secondary btn-small" id="obfuscate-preview-download"><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg> <span data-i18n="tools.downloadImage">Download</span></button>
                             </div>
                         </div>
                     </div>
@@ -1671,9 +1671,9 @@
                                 <div class="autosep-card autosep-card-scope" id="autosep-scope-status">
                                     <div class="autosep-scope-detail-block">
                                         <div class="scope-status-actions">
-                                            <button class="btn btn-secondary btn-small" id="btn-autosep-use-gallery-scope" type="button" data-i18n="scope.useGallery" title="Use whatever filters Gallery has right now"><svg class="icon" aria-hidden="true"><use href="#i-clipboard"/></svg> Use Gallery's current filters</button>
-                                            <button class="btn btn-secondary btn-small" id="btn-autosep-resync-scope" type="button" data-i18n="scope.resyncGallery" title="Gallery filters changed — click to update" hidden><svg class="icon" aria-hidden="true"><use href="#i-refresh"/></svg> Update from Gallery</button>
-                                            <button class="btn btn-ghost btn-small" id="btn-autosep-keep-scope" type="button" data-i18n="scope.keepSaved" title="Ignore Gallery changes, keep using the filters shown below" hidden><svg class="icon" aria-hidden="true"><use href="#i-lock"/></svg> Keep my filters</button>
+                                            <button class="btn btn-secondary btn-small" id="btn-autosep-use-gallery-scope" type="button" title="Use whatever filters Gallery has right now"><svg class="icon" aria-hidden="true"><use href="#i-clipboard"/></svg> <span data-i18n="scope.useGallery">Use Gallery's current filters</span></button>
+                                            <button class="btn btn-secondary btn-small" id="btn-autosep-resync-scope" type="button" title="Gallery filters changed — click to update" hidden><svg class="icon" aria-hidden="true"><use href="#i-refresh"/></svg> <span data-i18n="scope.resyncGallery">Update from Gallery</span></button>
+                                            <button class="btn btn-ghost btn-small" id="btn-autosep-keep-scope" type="button" title="Ignore Gallery changes, keep using the filters shown below" hidden><svg class="icon" aria-hidden="true"><use href="#i-lock"/></svg> <span data-i18n="scope.keepSaved">Keep my filters</span></button>
                                         </div>
                                     </div>
                                 </div>
@@ -2016,9 +2016,9 @@
                                 </div>
                                 <div class="scope-status-detail" id="manual-sort-scope-detail">Gallery filters changed. Manual Sort will still use the filters shown here.</div>
                                 <div class="scope-status-actions">
-                                    <button class="btn btn-secondary btn-small" id="btn-manual-sort-use-gallery-scope" type="button" data-i18n="scope.useGallery" title="Use whatever filters Gallery has right now"><svg class="icon" aria-hidden="true"><use href="#i-clipboard"/></svg> Use Gallery's current filters</button>
-                                    <button class="btn btn-secondary btn-small" id="btn-manual-sort-resync-scope" type="button" data-i18n="scope.resyncGallery" title="Gallery filters changed — click to update" hidden><svg class="icon" aria-hidden="true"><use href="#i-refresh"/></svg> Update from Gallery</button>
-                                    <button class="btn btn-ghost btn-small" id="btn-manual-sort-keep-scope" type="button" data-i18n="scope.keepSaved" title="Ignore Gallery changes, keep using the filters shown below" hidden><svg class="icon" aria-hidden="true"><use href="#i-lock"/></svg> Keep my filters</button>
+                                    <button class="btn btn-secondary btn-small" id="btn-manual-sort-use-gallery-scope" type="button" title="Use whatever filters Gallery has right now"><svg class="icon" aria-hidden="true"><use href="#i-clipboard"/></svg> <span data-i18n="scope.useGallery">Use Gallery's current filters</span></button>
+                                    <button class="btn btn-secondary btn-small" id="btn-manual-sort-resync-scope" type="button" title="Gallery filters changed — click to update" hidden><svg class="icon" aria-hidden="true"><use href="#i-refresh"/></svg> <span data-i18n="scope.resyncGallery">Update from Gallery</span></button>
+                                    <button class="btn btn-ghost btn-small" id="btn-manual-sort-keep-scope" type="button" title="Ignore Gallery changes, keep using the filters shown below" hidden><svg class="icon" aria-hidden="true"><use href="#i-lock"/></svg> <span data-i18n="scope.keepSaved">Keep my filters</span></button>
                                 </div>
                             </div>
                             <div class="filter-summary-compact" id="manual-sort-filter-summary">
@@ -3045,7 +3045,7 @@
                                     <input type="text" id="similar-search-text" class="input" style="flex:1;"
                                            placeholder="Describe it: red dress, smiling, garden…"
                                            data-i18n-placeholder="similar.searchTextPlaceholder" autocomplete="off">
-                                    <button class="btn btn-primary" id="btn-similar-search-text" data-i18n="similar.searchTextButton"><svg class="icon" aria-hidden="true"><use href="#i-sparkle"/></svg> Semantic search</button>
+                                    <button class="btn btn-primary" id="btn-similar-search-text"><svg class="icon" aria-hidden="true"><use href="#i-sparkle"/></svg> <span data-i18n="similar.searchTextButton">Semantic search</span></button>
                                 </div>
                                 <input type="number" id="similar-search-id" class="input" placeholder="Image ID" data-i18n-placeholder="similar.searchById">
                                 <button class="btn btn-primary" id="btn-similar-search" data-i18n="similar.searchById">Search by ID</button>
@@ -3870,8 +3870,7 @@
                                                 data-i18n="dataset.captionTypeApplyAll"
                                                 title="Apply the active image's type to every queue image">▸ All</button>
                                         <button type="button" class="btn btn-ghost btn-small" id="btn-dataset-captype-auto"
-                                                data-i18n="dataset.captionTypeAuto"
-                                                title="Auto: images that have a natural-language caption → Both, the rest → Booru"><svg class="icon" aria-hidden="true"><use href="#i-zap"/></svg> Auto</button>
+                                                title="Auto: images that have a natural-language caption → Both, the rest → Booru"><svg class="icon" aria-hidden="true"><use href="#i-zap"/></svg> <span data-i18n="dataset.captionTypeAuto">Auto</span></button>
                                     </div>
                                 </div>
 
@@ -3880,9 +3879,8 @@
                                      (local imports have no stored masks). -->
                                 <div class="dataset-mask-controls" id="dataset-mask-controls" hidden>
                                     <button type="button" class="btn btn-ghost btn-small" id="btn-dataset-mask-edit"
-                                            data-i18n="dataset.maskEditButton"
                                             title="Masked training: paint which regions the trainer learns from"
-                                            data-i18n-title="dataset.maskEditButtonTip"><svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg> Training mask</button>
+                                            data-i18n-title="dataset.maskEditButtonTip"><svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg> <span data-i18n="dataset.maskEditButton">Training mask</span></button>
                                     <span class="dataset-mask-state" id="dataset-mask-state"></span>
                                 </div>
 
@@ -3900,7 +3898,7 @@
                                          are injected by dataset/lora-prune.js (one source of truth for
                                          the palette + labels, shared with the LoRA-prune checkboxes). -->
                                     <details class="dataset-tag-color-legend" id="dataset-tag-color-legend" open>
-                                        <summary data-i18n="dataset.tagColorLegendTitle"><svg class="icon" aria-hidden="true"><use href="#i-palette"/></svg> Tag color legend</summary>
+                                        <summary><svg class="icon" aria-hidden="true"><use href="#i-palette"/></svg> <span data-i18n="dataset.tagColorLegendTitle">Tag color legend</span></summary>
                                         <div class="dataset-tag-color-legend-body" id="dataset-tag-color-legend-body"></div>
                                     </details>
                                     <div class="dataset-tag-add-wrap">
@@ -3962,16 +3960,16 @@
                                         <span class="dataset-confidence-summary-hint" id="dataset-confidence-summary-hint"></span>
                                     </summary>
                                     <div class="dataset-confidence-body">
-                                        <p class="dataset-confidence-help" data-i18n="dataset.confidenceHelp">
-                                            Each pill shows the local tagger's confidence. Click <svg class="icon" aria-hidden="true"><use href="#i-close"/></svg> to drop a tag from the active caption.
+                                        <p class="dataset-confidence-help"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg>
+                                            <span data-i18n="dataset.confidenceHelp">Each pill shows the local tagger's confidence. Use the remove button on a pill to drop that tag from the active caption.</span>
                                         </p>
                                         <div class="dataset-confidence-pills" id="dataset-confidence-pills"></div>
                                     </div>
                                 </details>
 
                                 <div class="dataset-editor-actions" id="dataset-editor-actions" hidden>
-                                    <button class="btn btn-secondary btn-small" id="btn-dataset-prev-image" data-i18n="dataset.prevImage">⬅ Prev</button>
-                                    <button class="btn btn-secondary btn-small" id="btn-dataset-next-image" data-i18n="dataset.nextImage">Next <svg class="icon" aria-hidden="true"><use href="#i-arrow-right"/></svg></button>
+                                    <button class="btn btn-secondary btn-small" id="btn-dataset-prev-image"><svg class="icon" aria-hidden="true"><use href="#i-arrow-left"/></svg> <span data-i18n="dataset.prevImage">Prev</span></button>
+                                    <button class="btn btn-secondary btn-small" id="btn-dataset-next-image"><span data-i18n="dataset.nextImage">Next</span> <svg class="icon" aria-hidden="true"><use href="#i-arrow-right"/></svg></button>
                                     <button class="btn btn-ghost btn-small" id="btn-dataset-revert-caption" data-i18n="dataset.revertCaption">Revert</button>
                                     <button class="btn btn-ghost btn-small" id="btn-dataset-undo-caption" data-i18n="dataset.undoCaption">Undo</button>
                                     <button class="btn btn-danger btn-small" id="btn-dataset-remove-image" data-i18n="dataset.removeFromDataset">Remove</button>
@@ -4307,8 +4305,8 @@
                                                     <span data-i18n="dataset.var.append">Common tags field below</span>
                                                 </div>
                                             </div>
-                                            <small class="dataset-template-hint" data-i18n="dataset.templateHint">
-                                                <svg class="icon" aria-hidden="true"><use href="#i-info"/></svg> Tip: Use newlines for multi-line captions (e.g., {tags}\n{nl_caption})
+                                            <small class="dataset-template-hint"><svg class="icon" aria-hidden="true"><use href="#i-info"/></svg>
+                                                <span data-i18n="dataset.templateHint">Tip: Use newlines for multi-line captions (e.g., {tags}\n{nl_caption})</span>
                                             </small>
                                         </details>
                                         <textarea id="dataset-template-override" class="form-input" rows="3"
@@ -4494,7 +4492,7 @@
                                 <p class="helper-text" data-i18n="dataset.separationConsoleHelp">Every tag across the queue: keep it promptable, or prune it so the trigger word absorbs it. Frequency is the evidence.</p>
                                 <div class="sepcon-toolbar">
                                     <span id="sepcon-stats" class="sepcon-stats"></span>
-                                    <button type="button" class="btn btn-ghost btn-small" id="sepcon-next-unseen" data-i18n="dataset.sepconNextUnseen">⏭ Next unreviewed</button>
+                                    <button type="button" class="btn btn-ghost btn-small" id="sepcon-next-unseen"><svg class="icon" aria-hidden="true"><use href="#i-arrow-right"/></svg> <span data-i18n="dataset.sepconNextUnseen">Next unreviewed</span></button>
                                 </div>
                                 <div class="sepcon-controls">
                                     <input type="text" id="sepcon-search" class="form-input" placeholder="filter tags..." data-i18n-placeholder="dataset.sepconSearch" autocomplete="off">
@@ -4515,15 +4513,15 @@
                                             <option value="concept" data-i18n="dataset.sepconPurposeConcept">Concept LoRA</option>
                                             <option value="general" data-i18n="dataset.sepconPurposeGeneral">General</option>
                                         </select>
-                                        <button type="button" class="btn btn-secondary btn-small" id="sepcon-health-run" data-i18n="dataset.sepconHealthRun"><svg class="icon" aria-hidden="true"><use href="#i-activity"/></svg> Health check</button>
+                                        <button type="button" class="btn btn-secondary btn-small" id="sepcon-health-run"><svg class="icon" aria-hidden="true"><use href="#i-activity"/></svg> <span data-i18n="dataset.sepconHealthRun">Health check</span></button>
                                         <button type="button" class="btn btn-secondary btn-small" id="sepcon-tipo-suggest"
                                                 title="TIPO proposes tags the taggers never scored (vocabulary blind spots) — review checklist, nothing auto-applies"
-                                                data-i18n="dataset.sepconTipoSuggest"><svg class="icon" aria-hidden="true"><use href="#i-layers"/></svg> Suggest missing tags</button>
+                                                ><svg class="icon" aria-hidden="true"><use href="#i-layers"/></svg> <span data-i18n="dataset.sepconTipoSuggest">Suggest missing tags</span></button>
                                     </div>
                                     <div id="sepcon-health-results" class="sepcon-health-results" hidden></div>
                                 </div>
                                 <div class="sepcon-rethreshold">
-                                    <p class="helper-text" data-i18n="dataset.sepconRtHelp"><svg class="icon" aria-hidden="true"><use href="#i-settings"/></svg> Re-threshold from stored scores — zero inference. Tags rebuild at the new cutoff; manual tags survive.</p>
+                                    <p class="helper-text"><svg class="icon" aria-hidden="true"><use href="#i-settings"/></svg> <span data-i18n="dataset.sepconRtHelp">Re-threshold from stored scores — zero inference. Tags rebuild at the new cutoff; manual tags survive.</span></p>
                                     <div class="sepcon-health-bar">
                                         <select id="sepcon-rt-model" class="input-field"></select>
                                         <input type="range" id="sepcon-rt-threshold" min="0.15" max="0.95" step="0.01" value="0.35">
@@ -4546,7 +4544,7 @@
                                 <p class="helper-text" data-i18n="dataset.ccipHelp">Flags images that may show the wrong character: every image is compared against the set's most typical image (the medoid). Advisory only — nothing is moved or deleted. Multi-character images confuse the check, and chibi/style variance raises distances, so review flagged rows yourself and adjust the threshold as needed.</p>
                                 <div class="ccip-toolbar">
                                     <button type="button" class="btn btn-secondary btn-small" id="ccip-run"
-                                            data-i18n="dataset.ccipRun"><svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg> Analyze character purity</button>
+                                            ><svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg> <span data-i18n="dataset.ccipRun">Analyze character purity</span></button>
                                     <button type="button" class="btn btn-ghost btn-small" id="ccip-cancel"
                                             data-i18n="common.cancel" hidden>Cancel</button>
                                     <label class="ccip-threshold-label">
@@ -4558,7 +4556,7 @@
                                 <div id="ccip-prepare-wrap" hidden>
                                     <p id="ccip-prepare-note" class="helper-text"></p>
                                     <button type="button" class="btn btn-secondary btn-small" id="ccip-prepare"
-                                            data-i18n="dataset.ccipPrepare">⬇ Download CCIP model (~150 MB)</button>
+                                            ><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg> <span data-i18n="dataset.ccipPrepare">Download CCIP model (~150 MB)</span></button>
                                 </div>
                                 <div id="ccip-status" class="sepcon-health-note" aria-live="polite"></div>
                                 <div id="ccip-results" class="ccip-results" hidden></div>
@@ -4750,14 +4748,14 @@
                                     <label class="dataset-preset-row">
                                         <input type="radio" name="dataset-image-op-radio" value="copy" checked>
                                         <span class="dataset-preset-label">
-                                            <strong data-i18n="dataset.imageOpCopySafe"><svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg> Copy (recommended) — originals stay safe</strong>
+                                            <strong><svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg> <span data-i18n="dataset.imageOpCopySafe">Copy (recommended) — originals stay safe</span></strong>
                                             <small data-i18n="dataset.imageOpCopyHint">A duplicate of each image is written to the output folder.</small>
                                         </span>
                                     </label>
                                     <label class="dataset-preset-row">
                                         <input type="radio" name="dataset-image-op-radio" value="move">
                                         <span class="dataset-preset-label">
-                                            <strong data-i18n="dataset.imageOpMoveTitle"><svg class="icon" aria-hidden="true"><use href="#i-alert"/></svg> Move — original images leave their current location</strong>
+                                            <strong><svg class="icon" aria-hidden="true"><use href="#i-alert"/></svg> <span data-i18n="dataset.imageOpMoveTitle">Move — original images leave their current location</span></strong>
                                             <small data-i18n="dataset.imageOpMoveHint">The image file is removed from its source folder and re-indexed at the new path. Use only when you're sure.</small>
                                         </span>
                                     </label>
@@ -4984,11 +4982,11 @@
                             </h3>
                             <div class="mask-editor-toolbar">
                                 <button type="button" class="btn btn-secondary btn-small mask-tool is-active" id="mask-tool-include"
-                                        data-i18n="dataset.maskToolInclude" title="Paint regions the trainer SHOULD learn from"
-                                        data-i18n-title="dataset.maskToolIncludeTip"><svg class="icon" aria-hidden="true"><use href="#i-brush"/></svg> Include</button>
+                                        title="Paint regions the trainer SHOULD learn from"
+                                        data-i18n-title="dataset.maskToolIncludeTip"><svg class="icon" aria-hidden="true"><use href="#i-brush"/></svg> <span data-i18n="dataset.maskToolInclude">Include</span></button>
                                 <button type="button" class="btn btn-secondary btn-small mask-tool" id="mask-tool-exclude"
-                                        data-i18n="dataset.maskToolExclude" title="Paint regions the trainer should IGNORE"
-                                        data-i18n-title="dataset.maskToolExcludeTip">⬛ Exclude</button>
+                                        title="Paint regions the trainer should IGNORE"
+                                        data-i18n-title="dataset.maskToolExcludeTip"><svg class="icon" aria-hidden="true"><use href="#i-square"/></svg> <span data-i18n="dataset.maskToolExclude">Exclude</span></button>
                                 <label class="mask-brush-size">
                                     <input type="range" id="mask-brush-size" min="4" max="160" step="2" value="40">
                                     <span id="mask-brush-size-value">40</span>
@@ -5003,8 +5001,8 @@
                                     </select>
                                 </label>
                                 <button type="button" class="btn btn-ghost btn-small" id="mask-tool-auto"
-                                        data-i18n="dataset.maskToolAuto" title="Generate a subject mask with the selected engine"
-                                        data-i18n-title="dataset.maskToolAutoTip"><svg class="icon" aria-hidden="true"><use href="#i-cpu"/></svg> Auto subject</button>
+                                        title="Generate a subject mask with the selected engine"
+                                        data-i18n-title="dataset.maskToolAutoTip"><svg class="icon" aria-hidden="true"><use href="#i-cpu"/></svg> <span data-i18n="dataset.maskToolAuto">Auto subject</span></button>
                             </div>
                             <p class="mask-lucida-license helper-text" id="mask-lucida-license"
                                data-i18n="dataset.maskLucidaLicense" hidden>Lucida weights are MIT; its training data includes research-only datasets. Commercial users should make their own assessment.</p>
@@ -5013,7 +5011,7 @@
                             </div>
                             <div class="mask-editor-status helper-text" id="mask-editor-status"></div>
                             <div class="dataset-modal-actions mask-editor-actions">
-                                <button type="button" class="btn btn-ghost" id="mask-editor-delete" data-i18n="dataset.maskDelete"><svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg> Remove mask</button>
+                                <button type="button" class="btn btn-ghost" id="mask-editor-delete"><svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg> <span data-i18n="dataset.maskDelete">Remove mask</span></button>
                                 <button type="button" class="btn btn-ghost" id="mask-editor-cancel" data-i18n="common.cancel">Cancel</button>
                                 <button type="button" class="btn btn-primary" id="mask-editor-save" data-i18n="dataset.maskSave">Save mask</button>
                             </div>
@@ -5099,7 +5097,7 @@
                             </details>
                             <div class="dataset-modal-actions">
                                 <button class="btn btn-secondary" id="btn-dataset-open-folder"
-                                        data-i18n="dataset.openOutputFolder"><svg class="icon" aria-hidden="true"><use href="#i-folder"/></svg> Open output folder</button>
+                                        ><svg class="icon" aria-hidden="true"><use href="#i-folder"/></svg> <span data-i18n="dataset.openOutputFolder">Open output folder</span></button>
                                 <button class="btn btn-primary" id="btn-dataset-result-close"
                                         data-i18n="common.close">Close</button>
                             </div>
@@ -5231,8 +5229,8 @@
                     </div>
                     <div class="settings-row">
                         <div class="settings-row-copy">
-                            <strong data-i18n="settings.entryHeroTitle"><svg class="icon" aria-hidden="true"><use href="#i-star"/></svg>5 cover art</strong>
-                            <span data-i18n="settings.entryHeroBody">Full-bleed <svg class="icon" aria-hidden="true"><use href="#i-star"/></svg>5 artwork on the entry page, rotating daily</span>
+                            <strong data-i18n="settings.entryHeroTitle">★5 cover art</strong>
+                            <span data-i18n="settings.entryHeroBody">Full-bleed ★5 artwork on the entry page, rotating daily</span>
                         </div>
                         <button type="button" class="btn btn-ghost" id="btn-settings-entry-hero-toggle" aria-pressed="true">
                             <span aria-hidden="true" id="settings-entry-hero-icon"><svg class="icon" aria-hidden="true"><use href="#i-image"/></svg></span>
@@ -5506,7 +5504,7 @@
                                         </div>
                                     </details>
                                     <button class="btn btn-ghost btn-small" id="btn-reparse-metadata" aria-label="Read image info again" data-i18n="modal.reparse">Read Again</button>
-                                    <button class="btn btn-ghost btn-small" id="btn-edit-metadata" aria-label="Edit metadata" data-i18n="modal.editMetadata" title="Edit image metadata" data-i18n-title="modal.editMetadataTitle"><svg class="icon" aria-hidden="true"><use href="#i-edit"/></svg> Edit</button>
+                                    <button class="btn btn-ghost btn-small" id="btn-edit-metadata" aria-label="Edit metadata" title="Edit image metadata" data-i18n-title="modal.editMetadataTitle"><svg class="icon" aria-hidden="true"><use href="#i-edit"/></svg> <span data-i18n="modal.editMetadata">Edit</span></button>
                                 </div>
                             </div>
                             <h3 id="modal-filename">filename.png</h3>
@@ -5641,7 +5639,7 @@
                         <div class="modal-tags-header">
                             <h4 data-i18n="modal.aiCaption">AI Caption</h4>
                             <div class="modal-caption-actions">
-                                <button class="btn btn-ghost btn-small" id="btn-edit-caption" type="button" data-i18n="modal.editCaptionBtn"><svg class="icon" aria-hidden="true"><use href="#i-edit"/></svg> Edit</button>
+                                <button class="btn btn-ghost btn-small" id="btn-edit-caption" type="button"><svg class="icon" aria-hidden="true"><use href="#i-edit"/></svg> <span data-i18n="modal.editCaptionBtn">Edit</span></button>
                                 <button class="btn btn-ghost btn-small" id="btn-copy-caption" title="Copy caption">Copy</button>
                             </div>
                         </div>
@@ -5983,7 +5981,7 @@
                     </button>
                     <div class="tagger-model-choice-list" id="tag-model-choice-list" role="radiogroup" aria-labelledby="tag-model-select-label"></div>
                     <small class="helper-text" id="tag-model-help" aria-live="polite">Balanced default. Good if you are not sure.</small>
-                    <button type="button" class="model-pick-help-link" data-action="open-model-guidance" data-i18n="models.whichToPick"><svg class="icon" aria-hidden="true"><use href="#i-help"/></svg> Which model should I pick?</button>
+                    <button type="button" class="model-pick-help-link" data-action="open-model-guidance"><svg class="icon" aria-hidden="true"><use href="#i-help"/></svg> <span data-i18n="models.whichToPick">Which model should I pick?</span></button>
                 </div>
 
                 <div class="tagger-nl-workflow-card tagger-nl-status-card" id="tagger-nl-workflow-card" data-tagger-shows="nl" style="display:none">
@@ -6201,8 +6199,8 @@
                                     <button type="button" class="btn btn-ghost btn-small" id="btn-tag-prebl-clear"
                                             data-i18n="common.clear">Clear</button>
                                 </div>
-                                <p class="form-hint" data-i18n="modal.tagPreBlacklistAlsoExport">
-                                    <svg class="icon" aria-hidden="true"><use href="#i-info"/></svg> You can also blacklist at export time inside Dataset Maker → Workbench.
+                                <p class="form-hint"><svg class="icon" aria-hidden="true"><use href="#i-info"/></svg>
+                                    <span data-i18n="modal.tagPreBlacklistAlsoExport">You can also blacklist at export time inside Dataset Maker → Workbench.</span>
                                 </p>
                             </div>
                         </details>
@@ -6316,7 +6314,7 @@
             <div class="modal-backdrop"></div>
             <div class="modal-content modal-large">
                 <button class="modal-close" aria-label="Close image analytics" data-i18n-aria="a11y.closeAnalytics"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button>
-                <h3 data-i18n="modal.analytics"><svg class="icon" aria-hidden="true"><use href="#i-chart"/></svg> Image Analytics</h3>
+                <h3><svg class="icon" aria-hidden="true"><use href="#i-chart"/></svg> <span id="analytics-title-text" data-i18n="modal.analytics">Image Analytics</span></h3>
                 <div class="analytics-grid">
                     <div class="analytics-card">
                         <h4 data-i18n="modal.topCheckpoints">Top Checkpoints</h4>
@@ -6444,7 +6442,7 @@
 
                 <div class="modal-actions">
                     <button class="btn btn-ghost" id="btn-meta-edit-cancel" data-i18n="modal.cancel">Cancel</button>
-                    <button class="btn btn-primary" id="btn-meta-edit-save" data-i18n="modal.saveChanges"><svg class="icon" aria-hidden="true"><use href="#i-save"/></svg> Save Changes</button>
+                    <button class="btn btn-primary" id="btn-meta-edit-save"><svg class="icon" aria-hidden="true"><use href="#i-save"/></svg> <span data-i18n="modal.saveChanges">Save Changes</span></button>
                 </div>
             </div>
         </div>
@@ -6470,7 +6468,7 @@
             <div class="modal-backdrop"></div>
             <div class="modal-content modal-large batch-export-shell">
                 <button class="modal-close" id="btn-close-batch-export" aria-label="Close caption export" data-i18n-aria="a11y.closeBatchExport"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button>
-                <h3 data-i18n="batchExport.title"><svg class="icon" aria-hidden="true"><use href="#i-edit"/></svg> Same-name .txt Captions</h3>
+                <h3><svg class="icon" aria-hidden="true"><use href="#i-edit"/></svg> <span id="batch-export-title-text" data-i18n="batchExport.title">Same-name .txt Captions</span></h3>
                 <p class="modal-description" id="batch-export-count">This batch export includes only 0 selected images.</p>
                 <small class="helper-text" data-i18n="batchExport.scopeHelp">This only writes files for the images selected in Gallery.</small>
 
@@ -6487,11 +6485,11 @@
                         </label>
                         <label class="segmented-option">
                             <input type="radio" name="batch-export-output-mode" value="clipboard">
-                            <span data-i18n="batchExport.outputModeClipboard"><svg class="icon" aria-hidden="true"><use href="#i-clipboard"/></svg> Copy combined to clipboard</span>
+                            <span><svg class="icon" aria-hidden="true"><use href="#i-clipboard"/></svg> <span data-i18n="batchExport.outputModeClipboard">Copy combined to clipboard</span></span>
                         </label>
                         <label class="segmented-option">
                             <input type="radio" name="batch-export-output-mode" value="download">
-                            <span data-i18n="batchExport.outputModeDownload">⬇️ Download single file</span>
+                            <span><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg> <span data-i18n="batchExport.outputModeDownload">Download single file</span></span>
                         </label>
                     </div>
                     <small class="helper-text" data-i18n="batchExport.outputModeBesideImageHelper">Writes each .txt / .json into the same folder as the source image. Best when your library spans many subfolders or feeds a per-folder training tool.</small>
@@ -6568,7 +6566,7 @@
                             <strong data-i18n="batchExport.livePreview">Live preview</strong>
                             <span class="helper-text" data-i18n="batchExport.livePreviewHelper">(first 5 selected images)</span>
                             <button class="btn btn-small btn-ghost" id="btn-refresh-preview" type="button">
-                                <span data-i18n="batchExport.refreshPreview"><svg class="icon" aria-hidden="true"><use href="#i-refresh"/></svg> Refresh</span>
+                                <span><svg class="icon" aria-hidden="true"><use href="#i-refresh"/></svg> <span data-i18n="batchExport.refreshPreview">Refresh</span></span>
                             </button>
                             <!-- v3.2.1 task #33: open the workbench in a dedicated full-screen window -->
                             <button class="btn btn-small btn-secondary" id="btn-open-caption-editor" type="button" title="Open caption editor in a larger window" data-i18n-title="captionEditor.openTooltip">
@@ -6686,7 +6684,7 @@
             <div class="modal-content caption-editor-shell">
                 <div class="caption-editor-topbar">
                     <div class="caption-editor-title-block">
-                        <h3 id="caption-editor-title" data-i18n="captionEditor.title"><svg class="icon" aria-hidden="true"><use href="#i-edit"/></svg> Caption Editor</h3>
+                        <h3 id="caption-editor-title"><svg class="icon" aria-hidden="true"><use href="#i-edit"/></svg> <span data-i18n="captionEditor.title">Caption Editor</span></h3>
                         <span id="caption-editor-subtitle" class="caption-editor-subtitle" data-i18n="captionEditor.subtitle">Edits here are temporary — only used when you Export, Copy, or Download from this session.</span>
                     </div>
                     <div class="caption-editor-topbar-actions">
@@ -8241,7 +8239,7 @@
         <div class="modal-backdrop"></div>
         <div class="modal-content modal-large">
             <button class="modal-close" aria-label="Close VLM captioning settings" data-i18n-aria="a11y.closeVlmSettings"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button>
-            <h3 data-i18n="vlmSettings.title"><svg class="icon" aria-hidden="true"><use href="#i-cpu"/></svg> VLM Captioning Settings</h3>
+            <h3><svg class="icon" aria-hidden="true"><use href="#i-cpu"/></svg> <span data-i18n="vlmSettings.title">VLM Captioning Settings</span></h3>
             <p class="modal-description" data-i18n="vlmSettings.description">Configure Vision Language Model for natural language captioning.</p>
 
             <div class="form-group">
@@ -8466,7 +8464,7 @@
         <div class="modal-backdrop"></div>
         <div class="modal-content modal-large mass-tag-shell">
             <button class="modal-close" id="btn-mass-tag-close" aria-label="Close mass tag editor"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button>
-            <h3 id="mass-tag-modal-title" data-i18n="massTag.title"><svg class="icon" aria-hidden="true"><use href="#i-broom"/></svg> Mass Tag Editor</h3>
+            <h3 id="mass-tag-modal-title"><svg class="icon" aria-hidden="true"><use href="#i-broom"/></svg> <span data-i18n="massTag.title">Mass Tag Editor</span></h3>
             <p class="modal-description" data-i18n="massTag.description">
                 Bulk operations on stored tags. Run "Dry-run preview" before "Apply". Successful edits offer Undo when an undo journal can be saved.
             </p>

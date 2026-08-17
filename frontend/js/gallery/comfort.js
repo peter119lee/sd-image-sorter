@@ -386,7 +386,7 @@
         } else {
             const parts = [];
             if (day.favorites > 0) {
-                parts.push(_t('gallery.comfort.statFavorites', '♥ {n}', { n: day.favorites }));
+                parts.push(_t('gallery.comfort.statFavorites', 'favorited {n}', { n: day.favorites }));
             }
             if (day.selectsPeak > 0) {
                 parts.push(_t('gallery.comfort.statSelects', 'selected up to {n}', { n: day.selectsPeak }));

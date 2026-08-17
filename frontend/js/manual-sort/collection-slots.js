@@ -81,7 +81,7 @@ function populateBracketWinnerSelect() {
     const select = document.getElementById('bracket-winner-collection');
     if (!select) return;
     const none = manualSortText('manual.bracketWinnerNone', "Don't save", '不收藏');
-    const fav = manualSortText('manual.bracketWinnerFav', '♥ Favorites', '♥ 收藏');
+    const fav = manualSortText('manual.bracketWinnerFav', 'Favorites', '收藏');
     const options = (ManualSortState.collectionsCache || [])
         .map((c) => `<option value="${c.id}">${escapeHtml(c.name)}</option>`)
         .join('');
@@ -111,7 +111,7 @@ function populateCullDestSelect(which) {
     const select = document.getElementById(which === 'reject' ? 'cull-reject-collection' : 'cull-keep-collection');
     if (!select) return;
     const none = manualSortText('manual.bracketWinnerNone', "Don't save", '不收藏');
-    const fav = manualSortText('manual.bracketWinnerFav', '♥ Favorites', '♥ 收藏');
+    const fav = manualSortText('manual.bracketWinnerFav', 'Favorites', '收藏');
     const options = (ManualSortState.collectionsCache || [])
         .map((c) => `<option value="${c.id}">${escapeHtml(c.name)}</option>`)
         .join('');

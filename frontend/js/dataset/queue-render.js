@@ -113,7 +113,7 @@
                     <p class="dataset-empty-body">
                         <span class="dataset-empty-arrow">←</span>
                         ${this._t('dataset.queueEmptyBody',
-                            'Open the <svg class="icon" aria-hidden="true"><use href="#i-image"/></svg> Gallery tab, click some images, then click "Add from Gallery" above.')}
+                            'Open the Gallery tab, click some images, then click "Add from Gallery" above.')}
                     </p>
                 </div>
             `;

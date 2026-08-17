@@ -388,7 +388,7 @@ function updateBracketProgress(result) {
     if (streakEl) {
         const streak = Number(ManualSortState.bracketStreak || 0);
         streakEl.textContent = streak >= 2
-            ? formatManualSortI18n('manual.bracketStreak', '👑 Streak ×{n}', { n: streak })
+            ? formatManualSortI18n('manual.bracketStreak', 'Streak ×{n}', { n: streak })
             : '';
     }
 }
@@ -505,7 +505,7 @@ async function collectBracketWinner(winnerImage) {
     try {
         if (dest === 'fav') {
             await API.setFavorite(winnerId, true);
-            return manualSortText('manual.bracketWinnerFav', '♥ Favorites', '♥ 收藏');
+            return manualSortText('manual.bracketWinnerFav', 'Favorites', '收藏');
         }
         const collectionId = Number(dest);
         if (!Number.isInteger(collectionId) || collectionId <= 0) return null;

@@ -458,7 +458,7 @@ async function runBulkDownload(items) {
     if (button) {
         button.disabled = false;
         button.innerHTML = originalLabel
-            || `<span aria-hidden="true">⬇️</span> <span>${escapeHtml(appT('models.bulkDownload', 'Download selected models'))}</span>`;
+            || `<svg class="icon" aria-hidden="true"><use href="#i-download"/></svg> <span>${escapeHtml(appT('models.bulkDownload', 'Download selected models'))}</span>`;
     }
 
     const actionableFailure = failures.find((failure) => failure.guidance);
@@ -490,7 +490,7 @@ async function runBulkDownload(items) {
     if (failures.length === 0 && !needsRestart) {
         showToast(appT('models.bulkDoneAll', 'All {count} model(s) downloaded successfully.', { count: total }), 'success');
     } else if (needsRestart) {
-        showToast(appT('models.bulkNeedsRestart', '⚠️ Restart required — close and reopen the app, then click Download again.'), 'warning');
+        showToast(appT('models.bulkNeedsRestart', 'Restart required — close and reopen the app, then click Download again.'), 'warning');
     } else {
         const okCount = total - failures.length;
         showToast(appT(

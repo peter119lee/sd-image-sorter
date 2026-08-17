@@ -21,7 +21,7 @@
                 // here is the #1 confusion point. Take the user there
                 // explicitly + show a sticky toast that survives the nav.
                 this._toast(this._t('dataset.gallerySelectionEmpty',
-                    '👈 Open the Gallery tab and select images first, then come back here and click this button again.'),
+                    'Open the Gallery tab and select images first, then come back here and click this button again.'),
                     'warning', 8000);
                 // Switch to the Gallery tab so the user sees the next step
                 // without having to figure out where to click.
