@@ -39,8 +39,22 @@ from services.derived_state_service import (
 # `sidecar_fingerprint`) pushed it past the tail bound and dropped the app's
 # largest `content_fingerprint` writer out of this audit entirely, silently. A
 # wider window can only ever find more statements, never fewer.
+DERIVED_REGEX_HEAD_BOUND = 1400
+DERIVED_REGEX_TAIL_BOUND = 1000
+
+# Reaching today's longest statement is not enough — that is exactly the state
+# the 900/500 window was in before it stopped reaching it. An ordinary column
+# clause in the scan upsert costs 50-60 characters
+# ("sidecar_fingerprint = COALESCE(?, sidecar_fingerprint), " is 56), so this
+# margin gives about four more columns of warning while there is still room to
+# act, instead of failing only once coverage has already been lost.
+DERIVED_REGEX_REQUIRED_MARGIN = 200
+
+# Built from the constants above so the bound this scanner uses and the bound
+# the margin test checks cannot drift apart.
 DERIVED_IMAGE_UPDATE_RE = re.compile(
-    r"UPDATE\s+images\s+SET[\s\S]{0,1400}?content_fingerprint[\s\S]{0,1000}?"
+    rf"UPDATE\s+images\s+SET[\s\S]{{0,{DERIVED_REGEX_HEAD_BOUND}}}?content_fingerprint"
+    rf"[\s\S]{{0,{DERIVED_REGEX_TAIL_BOUND}}}?"
     r"WHERE\s+id\s*=\s*\?(?:\s+AND\s+content_fingerprint\s*(?:=\s*\?|IS\s+NULL))?",
     re.IGNORECASE | re.MULTILINE,
 )
@@ -156,9 +170,14 @@ def _normalize_sql_snippet(value: str) -> str:
     return " ".join(value.split()).strip()
 
 
-def _collect_derived_image_update_statements() -> Counter[tuple[str, str]]:
+def _collect_derived_image_update_matches() -> list[tuple[str, str]]:
+    """Return ``(relative_path, matched_text)`` for every bounded-window hit.
+
+    The text is exactly what the regex matched, before whitespace is collapsed,
+    because the bounds are spent on the source as written.
+    """
     backend_root = Path(__file__).resolve().parents[1]
-    statements: Counter[tuple[str, str]] = Counter()
+    matches: list[tuple[str, str]] = []
 
     files: list[Path] = []
     for root, dirs, filenames in os.walk(backend_root):
@@ -170,9 +189,47 @@ def _collect_derived_image_update_statements() -> Counter[tuple[str, str]]:
         relative_path = file_path.relative_to(backend_root).as_posix()
         source = file_path.read_text(encoding="utf-8")
         for match in DERIVED_IMAGE_UPDATE_RE.finditer(source):
-            statements[(relative_path, _normalize_sql_snippet(match.group(0)))] += 1
+            matches.append((relative_path, match.group(0)))
 
+    return matches
+
+
+def _collect_derived_image_update_statements() -> Counter[tuple[str, str]]:
+    statements: Counter[tuple[str, str]] = Counter()
+    for relative_path, matched_text in _collect_derived_image_update_matches():
+        statements[(relative_path, _normalize_sql_snippet(matched_text))] += 1
     return statements
+
+
+def _bounded_window_slack(matched_text: str) -> int:
+    """Characters this statement could still grow before it stops matching.
+
+    The regex matches when some `content_fingerprint` occurrence sits within the
+    head bound of `UPDATE images SET` and within the tail bound of
+    `WHERE id = ?`. Occurrences are tried until one satisfies both, so the slack
+    is the best room any single occurrence leaves in its tighter window.
+    """
+    head_anchor = re.match(r"UPDATE\s+images\s+SET", matched_text, re.IGNORECASE)
+    where_anchor = re.search(r"WHERE\s+id\s*=\s*\?", matched_text, re.IGNORECASE)
+    assert head_anchor is not None and where_anchor is not None, (
+        f"Matched text is not shaped like the statement it claims to be:\n{matched_text}"
+    )
+
+    best_slack = None
+    for occurrence in re.finditer("content_fingerprint", matched_text, re.IGNORECASE):
+        if occurrence.start() < head_anchor.end() or occurrence.end() > where_anchor.start():
+            continue
+        slack = min(
+            DERIVED_REGEX_HEAD_BOUND - (occurrence.start() - head_anchor.end()),
+            DERIVED_REGEX_TAIL_BOUND - (where_anchor.start() - occurrence.end()),
+        )
+        if best_slack is None or slack > best_slack:
+            best_slack = slack
+
+    assert best_slack is not None, (
+        f"No `content_fingerprint` sits between the anchors:\n{matched_text}"
+    )
+    return best_slack
 
 
 def _derived_row(image_id: int) -> sqlite3.Row:
@@ -215,6 +272,40 @@ def test_derived_content_fingerprint_writers_stay_on_explicit_allowlist():
         "derived-state owner or update this allowlist with an explicit reason.\n"
         f"Unexpected: {current - EXPECTED_DERIVED_IMAGE_UPDATE_STATEMENTS}\n"
         f"Missing: {EXPECTED_DERIVED_IMAGE_UPDATE_STATEMENTS - current}"
+    )
+
+
+def test_bounded_scan_window_still_clears_the_longest_writer_by_a_margin():
+    """The audit above is only as wide as its window, so check the window.
+
+    A statement that outgrows the bounded regex stops being matched, and an
+    unmatched writer is an unaudited writer. That already happened once: the
+    900/500 window silently stopped spanning the scan upsert, the app's largest
+    `content_fingerprint` writer, when one column was added to its SET list.
+    Asserting that the window merely *reaches* today's statements would have
+    passed in that state right up until it broke, so assert the room left.
+    """
+    matches = _collect_derived_image_update_matches()
+
+    assert matches, (
+        "The bounded scan found no `content_fingerprint` writers at all, which "
+        "means this whole contract is auditing nothing."
+    )
+
+    slack_by_statement = sorted(
+        (_bounded_window_slack(matched_text), relative_path)
+        for relative_path, matched_text in matches
+    )
+    tightest_slack, tightest_path = slack_by_statement[0]
+
+    assert tightest_slack >= DERIVED_REGEX_REQUIRED_MARGIN, (
+        f"The longest `content_fingerprint` statement ({tightest_path}) has only "
+        f"{tightest_slack} characters of room left inside the "
+        f"{DERIVED_REGEX_HEAD_BOUND}/{DERIVED_REGEX_TAIL_BOUND} window, under the "
+        f"{DERIVED_REGEX_REQUIRED_MARGIN}-character margin. A few more columns "
+        "would push it out of the scan and it would stop being audited without "
+        "failing anything. Widen DERIVED_REGEX_HEAD_BOUND / "
+        "DERIVED_REGEX_TAIL_BOUND in the same commit that grows the statement."
     )
 
 
