@@ -22,6 +22,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from PIL import Image, UnidentifiedImageError
 
+from caption_format import caption_format_for_storage
 from config import ALLOWED_IMAGE_EXTENSIONS
 from services.dataset_sidecar import (
     MAX_DATASET_SIDECAR_BYTES,
@@ -38,6 +39,23 @@ THUMBNAIL_MAX_PX = 256
 THUMBNAIL_JPEG_QUALITY = 70
 SCAN_THUMB_WORKERS = max(4, min(16, (os.cpu_count() or 4)))
 
+
+
+def _sidecar_caption_fields(abs_path: str) -> Dict[str, Any]:
+    """Read the ``.txt`` beside ``abs_path`` and label the format of what it holds.
+
+    This path never touches the database: the caption is read fresh from disk on
+    every scan, so ``images.sidecar_caption_format`` is not available and the
+    marker has to be derived from the text just read. The label rides beside the
+    text and never replaces it — the caption is returned byte-for-byte as read,
+    so the caption editor can render tag chips or a prose field and still edit
+    exactly what is on disk.
+    """
+    caption = read_dataset_sidecar(abs_path, MAX_DATASET_SIDECAR_BYTES)
+    return {
+        "sidecar_caption": caption,
+        "sidecar_caption_format": caption_format_for_storage(caption),
+    }
 
 
 def _ds_id_for_path(abs_path: str) -> str:
@@ -106,10 +124,7 @@ def _manifest_item_for_path(path: Any, index: int) -> Dict[str, Any]:
         "scan_index": index,
         "source_kind": "folder_path",
         "sidecar_capability": "beside_image",
-        "sidecar_caption": read_dataset_sidecar(
-            abs_path,
-            MAX_DATASET_SIDECAR_BYTES,
-        ),
+        **_sidecar_caption_fields(abs_path),
     }
 
 
@@ -138,10 +153,7 @@ def _session_item_for_path(path: Path, scan_index: Optional[int] = None) -> Opti
         "scan_index": scan_index,
         "source_kind": "folder_path",
         "sidecar_capability": "beside_image",
-        "sidecar_caption": read_dataset_sidecar(
-            abs_path,
-            MAX_DATASET_SIDECAR_BYTES,
-        ),
+        **_sidecar_caption_fields(abs_path),
     }
 
 

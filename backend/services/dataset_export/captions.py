@@ -18,7 +18,13 @@ from pathlib import Path
 from collections.abc import Mapping, Sequence
 from typing import Any, Dict, List, Optional, Tuple
 
+from caption_format import caption_format_for_storage, detect_caption_format
 from services.annotation_models import TrainingCaptionContentV1
+from services.caption_dialect import (
+    caption_dialect_advisory,
+    caption_reads_as_prose,
+    nl_compose_advisory,
+)
 from services.dataset_export._constants import (
     DATASET_LEGACY_TEMPLATE,
     TRAINING_TAG_CONTENT_MODES,
@@ -191,6 +197,7 @@ def _compose_nl_caption(
     types_path: Dict[str, str],
     nl_overrides_int: Dict[int, str],
     nl_overrides_path: Dict[str, str],
+    advisories: Optional[List[Any]] = None,
 ) -> str:
     """Fold the natural-language sentence into a booru caption per the image's
     caption type (point 3: two-box editor / per-image Booru-NL-Both control).
@@ -202,6 +209,13 @@ def _compose_nl_caption(
     incorporates the caption. ``image_nl_overrides`` (the user's edited NL box)
     wins over the stored ``nl_caption`` so a freshly-rendered booru caption can
     be paired with an edited sentence without freezing the whole caption.
+
+    ``advisories`` is an optional sink; see the tag-export twin
+    ``tag_export.captions._compose_nl_for_image``, whose format rules this
+    mirrors so the two export engines cannot drift. Supplying it changes nothing
+    about the returned caption — the composition mode is still obeyed exactly and
+    the text is emitted in full — it only records that the prose slot is about to
+    receive tag text so the caller can say so.
     """
     caption_type = None
     if image_id and image_id in types_int:
@@ -220,12 +234,73 @@ def _compose_nl_caption(
     elif src_image_path and src_image_path in nl_overrides_path:
         nl_text = nl_overrides_path[src_image_path]
     if nl_text is None:
-        # Fall back to the stored pure NL, then the fused ai_caption for rows
-        # tagged before the nl_caption split existed.
-        nl_text = str(record.get("nl_caption") or record.get("ai_caption") or "")
+        # Stored pure NL first, then a sidecar that really is prose, then the
+        # fused ai_caption for rows tagged before the nl_caption split existed.
+        nl_text = str(record.get("nl_caption") or "")
+        if not nl_text:
+            sidecar = record.get("sidecar_caption")
+            nl_text = (
+                str(sidecar)
+                if caption_reads_as_prose(sidecar, record.get("sidecar_caption_format"))
+                else str(record.get("ai_caption") or "")
+            )
+    if advisories is not None:
+        advisory = nl_compose_advisory(caption_type, caption_format_for_storage(nl_text))
+        if advisory is not None:
+            advisories.append(advisory)
     # Join via the shared rule so the two export engines can never drift.
     return compose_caption_with_nl(rendered, caption_type, nl_text)
 
+
+
+def project_target_model(request: Any) -> str:
+    """The target model of the named project this export belongs to, or ``""``.
+
+    ``dataset_project_id`` already rides on every export, preview and readiness
+    request, so the backend can read the project's own ``target_model`` — stored
+    since migration 033 and never once compared against a caption format —
+    without the UI needing to send anything new. A project that cannot be loaded
+    yields ``""``, which means "no dialect opinion": an advisory must never be
+    the thing that fails an export.
+    """
+    project_id = getattr(request, "dataset_project_id", None)
+    if project_id is None:
+        return ""
+    try:
+        import db_dataset_projects as project_db
+        from services.dataset_project_models import DatasetProjectSettingsV1
+
+        record = project_db.get_dataset_project_record(int(project_id))
+        settings = DatasetProjectSettingsV1.model_validate_json(
+            record["settings_json"],
+            strict=True,
+        )
+    except Exception:  # noqa: BLE001 - an unreadable project simply has no opinion
+        return ""
+    return str(settings.target_model or "")
+
+
+def caption_dialect_advisories(
+    rendered: str,
+    target_model: str,
+    compose_advisories: Sequence[Any],
+) -> list[Any]:
+    """Every dialect advisory that applies to one rendered caption.
+
+    Two independent checks, both advisory: whatever the composition step already
+    reported, plus the target-model join measured on the caption that would
+    actually be written. The second is deliberately not read off the source
+    marker alone, because a library item's caption is rendered from tag rows and
+    carries no sidecar marker at all, yet still lands in a krea2 dataset as tags.
+    """
+    advisories = list(compose_advisories)
+    target_advisory = caption_dialect_advisory(
+        target_model,
+        detect_caption_format(rendered),
+    )
+    if target_advisory is not None:
+        advisories.append(target_advisory)
+    return advisories
 
 
 def _normalise_common_tag(tag: str, *, normalize_tag_underscores: bool) -> str:
@@ -322,6 +397,7 @@ def _render_dataset_sidecar(
     image_types_path: Optional[Dict[str, str]] = None,
     nl_overrides_int: Optional[Dict[int, str]] = None,
     nl_overrides_path: Optional[Dict[str, str]] = None,
+    advisories: Optional[List[Any]] = None,
 ) -> str:
     image_id = int(record.get("id") or 0)
     src_image_path = str(record.get("path") or "")
@@ -366,6 +442,7 @@ def _render_dataset_sidecar(
         types_path=image_types_path or {},
         nl_overrides_int=nl_overrides_int or {},
         nl_overrides_path=nl_overrides_path or {},
+        advisories=advisories,
     )
     transformed = apply_caption_transforms(
         rendered,

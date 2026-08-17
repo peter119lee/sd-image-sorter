@@ -33,6 +33,8 @@ from fastapi import HTTPException
 from PIL import Image, UnidentifiedImageError
 
 import database as db
+from caption_format import caption_format_for_storage
+from services.caption_dialect import nl_compose_advisory
 from services.dataset_bucket_service import (
     BucketTransformError,
     apply_center_bucket_resize,
@@ -62,6 +64,8 @@ from services.dataset_export.captions import (
     _render_dataset_sidecar,
     _split_image_overrides,
     _split_keyed_str_map,
+    caption_dialect_advisories,
+    project_target_model,
     render_training_caption_content,
 )
 from services.dataset_export.annotations import (
@@ -1583,6 +1587,7 @@ def preview_dataset_export(request: DatasetExportPreviewRequest) -> Dict[str, An
     nl_overrides_int, nl_overrides_path = _split_keyed_str_map(getattr(request, "image_nl_overrides", None))
     caption_extension = _dataset_sidecar_extension(content_mode)
     limit = max(1, min(int(request.limit or 72), 500))
+    preview_target_model = project_target_model(request)
     used_image_paths: set[str] = set()
     used_caption_paths: set[str] = set()
     used_mask_paths: set[str] = set()
@@ -1636,15 +1641,23 @@ def preview_dataset_export(request: DatasetExportPreviewRequest) -> Dict[str, An
             )
         rendered = ""
         render_error = error
+        compose_advisories: List[Any] = []
         if not render_error:
             try:
                 if annotation is not None and annotation["content"] is not None:
+                    content = annotation["content"]
                     rendered = render_training_caption_content(
-                        annotation["content"],
+                        content,
                         request.caption_transforms or {},
                         request.trigger,
                         request.common_tags,
                     )
+                    compose_advisory = nl_compose_advisory(
+                        content.caption_type,
+                        caption_format_for_storage(content.nl_caption),
+                    )
+                    if compose_advisory is not None:
+                        compose_advisories.append(compose_advisory)
                 else:
                     rendered = _render_dataset_sidecar(
                         record,
@@ -1657,6 +1670,7 @@ def preview_dataset_export(request: DatasetExportPreviewRequest) -> Dict[str, An
                         image_types_path=image_types_path,
                         nl_overrides_int=nl_overrides_int,
                         nl_overrides_path=nl_overrides_path,
+                        advisories=compose_advisories,
                     )
             except Exception as exc:  # pragma: no cover - defensive preview fallback
                 render_error = str(exc)
@@ -1677,6 +1691,28 @@ def preview_dataset_export(request: DatasetExportPreviewRequest) -> Dict[str, An
             # show / edit it independently of the booru-tags box (point 2/3).
             "ai_caption": str(record.get("ai_caption") or ""),
             "nl_caption": str(record.get("nl_caption") or ""),
+            # What format the caption above is in, and anything about it that
+            # needs the user's attention. Advisory only: ``caption`` is the exact
+            # text export will write either way, and an empty list is the normal
+            # case. The preview is the WYSIWYG surface, so this is where "these
+            # captions are tag lists, not prose" has to be readable.
+            "caption_format": caption_format_for_storage(rendered),
+            "caption_advisories": [
+                {
+                    "code": advisory.code,
+                    "caption_format": advisory.caption_format,
+                    "expected_dialect": advisory.expected_dialect,
+                    "target_model": advisory.target_model,
+                    "convert": advisory.convert,
+                    "message": advisory.message,
+                    "action": advisory.action,
+                }
+                for advisory in caption_dialect_advisories(
+                    rendered,
+                    preview_target_model,
+                    compose_advisories,
+                )
+            ],
             "skipped_reason": skip_reason,
             "error": render_error or None,
         })

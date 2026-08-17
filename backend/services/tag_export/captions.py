@@ -21,6 +21,9 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import HTTPException
 
+from caption_format import caption_format_for_storage
+from services.caption_dialect import caption_reads_as_prose, nl_compose_advisory
+
 
 PARAMETER_EXPORT_ORDER = [
     ("steps", "Steps"),
@@ -346,12 +349,26 @@ def _image_nl_source_text(image: Dict[str, Any], image_id: int, nl_overrides: Di
     """Resolve one image's natural-language caption text.
 
     Editor override first (an explicit empty string intentionally suppresses
-    the stored sentence), then the stored pure NL, then the fused ai_caption
-    for rows tagged before the nl_caption split existed.
+    the stored sentence), then the stored pure NL, then a ``.txt`` sidecar that
+    is actually prose, then the fused ai_caption for rows tagged before the
+    nl_caption split existed.
+
+    The sidecar step is why the format marker exists here: this function used to
+    fall straight through to ``ai_caption`` — a booru string — while a perfectly
+    good natural-language sidecar sat unread in ``sidecar_caption``. Only a
+    sidecar whose format is ``natural`` is promoted; ``tags``, ``mixed`` and
+    ``unknown`` keep the historical fallback, because putting a tag list in the
+    prose slot is the very defect being closed.
     """
     if image_id in nl_overrides:
         return str(nl_overrides[image_id] or "")
-    return str(image.get("nl_caption") or image.get("ai_caption") or "")
+    stored_nl = str(image.get("nl_caption") or "")
+    if stored_nl:
+        return stored_nl
+    sidecar = image.get("sidecar_caption")
+    if caption_reads_as_prose(sidecar, image.get("sidecar_caption_format")):
+        return str(sidecar)
+    return str(image.get("ai_caption") or "")
 
 
 def _compose_nl_for_image(
@@ -362,11 +379,19 @@ def _compose_nl_for_image(
     content_mode: str,
     image_types: Dict[int, str],
     nl_overrides: Dict[int, str],
+    advisories: Optional[List[Any]] = None,
 ) -> str:
     """Apply the per-image caption type to an already-rendered caption.
 
     An explicit empty-string entry in ``nl_overrides`` intentionally
     suppresses the stored sentence (mirrors dataset_export_service).
+
+    ``advisories`` is an optional sink. When supplied, a request for prose over
+    a caption source that is really a tag list appends one
+    ``CaptionDialectAdvisory`` so the caller can tell the user. The returned
+    caption is byte-identical either way: the text is never substituted,
+    trimmed or withheld, because a user who asked for prose and silently got a
+    tag dump has been given wrong output, while a user who is told can act.
     """
     caption_type = str(image_types.get(image_id, "") or "").strip().lower()
     if caption_type not in ("nl", "both"):
@@ -374,6 +399,10 @@ def _compose_nl_for_image(
     if str(content_mode or "").strip().lower() not in NL_COMPOSE_MODES:
         return rendered
     nl_text = _image_nl_source_text(image, image_id, nl_overrides)
+    if advisories is not None:
+        advisory = nl_compose_advisory(caption_type, caption_format_for_storage(nl_text))
+        if advisory is not None:
+            advisories.append(advisory)
     return compose_caption_with_nl(rendered, caption_type, nl_text)
 
 

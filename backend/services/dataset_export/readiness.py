@@ -10,6 +10,8 @@ from typing import Callable, Dict, List, Literal, Optional, Tuple
 
 import database as db
 from PIL import Image, UnidentifiedImageError
+
+from caption_format import caption_format_for_storage
 from services.dataset_bucket_service import (
     BucketTransformError,
     plan_center_bucket_resize,
@@ -32,6 +34,8 @@ from services.dataset_export.captions import (
     _render_dataset_sidecar,
     _split_image_overrides,
     _split_keyed_str_map,
+    caption_dialect_advisories,
+    project_target_model,
     render_training_caption_content,
 )
 from services.dataset_export.annotations import (
@@ -46,6 +50,7 @@ from services.dataset_export.models import (
     DatasetReadinessRequest,
     DatasetReadinessSummary,
 )
+from services.caption_dialect import CaptionDialectAdvisory, nl_compose_advisory
 from services.export_validation import ExportValidator
 from services.dataset_export.planning import (
     _dataset_sidecar_extension,
@@ -267,6 +272,42 @@ def _inspect_auxiliary_file(
     }
 
 
+def _dialect_advisory_issue(
+    advisory: CaptionDialectAdvisory,
+    *,
+    affected: int,
+    sample_paths: List[str],
+) -> DatasetReadinessIssue:
+    """One aggregated warning for a dialect problem that spans many items.
+
+    Aggregated rather than per item on purpose: a 5,000-item project would
+    otherwise fill the 100-slot issue list with identical notices and crowd out
+    real blockers. The per-item flag lives on the Dataset Project response, which
+    has no such limit. ``warning_count`` still reflects the aggregate, so the
+    report status becomes ``warnings`` and never ``blocked``.
+    """
+    return _make_issue(
+        severity="warning",
+        code=advisory.code,
+        message=f"{advisory.message} Affected items: {affected}.",
+        image_id=None,
+        source_path=sample_paths[0] if sample_paths else None,
+        destination=None,
+        observed=(
+            f"{affected} caption(s) render as {advisory.caption_format}; "
+            f"first: {', '.join(sample_paths)}"
+            if sample_paths
+            else f"{affected} caption(s) render as {advisory.caption_format}"
+        ),
+        expected=(
+            f"captions in the {advisory.expected_dialect} dialect"
+            if advisory.expected_dialect
+            else "a caption source that matches the requested composition mode"
+        ),
+        action=advisory.action,
+    )
+
+
 def _readiness_status(blocker_count: int, warning_count: int) -> str:
     if blocker_count > 0:
         return "blocked"
@@ -315,6 +356,9 @@ def run_dataset_readiness(
     resolved_annotations = resolve_annotation_selections(request)
     strict_annotations = bool(request.annotation_selections)
     used_annotation_keys: set[str] = set()
+    target_model = project_target_model(request)
+    # code -> (advisory, affected count, up to three sample source paths)
+    dialect_advisories: Dict[str, Tuple[CaptionDialectAdvisory, int, List[str]]] = {}
     issues: List[DatasetReadinessIssue] = []
     sample_pairs: List[DatasetReadinessPair] = []
     total_issues = 0
@@ -343,6 +387,23 @@ def run_dataset_readiness(
             warning_count += 1
         if len(issues) < DATASET_READINESS_ISSUE_LIMIT:
             issues = [*issues, issue]
+
+    def note_dialect_advisory(
+        advisory: Optional[CaptionDialectAdvisory],
+        source_path: str,
+    ) -> None:
+        if advisory is None:
+            return
+        existing = dialect_advisories.get(advisory.code)
+        if existing is None:
+            dialect_advisories[advisory.code] = (advisory, 1, [source_path])
+            return
+        kept_advisory, count, samples = existing
+        dialect_advisories[advisory.code] = (
+            kept_advisory,
+            count + 1,
+            samples if len(samples) >= 3 else [*samples, source_path],
+        )
 
     def emit_progress() -> None:
         progress_callback(
@@ -566,14 +627,22 @@ def run_dataset_readiness(
                 },
             )
 
+        compose_advisories: List[CaptionDialectAdvisory] = []
         try:
             if annotation is not None and annotation["content"] is not None:
+                content = annotation["content"]
                 caption = render_training_caption_content(
-                    annotation["content"],
+                    content,
                     request.caption_transforms or {},
                     request.trigger,
                     request.common_tags,
                 )
+                compose_advisory = nl_compose_advisory(
+                    content.caption_type,
+                    caption_format_for_storage(content.nl_caption),
+                )
+                if compose_advisory is not None:
+                    compose_advisories.append(compose_advisory)
             else:
                 caption = _render_dataset_sidecar(
                     normalized_record,
@@ -586,6 +655,7 @@ def run_dataset_readiness(
                     image_types_path=image_types_path,
                     nl_overrides_int=nl_overrides_int,
                     nl_overrides_path=nl_overrides_path,
+                    advisories=compose_advisories,
                 )
         except Exception as exc:  # noqa: BLE001 - the failure becomes an actionable blocker
             add_issue(_make_issue(
@@ -608,6 +678,17 @@ def run_dataset_readiness(
             "output_caption_path": str(output_caption_path),
             "utf8_sha256": hashlib.sha256(caption.encode("utf-8")).hexdigest(),
         })
+
+        # Dialect advisories are derived entirely from inputs already folded into
+        # the fingerprint above, so they are deliberately NOT fed to
+        # ``update_input``: a notice must not change the authorization identity of
+        # an otherwise identical export.
+        for advisory in caption_dialect_advisories(
+            caption,
+            target_model,
+            compose_advisories,
+        ):
+            note_dialect_advisory(advisory, source_path)
 
         if not caption.strip():
             add_issue(_make_issue(
@@ -1012,6 +1093,13 @@ def run_dataset_readiness(
             observed=f"unused selection key {annotation_key!r}",
             expected="exactly one selection for every exported item and no extras",
             action="Reload the Dataset Project membership and run readiness again.",
+        ))
+
+    for _code, (advisory, affected, sample_paths) in sorted(dialect_advisories.items()):
+        add_issue(_dialect_advisory_issue(
+            advisory,
+            affected=affected,
+            sample_paths=sample_paths,
         ))
 
     if trainable_pairs == 0:

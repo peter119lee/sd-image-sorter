@@ -135,6 +135,10 @@ PREVIEW_ITEM_KEYS = {
     "index", "image_id", "abs_path", "filename", "thumbnail_url",
     "output_image_name", "output_caption_name", "output_image_path",
     "output_caption_path", "caption", "ai_caption", "nl_caption",
+    # Format of the caption above, plus anything about it that needs attention
+    # for this project's target model or the requested composition mode. Both
+    # are advisory; ``caption`` is unaffected by them.
+    "caption_format", "caption_advisories",
     "skipped_reason", "error",
 }
 
@@ -272,6 +276,10 @@ FOLDER_SCAN_ITEM_KEYS = {
     "ds_id", "abs_path", "filename", "width", "height",
     "mtime", "size", "thumb_b64", "scan_index",
     "source_kind", "sidecar_capability", "sidecar_caption",
+    # Format of sidecar_caption (tags/natural/mixed/unknown, or null when there
+    # is no caption). Derived from the text read off disk because this path has
+    # no images row to read migration 044's column from.
+    "sidecar_caption_format",
 }
 
 
@@ -319,3 +327,6 @@ def test_folder_scan_response_shape_is_pinned(test_client, tmp_path: Path):
         assert isinstance(item["source_kind"], str)
         assert isinstance(item["sidecar_capability"], str)
         assert item["sidecar_caption"] is None or isinstance(item["sidecar_caption"], str)
+        assert item["sidecar_caption_format"] in (
+            None, "tags", "natural", "mixed", "unknown",
+        )

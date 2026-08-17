@@ -628,6 +628,11 @@ def test_mixed_project_persists_server_derived_local_identity_across_restart(
             "inode": str(expected_stat.st_ino),
             "source_status": "available",
             "sidecar_caption": "1girl, red_hair",
+            # Format marker + target-model advisory travel with every local item.
+            # This project's target_model is "" (unset), which has no evidenced
+            # caption dialect, so the advisory is deliberately null here.
+            "sidecar_caption_format": "tags",
+            "caption_dialect": None,
         },
         {
             "position": 1,

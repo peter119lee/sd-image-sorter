@@ -6,7 +6,9 @@ import stat
 from pathlib import Path
 
 import db_dataset_projects as project_db
+from caption_format import caption_format_for_storage
 from config import ALLOWED_IMAGE_EXTENSIONS
+from services.caption_dialect import caption_dialect_advisory
 from services.dataset_session.allowlist import (
     _register_thumbnail_paths,
     project_save_authorization_status,
@@ -211,6 +213,35 @@ def _record_sidecar_snapshot(
     }
 
 
+def _caption_dialect_fields(
+    caption: str | None,
+    target_model: str,
+) -> dict[str, object]:
+    """Label the caption's format and say whether it suits the project's target.
+
+    A local item has no database row, so the format is derived from the ``.txt``
+    text just read from disk rather than from ``images.sidecar_caption_format``.
+    This is the join that ``target_model`` never had: a ``krea2`` project whose
+    sources are Booru tag lists is now flagged per item instead of silently
+    exporting tag captions to a natural-language-first target. The caption text
+    in the same item is returned in full regardless of what the label says.
+    """
+    caption_format = caption_format_for_storage(caption)
+    advisory = caption_dialect_advisory(target_model, caption_format)
+    return {
+        "sidecar_caption_format": caption_format,
+        "caption_dialect": None if advisory is None else {
+            "code": advisory.code,
+            "target_model": advisory.target_model,
+            "expected_dialect": advisory.expected_dialect,
+            "caption_format": advisory.caption_format,
+            "convert": advisory.convert,
+            "message": advisory.message,
+            "action": advisory.action,
+        },
+    }
+
+
 def _project_response(
     record: project_db.DatasetProjectRecord,
     sidecar_snapshot: dict[str, str | None] | None,
@@ -224,20 +255,21 @@ def _project_response(
         if sidecar_snapshot is None
         else sidecar_snapshot
     )
-    response_items = [
-        {
+    response_items = []
+    for item in record["items"]:
+        if item["item_type"] != "local":
+            response_items.append(item)
+            continue
+        caption = (
+            captions[item["path"]]
+            if item["source_status"] == "available"
+            else None
+        )
+        response_items.append({
             **item,
-            "sidecar_caption": (
-                captions[item["path"]]
-                if item["item_type"] == "local"
-                and item["source_status"] == "available"
-                else None
-            ),
-        }
-        if item["item_type"] == "local"
-        else item
-        for item in record["items"]
-    ]
+            "sidecar_caption": caption,
+            **_caption_dialect_fields(caption, settings.target_model),
+        })
     response = DatasetProjectResponse.model_validate(
         {
             "id": record["id"],

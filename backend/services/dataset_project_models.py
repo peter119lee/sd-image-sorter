@@ -280,6 +280,27 @@ class DatasetProjectLibraryItemResponse(BaseModel):
     missing: bool
 
 
+class DatasetProjectCaptionDialectAdvisory(BaseModel):
+    """Why this item's caption format needs attention for the project's target.
+
+    Purely advisory. It reports; it never blocks a save or an export, and the
+    caption text beside it is always the untouched original — the marker exists
+    to decide how text is presented or converted, never to withhold it.
+    ``convert`` is ``None`` for a hybrid caption because NL+tag captions are
+    deliberate for some trainers, so no direction may be asserted.
+    """
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    code: Literal["caption_dialect_mismatch", "caption_dialect_partial"]
+    target_model: Literal["krea2", "anima"]
+    expected_dialect: Literal["tags", "natural"]
+    caption_format: Literal["tags", "natural", "mixed"]
+    convert: Literal["tags_to_natural", "natural_to_tags"] | None
+    message: str
+    action: str
+
+
 class DatasetProjectLocalItemResponse(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
@@ -293,6 +314,11 @@ class DatasetProjectLocalItemResponse(BaseModel):
     inode: str = Field(pattern=r"^(0|[1-9][0-9]*)$")
     source_status: Literal["available", "missing", "changed"]
     sidecar_caption: str | None
+    # Format of ``sidecar_caption``, derived from the text read off disk because
+    # a local item has no database row. ``None`` means "no caption text";
+    # ``"unknown"`` means "there is text and the classifier declined to guess".
+    sidecar_caption_format: Literal["tags", "natural", "mixed", "unknown"] | None
+    caption_dialect: DatasetProjectCaptionDialectAdvisory | None
 
 
 DatasetProjectItemResponse = Annotated[
