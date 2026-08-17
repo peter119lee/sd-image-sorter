@@ -293,6 +293,68 @@ def test_canvas_save_preserves_alpha_for_transparent_output(
     assert result["warnings"] == []
 
 
+def test_failed_encode_leaves_the_overwritten_original_byte_identical(
+    tmp_path: Path,
+) -> None:
+    """A save that dies inside the encoder must not consume the old file.
+
+    20000px exceeds WebP's 16383 dimension limit, so Pillow raises *after* it
+    has opened the destination. Writing straight at the destination left the
+    user's original at 0 bytes with no backup and no undo.
+    """
+    from services.censor_service import CensorService
+
+    target = tmp_path / "precious-original.webp"
+    _create_rgba_image(target, "WEBP")
+    original_bytes = target.read_bytes()
+    assert original_bytes
+
+    with pytest.raises((ValueError, OSError)):
+        CensorService._save_image_with_format(
+            Image.new("RGB", (20000, 8), color="red"),
+            str(target),
+            "webp",
+            {},
+        )
+
+    assert target.read_bytes() == original_bytes
+    assert [entry.name for entry in tmp_path.iterdir()] == [target.name]
+
+
+def test_canvas_save_failure_keeps_the_confirmed_overwrite_target_intact(
+    test_client: TestClient,
+    test_db: ModuleType,
+    tmp_path: Path,
+) -> None:
+    """The user confirmed an overwrite, the encode failed, and the app said
+    "Save data failed" — the file they overwrote must still be there."""
+    output_folder = tmp_path / "canvas-overwrite-out"
+    output_folder.mkdir()
+    target = output_folder / "precious.webp"
+    _create_rgba_image(target, "WEBP")
+    original_bytes = target.read_bytes()
+
+    oversized = BytesIO()
+    Image.new("RGB", (20000, 8), color="red").save(oversized, format="PNG")
+    image_data = base64.b64encode(oversized.getvalue()).decode("ascii")
+
+    response = test_client.post(
+        "/api/censor/save-data",
+        json={
+            "image_data": f"data:image/png;base64,{image_data}",
+            "filename": "precious.webp",
+            "output_folder": str(output_folder),
+            "metadata_option": "strip",
+            "output_format": "webp",
+            "allow_overwrite": True,
+        },
+    )
+
+    assert response.status_code == 500, response.text
+    assert target.read_bytes() == original_bytes
+    assert [entry.name for entry in output_folder.iterdir()] == [target.name]
+
+
 def test_operation_save_flattens_rgba_to_white_jpeg_and_warns(
     test_client: TestClient,
     test_db: ModuleType,

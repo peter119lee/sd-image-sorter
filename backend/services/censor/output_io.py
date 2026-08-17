@@ -21,6 +21,7 @@ import base64
 import binascii
 import logging
 import os
+import tempfile
 from io import BytesIO
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional
@@ -56,6 +57,48 @@ def _normalize_censor_source(image: Image.Image) -> Image.Image:
     '''Return a detached RGB/RGBA raster suitable for censor operations.'''
     target_mode = 'RGBA' if _image_has_alpha(image) else 'RGB'
     return image.convert(target_mode)
+
+
+def _save_pillow_image_atomically(
+    image: Image.Image,
+    output_path: str,
+    image_format: str,
+    save_kwargs: Dict[str, object],
+) -> None:
+    """Encode to a sibling temp file, then publish it with ``os.replace``.
+
+    ``Image.save`` opens the destination with ``w+b`` and only removes the file
+    on failure when it created it, so encoding straight at the destination left
+    an overwritten original truncated to 0 bytes with no backup and no undo.
+    Same temp-then-replace convention as ``image_manager._copy_file_atomically``
+    and ``dataset_export.engine._write_pillow_image_atomic``.
+    """
+    target = Path(output_path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    temp_path: Optional[Path] = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w+b",
+            prefix=f".{target.name}.",
+            suffix=target.suffix or ".tmp",
+            dir=str(target.parent),
+            delete=False,
+        ) as handle:
+            temp_path = Path(handle.name)
+            image.save(handle, format=image_format, **save_kwargs)
+            handle.flush()
+            try:
+                os.fsync(handle.fileno())
+            except OSError:
+                pass
+        os.replace(str(temp_path), str(target))
+        temp_path = None
+    finally:
+        if temp_path is not None:
+            try:
+                temp_path.unlink(missing_ok=True)
+            except OSError:
+                pass
 
 
 def _resolve_censor_output_format(source_format: Optional[str]) -> tuple[CensorOutputFormat, str]:
@@ -316,6 +359,7 @@ class _OutputMixin:
         except HTTPException:
             raise
         except Exception:
+            logger.exception("Censor save failed")
             raise HTTPException(status_code=500, detail="Save failed")
 
     def save_data(self, request: CensorSaveDataRequest) -> Dict[str, Any]:
@@ -382,6 +426,7 @@ class _OutputMixin:
         except HTTPException:
             raise
         except Exception:
+            logger.exception("Censor canvas save failed")
             raise HTTPException(status_code=500, detail="Save data failed")
 
     @staticmethod
@@ -569,12 +614,12 @@ class _OutputMixin:
         warnings: List[str] = []
         if output_format == 'webp':
             webp_kwargs = {k: v for k, v in save_kwargs.items() if k in ['exif', 'icc_profile']}
-            image.save(output_path, format='WEBP', quality=95, **webp_kwargs)
+            _save_pillow_image_atomically(image, output_path, 'WEBP', {'quality': 95, **webp_kwargs})
         elif output_format in ['jpg', 'jpeg']:
             image = prepare_image_for_save(image, 'JPEG', warnings)
             jpeg_kwargs = {k: v for k, v in save_kwargs.items() if k in ['exif', 'icc_profile', 'dpi']}
-            image.save(output_path, format='JPEG', quality=95, **jpeg_kwargs)
+            _save_pillow_image_atomically(image, output_path, 'JPEG', {'quality': 95, **jpeg_kwargs})
         else:
             png_kwargs = {k: v for k, v in save_kwargs.items() if k in ['pnginfo', 'dpi', 'icc_profile']}
-            image.save(output_path, format='PNG', **png_kwargs)
+            _save_pillow_image_atomically(image, output_path, 'PNG', png_kwargs)
         return warnings
