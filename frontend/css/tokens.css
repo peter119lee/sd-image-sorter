@@ -1,165 +1,201 @@
 /* ==========================================================================
-   "Fresh Aurora" Design Tokens — v4.0 redesign, Phase 1 (skin-level migration)
-   Spec: design_handoff_aurora_redesign/README.md (§Design Tokens)
+   "Graphite" Design Tokens — the single source of truth for the whole app.
 
-   This file is loaded LAST in index.html and is the single source of truth
-   for the palette. It (a) defines the Aurora canonical tokens, (b) remaps
-   every legacy token name from styles.css / ui-refresh.css onto Aurora
-   values, and (c) applies the few base-component overrides Phase 1 owns
-   (flat canvas, focus unification, solid-blue primary button, modal scrim).
+   This file is loaded LAST in index.html. Every other sheet (styles.css,
+   ui-refresh.css, and the per-feature sheets) consumes the legacy token names
+   remapped at the bottom of this :root block, so the entire application
+   reskins from here. Do not add a competing palette anywhere else.
 
-   Accent semantics are a hard rule of the design language:
-     --blue   = next action / in-progress / links (ONE solid blue per screen)
-     --pink   = the USER's decisions (selection, hearts, favorites, trigger)
-     --purple = AI output (tags, scores, detections, VLM)
-     gradient = blue→purple, max once per screen, cross-step actions only
-   Phase 1 remaps the old palette wholesale (indigo→blue, teal→purple,
-   orange→warning); per-surface semantic corrections (e.g. selection rings
-   to pink) land with each view in Phase 3.
+   Design register: a professional local desktop utility, not a web landing
+   page. The rules that define it:
 
-   Legacy :root blocks in styles.css / ui-refresh.css stay until Phase 4;
-   hardcoded long-tail one-off shades (<3 uses, state-specific) are swept
-   per-view in Phase 3 against the #24a–d checklists.
+     1. Surfaces are TRUE NEUTRAL graphite. No blue, indigo or violet cast.
+        A hue-tinted "dark theme" is the single loudest generated-UI tell, and
+        a tinted chrome also lies about the colour of the images on screen.
+     2. Exactly ONE accent (--accent, a restrained amber). It marks the
+        primary action and the active/selected state. Nothing else. It is
+        never a gradient, never a glow, never decoration.
+     3. Panels are flat and separated by 1px hairlines. Shadows are neutral
+        and reserved for things that genuinely float (modal, popover, menu).
+        backdrop-filter is not a surface treatment.
+     4. Hierarchy comes from size, weight and spacing — not from colour.
+     5. Status colours (success/warning/danger) are data, not decoration, and
+        are always paired with a glyph so colour is never the sole carrier.
+     6. Motion is functional: 120-160ms, only on a state the user caused.
    ========================================================================== */
 
 :root {
-    /* ===== Aurora canonical: surfaces (blue-tinted dark) ===== */
-    --bg: #12141A;              /* app canvas */
-    --surface-1: #181B23;       /* panels */
-    --surface-2: #1F2330;       /* raised: modals, hover */
-    --stage: #101218;           /* deep stage behind images */
-    --border: #2A2F3D;
-    --border-strong: #333A4B;
-    --hairline-1: #1E222D;      /* table/list row hairlines */
-    --hairline-2: #232836;
-    --scrim: rgba(6, 8, 12, 0.82);
+    /* ===== Surfaces — true neutral graphite (R=G=B, no hue cast) ===== */
+    --bg: #0E0E0F;              /* app canvas */
+    --surface-1: #151517;       /* panels */
+    --surface-2: #1C1C1E;       /* raised: modals, menus */
+    --surface-3: #232326;       /* hover / pressed */
+    --stage: #09090A;           /* deep stage behind images */
+    --border: #2B2B2E;          /* standard 1px hairline */
+    --border-strong: #3A3A3E;   /* emphasised divider, input outline */
+    --hairline-1: #1F1F22;      /* table/list row separators */
+    --hairline-2: #26262A;
+    --scrim: rgba(0, 0, 0, 0.72);
 
-    /* ===== Aurora canonical: text ===== */
-    --text: #EDF0F7;
-    --text-2: #9CA6B8;
-    /* Measured 2026-08-04: the previous #5F6878 rendered at 3.06:1 on the card
-       surfaces and 3.36:1 on the page background — below WCAG AA (4.5:1) for
-       the 11-13px text this token carries in 265+ places (helper text, stat
-       labels, hints, placeholders). #8792A6 measures 5.49:1 / 6.01:1 and stays
-       visibly secondary against --text-2. */
-    --muted: #8792A6;           /* never the sole carrier of meaning */
-    --text-disabled: #4A5158;   /* disabled control text (+ reason tooltip) */
+    /* ===== Text — hierarchy by weight/size, contrast measured on --bg ===== */
+    --text: #E8E8EA;            /* 15.8:1 */
+    --text-2: #A6A6AB;          /* 7.96:1 */
+    --muted: #8A8A90;           /* 5.62:1 — still AA at 12px */
+    --text-disabled: #5A5A60;   /* non-interactive only */
 
-    /* ===== Aurora canonical: accents (each OWNS a semantic) ===== */
-    --blue: #5CC8FF;            /* next action / in-progress / links */
-    --blue-rgb: 92, 200, 255;
-    --blue-hover: #7DD3FF;      /* +1 lightness step */
-    --blue-active: #48ADE0;     /* −1 lightness step */
-    --pink: #FF8FC0;            /* user decisions: selection, ♥, trigger word */
-    --pink-rgb: 255, 143, 192;
-    --pink-hover: #FFA6CD;
-    --pink-active: #E578A9;
-    --purple: #A78BFF;          /* AI output: tags, scores, detections, VLM */
-    --purple-rgb: 167, 139, 255;
-    --purple-hover: #B9A3FF;
-    --purple-active: #9174E8;
-    /* De-AI: no brand gradient. Solid blue is the only primary action fill.
-       --grad kept as an alias so old selectors don't invent a second look. */
-    --grad: var(--blue);
-    --on-accent: #12141A;       /* ink on solid blue/pink/purple */
-    --tag-chip-bg: rgba(167, 139, 255, 0.10);
+    /* ===== The one accent: restrained amber =====
+       Chosen for the instrument-panel register of real desktop tools. It is
+       deliberately outside the cyan/violet/magenta range that reads as
+       generated. 6.42:1 as text on --bg; 6.42:1 for --on-accent ink on the
+       solid fill, so it works as text AND as a button surface. */
+    --accent: #C8873C;
+    --accent-rgb: 200, 135, 60;
+    --accent-bright: #D8974C;   /* hover: +1 step */
+    --accent-deep: #AE7231;     /* active: -1 step */
+    --accent-soft: rgba(200, 135, 60, 0.12);   /* selected row/tile wash */
+    --accent-line: rgba(200, 135, 60, 0.45);   /* selected outline */
+    --on-accent: #17120A;       /* ink on a solid accent fill */
 
-    /* ===== Aurora canonical: semantic (always paired with ✓ ⚠ ✕ glyph) ===== */
-    --success: #5FDBA7;
-    --success-rgb: 95, 219, 167;
-    --warning: #FFC46B;
-    --warning-rgb: 255, 196, 107;
-    --danger: #FF7A76;
-    --danger-rgb: 255, 122, 118;
+    /* ===== Status — data, always paired with a glyph ===== */
+    --success: #5FB37E;
+    --success-rgb: 95, 179, 126;
+    --warning: #DFB750;
+    --warning-rgb: 223, 183, 80;
+    --danger: #DE6B66;
+    --danger-rgb: 222, 107, 102;
 
-    /* ===== Aurora canonical: booru categories (tag-editing surfaces ONLY —
-       caption editor, tag library, tagger review; browsing stays quiet purple) ===== */
-    --booru-general: #7FB8FF;
-    --booru-character: #7EDB8F;
-    --booru-artist: #FF9E9E;
-    --booru-copyright: #C9A6FF;
-    --booru-meta: #FFC46B;
+    /* ===== Booru categories — a muted data legend, tag-editing surfaces only.
+       These encode Danbooru's canonical category axis, so they are real
+       information rather than decoration; they are held at low chroma so the
+       tag list reads as a table, not a rainbow. ===== */
+    --booru-general: #8FA9C4;
+    --booru-character: #8FC49B;
+    --booru-artist: #D08C8C;
+    --booru-copyright: #B49FC9;
+    --booru-meta: #C9B183;
 
-    /* ===== Aurora canonical: motion (docs/DESIGN.md §motion) =====
-       These names were already consumed via var(..., fallback) across
-       ui-refresh.css / vlm.css without ever being defined — the values below
-       equal those live fallbacks, so defining them changes nothing visually
-       and closes the undefined-token class of bug. */
-    --duration-fast: 150ms;    /* hover / focus / toggles / chips */
-    --duration-normal: 250ms;  /* panels, modals, view reveals */
-    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);  /* entrances: menus, toasts */
+    /* ===== Motion — functional only ===== */
+    --duration-fast: 120ms;     /* hover, focus, toggles */
+    --duration-normal: 160ms;   /* panels, modals, view reveals */
+    --ease-out: cubic-bezier(0.2, 0, 0, 1);
 
-    /* ===== Aurora canonical: radii ===== */
-    --r-ctl: 10px;              /* buttons, inputs */
-    --r-card: 12px;             /* cards */
-    --r-tile: 14px;             /* image tiles */
-    --r-modal: 16px;
-    --r-pill: 999px;            /* chips, pills */
+    /* ===== Radii — small and deliberate. Uniformly large corners are a
+       generated-UI tell and cost usable pixels in a dense tool. ===== */
+    --r-ctl: 4px;               /* buttons, inputs */
+    --r-card: 5px;              /* panels, cards */
+    --r-tile: 3px;              /* image tiles */
+    --r-modal: 6px;
+    --r-pill: 999px;            /* genuinely round things only: toggles, dots */
 
-    /* ===== Aurora canonical: type ===== */
-    --font-body: 'Noto Sans SC', 'Microsoft YaHei', 'PingFang SC', 'Hiragino Sans GB', 'Source Han Sans SC', -apple-system, 'Segoe UI', sans-serif;
-    --font-display: var(--font-body);   /* headings = Noto 900, no separate face */
-    --font-mono: 'IBM Plex Mono', 'Consolas', 'Monaco', ui-monospace, monospace;
-    --font-numeral: 'Oswald', var(--font-body);  /* entry-page large numerals only */
-    /* Scale (applied per-view in Phase 3; tokens are the contract) */
-    --fs-screen-title: 18px;    /* weight 900, one per screen */
-    --fs-modal-title: 16px;     /* weight 900 */
-    --fs-section: 13px;         /* weight 700 */
+    /* ===== Type — one UI stack, resolved from the OS.
+       The previous build pulled Noto Sans SC + IBM Plex Mono + Oswald from
+       fonts.googleapis.com. For an offline-first local tool that is both a
+       network dependency on the critical render path and a privacy leak, and
+       three families is one more than this UI needs. The stack below resolves
+       natively on Windows/macOS/Linux and covers CJK. ===== */
+    --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text",
+        "Segoe UI", system-ui, "Microsoft YaHei", "PingFang SC",
+        "Hiragino Sans GB", "Noto Sans CJK SC", "Source Han Sans SC",
+        "Noto Sans SC", Roboto, sans-serif;
+    --font-display: var(--font-body);
+    --font-mono: ui-monospace, "Cascadia Mono", "Cascadia Code",
+        "Segoe UI Mono", "SF Mono", Menlo, Consolas, "Liberation Mono",
+        monospace;
+    --font-numeral: var(--font-body);
+
+    /* Scale: tight, 5 real steps. Hierarchy is weight + size, never colour. */
+    --fs-screen-title: 15px;    /* weight 600, one per screen */
+    --fs-modal-title: 14px;     /* weight 600 */
+    --fs-section: 12px;         /* weight 600 */
     --fs-body: 13px;            /* weight 400 */
     --fs-label: 12px;           /* weight 500 */
-    --fs-data: 11px;            /* mono: seeds, paths, counts */
-    --fs-footnote: 10px;        /* mono, minimum size */
-    --lh-body: 1.7;
+    --fs-data: 12px;            /* mono: seeds, paths, counts */
+    --fs-footnote: 11px;        /* mono, minimum size */
+    --lh-body: 1.5;             /* was 1.7 — density is a desktop feature */
 
     /* ==================================================================
-       Legacy token remap — every name below is consumed by pre-Aurora CSS
-       (styles.css, ui-refresh.css, feature sheets). Values re-point to the
-       Aurora tokens above so the whole app reskins without markup changes.
+       Legacy token remap — every name below is consumed by pre-Graphite
+       CSS (styles.css, ui-refresh.css, feature sheets). They re-point onto
+       the tokens above so the whole app reskins without markup changes.
+
+       THE NAMES --blue / --pink / --purple ARE HISTORICAL. They no longer
+       describe a colour or a meaning; they exist only because hundreds of
+       rules in the older sheets still reference them. What they actually
+       resolve to now:
+         --blue   -> --accent  (the one amber; former "next action")
+         --pink   -> --accent  (the one amber; former "user selection")
+         --purple -> #B7B7BD   (neutral grey; former "AI output")
+       So --blue and --pink are the SAME colour, and nothing is blue, pink or
+       violet anywhere in the app. The old three-accent semantics are gone:
+       "next action" and "selected" are both just the accent, and AI output is
+       content rather than a category worth a colour of its own.
+
+       Renaming these is a separate mechanical change (they are referenced
+       widely across styles.css / ui-refresh.css / feature sheets). Until then,
+       read every `var(--pink)` below as "the accent", not as a second colour.
        ================================================================== */
+
+    /* Historical names, single destination. See the note above before adding
+       any rule that treats --blue and --pink as two different colours. */
+    --blue: var(--accent);
+    --blue-rgb: var(--accent-rgb);
+    --blue-hover: var(--accent-bright);
+    --blue-active: var(--accent-deep);
+    --pink: var(--accent);
+    --pink-rgb: var(--accent-rgb);
+    --pink-hover: var(--accent-bright);
+    --pink-active: var(--accent-deep);
+    --purple: #B7B7BD;                   /* AI output -> neutral, not violet */
+    --purple-rgb: 183, 183, 189;
+    --purple-hover: #C9C9CE;
+    --purple-active: #9C9CA3;
+    --grad: var(--accent);               /* there is no brand gradient */
+    --tag-chip-bg: rgba(255, 255, 255, 0.055);
 
     /* surfaces */
     --bg-dark: var(--bg);
     --bg-card: var(--surface-1);
     --bg-card-solid: var(--surface-1);
-    --bg-hover: var(--surface-2);
+    --bg-hover: var(--surface-3);
     --bg-elevated: var(--surface-2);
     --surface-canvas: var(--bg);
-    --surface-shell: rgba(18, 20, 26, 0.94);
+    --surface-shell: var(--surface-1);
     --surface-panel: var(--surface-1);
     --surface-panel-solid: var(--surface-1);
     --surface-card: var(--surface-1);
     --surface-card-solid: var(--surface-1);
     --surface-elevated: var(--surface-2);
-    --surface-hover: var(--surface-2);
-    --surface-active: rgba(var(--blue-rgb), 0.14);
+    --surface-hover: var(--surface-3);
+    --surface-active: var(--accent-soft);
     --surface-danger: rgba(var(--danger-rgb), 0.12);
-    --control-bg: rgba(16, 18, 24, 0.85);       /* inputs sit a step below panels */
-    --control-bg-hover: rgba(31, 35, 48, 0.85);
-    --toolbar-bg: rgba(24, 27, 35, 0.82);
-    --modal-bg: rgba(31, 35, 48, 0.97);         /* surface-2, near-opaque */
-    --empty-bg: rgba(24, 27, 35, 0.6);
-    --glass-bg: rgba(24, 27, 35, 0.88);         /* translucency only earns its keep over images */
-    --glass-bg-strong: rgba(18, 20, 26, 0.94);
-    --glass-border: var(--hairline-2);
+    --control-bg: #101012;              /* inputs sit a step below panels */
+    --control-bg-hover: #17171A;
+    --toolbar-bg: var(--surface-1);
+    --modal-bg: var(--surface-2);
+    --empty-bg: rgba(255, 255, 255, 0.02);
+    /* "glass" is retired: these are now plain opaque surfaces so that any
+       sheet still asking for glass gets a flat panel instead of blur. */
+    --glass-bg: var(--surface-1);
+    --glass-bg-strong: var(--surface-2);
+    --glass-border: var(--border);
 
-    /* accents */
-    --accent-primary: var(--blue);
-    --accent-primary-rgb: var(--blue-rgb);
-    --accent-secondary: var(--purple);          /* old teal: gradients/second voice → purple */
-    --accent-secondary-rgb: var(--purple-rgb);
-    --accent-tertiary: var(--warning);          /* old orange → warning amber */
+    --accent-primary: var(--accent);
+    --accent-primary-rgb: var(--accent-rgb);
+    --accent-secondary: var(--accent);   /* no second brand colour exists */
+    --accent-secondary-rgb: var(--accent-rgb);
+    --accent-tertiary: var(--warning);
     --accent-tertiary-rgb: var(--warning-rgb);
     --accent-success: var(--success);
     --accent-success-rgb: var(--success-rgb);
     --accent-danger: var(--danger);
     --accent-danger-rgb: var(--danger-rgb);
-    --accent-contrast: var(--on-accent);        /* was warm white; ink on accents is dark */
-    --accent-grad: var(--grad);
-    --color-primary: var(--blue);               /* previously undefined (orange fallback) */
-    --accent-color: var(--blue);                /* previously undefined (orange fallback) */
-    --accent-hover: var(--blue-hover);          /* previously undefined (orange fallback) */
-    --color-danger: var(--danger);              /* previously undefined */
-    --color-error: var(--danger);               /* previously undefined */
+    --accent-contrast: var(--on-accent);
+    --accent-grad: var(--accent);
+    --color-primary: var(--accent);
+    --accent-color: var(--accent);
+    --accent-hover: var(--accent-bright);
+    --color-danger: var(--danger);
+    --color-error: var(--danger);
 
     /* text */
     --text-primary: var(--text);
@@ -170,25 +206,25 @@
     /* borders / focus */
     --border-color: var(--border);
     --border-subtle: var(--hairline-2);
-    --border-glow: rgba(var(--blue-rgb), 0.35);
-    --focus-ring: 0 0 0 3px rgba(var(--blue-rgb), 0.18), 0 0 0 1px rgba(var(--blue-rgb), 0.6);
+    --border-glow: var(--accent-line);
+    --focus-ring: 0 0 0 2px rgba(var(--accent-rgb), 0.55);
 
-    /* progress / shadows */
-    --progress-track: rgba(255, 255, 255, 0.07);
-    --progress-fill: var(--blue);               /* solid — no decorative gradient bars */
-    --shadow-glow: 0 0 0 transparent;           /* de-AI: no ambient glow brand */
-    --shadow-card: 0 12px 32px rgba(0, 0, 0, 0.35);
-    --shadow-modal: 0 24px 60px rgba(0, 0, 0, 0.5);
-    --shadow-float: 0 12px 32px rgba(0, 0, 0, 0.4);
+    /* progress / shadows — flat panels, shadows only for floating layers */
+    --progress-track: rgba(255, 255, 255, 0.08);
+    --progress-fill: var(--accent);
+    --shadow-glow: none;
+    --shadow-card: none;
+    --shadow-modal: 0 16px 48px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.06);
+    --shadow-float: 0 8px 24px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);
 
-    /* radii: legacy ladder lands on the Aurora steps (10 ctl / 12–14 card / 16 modal) */
-    --radius-xs: 6px;
-    --radius-sm: 8px;
-    --radius-md: 10px;
-    --radius-lg: 10px;
-    --radius-xl: 12px;
-    --radius-2xl: 16px;
-    --radius-3xl: 16px;
+    /* radii: the legacy ladder collapses onto the small Graphite steps */
+    --radius-xs: 3px;
+    --radius-sm: 4px;
+    --radius-md: 4px;
+    --radius-lg: 5px;
+    --radius-xl: 6px;
+    --radius-2xl: 6px;
+    --radius-3xl: 8px;
     --radius-full: 999px;
 
     /* fonts (legacy aliases) */
@@ -201,7 +237,7 @@
    Base overrides owned by Phase 1
    ========================================================================== */
 
-/* Flat Aurora canvas: retire the neon gradient washes and grid texture. */
+/* Flat canvas: no neon gradient washes, no grid texture. */
 html,
 body {
     background: var(--bg);
@@ -239,9 +275,9 @@ textarea:focus-visible,
     outline-offset: 2px;
 }
 
-/* Primary action: exactly one SOLID blue button per screen, dark ink.
-   (The blue→purple gradient is reserved for cross-step actions and is
-   assigned per-view in Phase 3.) Hover = +1 lightness, active = −1. */
+/* Primary action: one solid ACCENT (amber) button per screen, dark ink.
+   There is no gradient anywhere — not for cross-step actions, not for the
+   brand. Hover = +1 lightness step, active = −1. */
 .btn-primary {
     background: var(--blue);
     color: var(--on-accent);
@@ -299,31 +335,36 @@ textarea:focus-visible,
 }
 
 /* ==========================================================================
-   Phase 2.5 — Visual Unification Pass
-   Spec: design_handoff_aurora_redesign/README.md + docs/DESIGN.md §principles
+   App-wide unification pass — what the rest of this file actually does.
 
-   Goals (app-wide, not per-view rewrites):
-   1. Semantic accents land where they mean something (pink=user, purple=AI).
-   2. Glass is budgeted: only shell chrome / floating overlays may blur.
-   3. Five shared patterns look like one family: empty, CTA, progress, toast,
-      panel header.
-   4. Legacy neon/amber "decoration accents" retire in favor of Aurora tokens.
+   1. ONE accent. There are no per-meaning accents: "user action" and
+      "AI output" do not get colours of their own. See the historical-names
+      note in :root before reading any var(--pink) / var(--purple) below.
+   2. No glass. backdrop-filter is not a surface treatment; surfaces are flat
+      graphite separated by 1px hairlines.
+   3. The shared patterns — empty state, CTA, progress, toast, panel header —
+      are one family, built from size/weight/spacing rather than colour.
+   4. No gradients as brand or decoration.
 
-   Loaded last via tokens.css so these win over styles.css / ui-refresh.css
-   without needing a third competing stylesheet (DESIGN.md §css-ownership).
+   READ THIS BEFORE "CLEANING UP" THE OTHER STYLESHEETS:
+   this file is an OVERRIDE LAYER, not a replacement. It is loaded LAST
+   (index.html) precisely so the rules below win over styles.css and
+   ui-refresh.css, which still contain the pre-Graphite values (their
+   hardcoded radii and line-heights are untouched). Deleting or "tidying"
+   those sheets on the assumption that this file is the only truth will
+   break the design; the two are a pair.
    ========================================================================== */
 
-/* --- Surfaces: solid elevation, glass only where it earns its keep ------ */
+/* --- Surfaces: flat panels, 1px hairlines, shadows only when floating --- */
 
 .nav-bar {
-    background: rgba(18, 20, 26, 0.97);
+    background: var(--surface-1);
     border-bottom: 1px solid var(--border);
-    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03), 0 12px 28px rgba(0, 0, 0, 0.28);
-    backdrop-filter: blur(10px) saturate(120%);
-    -webkit-backdrop-filter: blur(10px) saturate(120%);
+    box-shadow: none;
 }
 
-/* Content panels: solid surface-1, no blur (reads cleaner over dense grids). */
+/* Content panels: flat surface-1 + hairline. No blur, no drop shadow — a
+   panel that is not floating must not pretend to. */
 .filter-sidebar,
 .autosep-panel,
 .sort-setup,
@@ -340,11 +381,10 @@ textarea:focus-visible,
     background: var(--surface-1);
     border: 1px solid var(--border);
     box-shadow: var(--shadow-card);
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
 }
 
-/* Floating chrome may keep a light blur (over images / stage). */
+/* Floating chrome: opaque, and the ONLY place a shadow is allowed, because
+   these genuinely sit above the page. */
 .modal-content,
 .selection-fab,
 .gallery-action-bar,
@@ -352,17 +392,16 @@ textarea:focus-visible,
 .update-popup-card {
     background: var(--surface-2);
     border: 1px solid var(--border);
-    backdrop-filter: blur(12px) saturate(120%);
-    -webkit-backdrop-filter: blur(12px) saturate(120%);
+    box-shadow: var(--shadow-float);
 }
 
 .modal-content {
     border-radius: var(--r-modal);
     box-shadow: var(--shadow-modal);
-    background: rgba(31, 35, 48, 0.98);
+    background: var(--surface-2);
 }
 
-/* Nested inset cards: one quiet elevation step, no second glass layer. */
+/* Nested inset cards: one quiet elevation step, hairline only. */
 .filter-summary,
 .filter-summary-compact,
 .autosep-preview-list,
@@ -519,14 +558,14 @@ textarea:focus-visible,
     font-size: var(--fs-footnote);
 }
 
-/* --- Selection = pink (user decision) — all multi-select surfaces -------- */
+/* --- Selection = the accent (user decision) — all multi-select surfaces ---
+   The old scheme gave selection its own pink. There is one accent now, and
+   "selected" is exactly the state it exists for. ------------------------- */
 
 .gallery-item.selected {
     outline: 2px solid var(--pink);
     outline-offset: -2px;
-    box-shadow:
-        0 0 0 1px rgba(var(--pink-rgb), 0.45),
-        0 12px 28px rgba(0, 0, 0, 0.28);
+    box-shadow: 0 0 0 1px rgba(var(--pink-rgb), 0.45), 0 12px 28px rgba(0, 0, 0, 0.28);
 }
 
 .gallery-item.selected::after {
@@ -560,7 +599,7 @@ textarea:focus-visible,
     background: var(--pink);
     border-color: var(--pink-active);
     color: var(--on-accent);
-    box-shadow: 0 10px 24px rgba(var(--pink-rgb), 0.22);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.25);
 }
 
 .dataset-import-gallery-grid .import-thumb.multi-selected,
@@ -631,7 +670,10 @@ textarea:focus-visible,
     background: rgba(var(--blue-rgb), 0.14);
 }
 
-/* --- AI output = purple -------------------------------------------------- */
+/* --- AI output = neutral -------------------------------------------------
+   Tags, scores and detections are content, not a category that earns a hue.
+   --purple now resolves to a neutral grey; these rules stay so the surfaces
+   keep their shape. ------------------------------------------------------ */
 
 .gallery-item-aesthetic,
 .library-tag .tag-count,
@@ -863,7 +905,7 @@ input[type="radio"] {
     accent-color: var(--pink);
 }
 
-/* --- Links = next action blue -------------------------------------------- */
+/* --- Links = the accent --------------------------------------------------- */
 
 a,
 .link,
@@ -970,7 +1012,7 @@ a:hover,
     font-size: var(--fs-data);
 }
 
-/* --- Kill leftover decorative amber on chrome (keep warning semantics) --- */
+/* --- Route stray decorative colour back onto the accent ------------------ */
 
 .workspace-start-eyebrow,
 .update-popup-value.has-update,
@@ -981,7 +1023,7 @@ a:hover,
 /* Prefer solid blue for "active primary path" panels over dual gradients. */
 #similar-workflow-status.similar-workflow-primary {
     background:
-        linear-gradient(180deg, rgba(var(--blue-rgb), 0.10), rgba(255, 255, 255, 0.02));
+        rgba(var(--blue-rgb), 0.10);
     border-color: rgba(var(--blue-rgb), 0.28);
 }
 
@@ -1010,13 +1052,12 @@ a:hover,
     color: var(--text);
 }
 
-/* Soften floating action bars over dense grids. */
+/* Floating action bar over dense grids: opaque so the grid does not show
+   through and fight the labels. */
 .gallery-action-bar {
-    background: rgba(31, 35, 48, 0.96);
+    background: var(--surface-2);
     border: 1px solid var(--border);
-    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
-    backdrop-filter: blur(12px) saturate(120%);
-    -webkit-backdrop-filter: blur(12px) saturate(120%);
+    box-shadow: var(--shadow-float);
 }
 
 /* --- Reduced motion: no bounce on toasts -------------------------------- */
@@ -1032,15 +1073,15 @@ a:hover,
 }
 
 /* ==========================================================================
-   Phase 3 — Workbench unification (Censor + Dataset)
-   Spec: design_handoff #25d / #15e + DESIGN.md accent semantics
+   Workbench unification (Censor + Dataset)
 
-   Censor and Dataset still carry pre-Aurora glass, cyan selection, and
-   multiple solid-blue primaries. This block remaps them without rewriting
-   feature layout CSS (feature sheets keep structure; tokens own chrome).
+   The Censor and Dataset feature sheets still carry their own glass, cyan
+   selection and several competing solid primaries. This block remaps that
+   chrome onto the single accent without rewriting the feature layout CSS —
+   the feature sheets keep structure, this file owns chrome.
    ========================================================================== */
 
-/* Censor accent aliases track Aurora action blue (not legacy neon). */
+/* Censor aliases point at the one accent (historical name: --blue). */
 :root {
     --censor-accent: var(--blue);
     --censor-accent-rgb: var(--blue-rgb);
@@ -1061,8 +1102,6 @@ a:hover,
 #view-censor .censor-sidebar-v2,
 #view-censor .censor-sidebar-v2.right {
     background: var(--surface-1) !important;
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
     border-color: var(--border) !important;
     box-shadow: none !important;
     color: var(--text);
@@ -1091,26 +1130,20 @@ a:hover,
 /* Floating toolbar + footer: one light glass layer only (over the stage).
    !important needed — ui-refresh pins legacy rgba backgrounds with !important. */
 #view-censor .censor-toolbar-v2 {
-    background: rgba(31, 35, 48, 0.94) !important;
-    backdrop-filter: blur(12px) saturate(120%) !important;
-    -webkit-backdrop-filter: blur(12px) saturate(120%) !important;
+    background: rgba(28, 28, 30, 0.94) !important;
     border: 1px solid var(--border) !important;
     border-radius: var(--r-pill) !important;
     box-shadow: var(--shadow-float) !important;
 }
 
 #view-censor .censor-footer-bars {
-    background: rgba(18, 20, 26, 0.94) !important;
-    backdrop-filter: blur(10px) saturate(120%) !important;
-    -webkit-backdrop-filter: blur(10px) saturate(120%) !important;
+    background: rgba(14, 14, 15, 0.94) !important;
     border-top: 1px solid var(--border) !important;
 }
 
 #view-censor .zoom-controls-bar,
 #view-censor .zoom-controls-v2 {
-    background: rgba(31, 35, 48, 0.92) !important;
-    backdrop-filter: blur(10px) !important;
-    -webkit-backdrop-filter: blur(10px) !important;
+    background: rgba(28, 28, 30, 0.92) !important;
     border: 1px solid var(--border) !important;
     box-shadow: var(--shadow-float) !important;
 }
@@ -1469,7 +1502,7 @@ a:hover,
 
 #view-dataset .dataset-queue-select-toggle {
     border: 1px solid rgba(255, 255, 255, 0.28);
-    background: rgba(18, 20, 26, 0.72);
+    background: rgba(14, 14, 15, 0.72);
     border-radius: 4px;
 }
 
@@ -1533,10 +1566,8 @@ a:hover,
 
 /* Export sticky bar + cross-step CTA (ONE gradient on this tab). */
 #view-dataset .dataset-export-action-bar {
-    background: rgba(24, 27, 35, 0.96);
+    background: rgba(21, 21, 23, 0.96);
     border-bottom: 1px solid var(--border);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
     box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
 }
 
@@ -1619,8 +1650,6 @@ a:hover,
 
 #view-dataset .dataset-modal-backdrop {
     background: var(--scrim);
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
 }
 
 /* Smart-tag on workbench is AI prep — quiet, not solid primary. */
@@ -1746,7 +1775,7 @@ html.gallery-comfort-room #view-gallery .filter-sidebar,
 }
 
 html.gallery-comfort-room .filter-sidebar {
-    background: rgba(24, 27, 35, 0.92);
+    background: rgba(21, 21, 23, 0.92);
     border-color: var(--hairline-2);
     box-shadow: none;
 }
@@ -1755,7 +1784,7 @@ html.gallery-comfort-room .filter-sidebar {
 #gallery-empty-state .empty-state-onboarding {
     max-width: min(880px, 92%);
     padding: 28px 24px 22px;
-    background: rgba(24, 27, 35, 0.72);
+    background: rgba(21, 21, 23, 0.72);
     border: 1px solid var(--border);
     box-shadow: var(--shadow-card);
 }
@@ -1855,8 +1884,6 @@ html.gallery-comfort-has-hero #view-gallery .gallery-container::after {
     position: absolute;
     inset: 0;
     background: rgba(6, 8, 12, 0.72);
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
 }
 
 .gallery-comfort-peek-stage {
@@ -1868,7 +1895,7 @@ html.gallery-comfort-has-hero #view-gallery .gallery-container::after {
     gap: 12px;
     max-width: min(92vw, 1280px);
     max-height: min(88vh, 960px);
-    animation: comfortPeekIn 180ms var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1)) both;
+    animation: none;
 }
 
 .gallery-comfort-peek-img {
@@ -1889,14 +1916,11 @@ html.gallery-comfort-has-hero #view-gallery .gallery-container::after {
     letter-spacing: 0.02em;
     padding: 6px 12px;
     border-radius: var(--r-pill);
-    background: rgba(18, 20, 26, 0.72);
+    background: rgba(14, 14, 15, 0.72);
     border: 1px solid var(--border);
 }
 
-@keyframes comfortPeekIn {
-    from { opacity: 0; transform: translateY(8px) scale(0.985); }
-    to   { opacity: 1; transform: translateY(0) scale(1); }
-}
+
 
 html.gallery-comfort-peeking {
     cursor: zoom-in;
@@ -1950,15 +1974,12 @@ html.gallery-comfort-peeking {
 
 /* Selection action bar: short settle, neutral chrome (no pink glow brand). */
 #gallery-action-bar.is-magnet-in {
-    animation: comfortMagnetIn 180ms var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1)) both;
+    animation: none;
     box-shadow: 0 16px 36px rgba(0, 0, 0, 0.42);
     border-color: var(--border);
 }
 
-@keyframes comfortMagnetIn {
-    from { opacity: 0; transform: translateY(14px) scale(0.98); }
-    to   { opacity: 1; transform: translateY(0) scale(1); }
-}
+
 
 @media (prefers-reduced-motion: reduce) {
     .gallery-comfort-peek-stage,
@@ -1971,38 +1992,37 @@ html.gallery-comfort-peeking {
    Comfort-3 — whole-app studio shell (zen / warmth / room enter)
    ========================================================================== */
 
-/* --- Warmth personalization (data-comfort-warmth on <html>) --- */
+/* --- Warmth personalization (data-comfort-warmth on <html>) ---
+   Kept as a user setting. Retuned so that "cool" and "warm" are a barely
+   perceptible temperature shift of the SAME graphite, not two extra themes:
+   the delta is a couple of points per channel, the accent never changes, and
+   neither variant reintroduces a blue/violet cast. */
 html[data-comfort-warmth="cool"] {
-    --bg: #10131a;
-    --surface-1: #161a22;
-    --surface-2: #1c2230;
-    --stage: #0c0f14;
-    --text: #e8eef8;
-    --text-2: #94a0b5;
+    --bg: #0D0E10;
+    --surface-1: #141518;
+    --surface-2: #1B1C1F;
+    --surface-3: #222327;
+    --stage: #08090A;
+    --text: #E7E9EC;
+    --text-2: #A3A6AC;
 }
 
 html[data-comfort-warmth="neutral"] {
-    /* Aurora defaults already neutral-cool; keep as identity. */
+    /* Graphite defaults are already dead neutral; identity. */
 }
 
 html[data-comfort-warmth="warm"] {
-    --bg: #14120f;
-    --surface-1: #1c1915;
-    --surface-2: #252019;
-    --stage: #100e0c;
-    --text: #f4efe6;
-    --text-2: #b0a496;
-    --border: #3a342c;
-    --border-strong: #4a4238;
-    --hairline-1: #221e19;
-    --hairline-2: #2c2720;
-    /* Slightly warmer accents (still semantic roles). */
-    --blue: #6bc4e8;
-    --blue-rgb: 107, 196, 232;
-    --pink: #f09bb8;
-    --pink-rgb: 240, 155, 184;
-    --purple: #b49ae8;
-    --purple-rgb: 180, 154, 232;
+    --bg: #100F0D;
+    --surface-1: #171614;
+    --surface-2: #1E1D1A;
+    --surface-3: #262421;
+    --stage: #0A0A09;
+    --text: #EAE8E4;
+    --text-2: #A9A59E;
+    --border: #2E2C29;
+    --border-strong: #3D3A36;
+    --hairline-1: #211F1D;
+    --hairline-2: #282623;
 }
 
 /* Remap legacy tokens when warmth overrides canonicals. */
@@ -2011,20 +2031,22 @@ html[data-comfort-warmth="warm"] {
     --bg-dark: var(--bg);
     --bg-card: var(--surface-1);
     --bg-card-solid: var(--surface-1);
-    --bg-hover: var(--surface-2);
+    --bg-hover: var(--surface-3);
     --bg-elevated: var(--surface-2);
     --surface-canvas: var(--bg);
     --surface-panel: var(--surface-1);
     --surface-panel-solid: var(--surface-1);
     --surface-card: var(--surface-1);
     --surface-elevated: var(--surface-2);
+    --surface-hover: var(--surface-3);
+    --control-bg: var(--bg);
+    --toolbar-bg: var(--surface-1);
+    --modal-bg: var(--surface-2);
+    --glass-bg: var(--surface-1);
+    --glass-bg-strong: var(--surface-2);
     --text-primary: var(--text);
     --text-secondary: var(--text-2);
     --text-muted: var(--muted);
-    --accent-primary: var(--blue);
-    --accent-primary-rgb: var(--blue-rgb);
-    --accent-secondary: var(--purple);
-    --accent-secondary-rgb: var(--purple-rgb);
     --border-color: var(--border);
 }
 
@@ -2036,7 +2058,7 @@ html[data-comfort-warmth="warm"] body {
 
 /* --- Soft zen (chrome recedes; nav still reachable) --- */
 html.comfort-zen .nav-bar {
-    background: rgba(18, 20, 26, 0.82);
+    background: rgba(14, 14, 15, 0.82);
     box-shadow: none;
     border-bottom-color: transparent;
 }
@@ -2055,7 +2077,7 @@ html.comfort-zen .nav-actions .btn:not(.btn-primary) {
 }
 
 html.comfort-zen .filter-sidebar {
-    background: rgba(18, 20, 26, 0.78);
+    background: rgba(14, 14, 15, 0.78);
     border-color: transparent;
 }
 
@@ -2068,7 +2090,7 @@ html.comfort-zen .similar-header {
 
 html.comfort-zen #view-censor .censor-sidebar-v2,
 html.comfort-zen #view-censor .censor-sidebar-v2.right {
-    background: rgba(18, 20, 26, 0.88) !important;
+    background: rgba(14, 14, 15, 0.88) !important;
     border-color: transparent !important;
 }
 
@@ -2108,7 +2130,7 @@ html.comfort-zen .gallery-daily-loop {
 
 /* --- View room enter (censor / dataset / gallery / …) --- */
 .view.comfort-room-enter-active {
-    animation: comfortRoomEnter 240ms var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1)) both;
+    animation: comfortRoomEnter 160ms var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1)) both;
 }
 
 @keyframes comfortRoomEnter {
@@ -2159,5 +2181,224 @@ html.comfort-zen .dataset-tab:not([aria-selected="true"]) {
     html.comfort-zen .nav-actions .btn:not(.btn-primary) .btn-label,
     html.comfort-zen .nav-actions .btn:not(.btn-primary) > span:last-child:not([aria-hidden]) {
         /* leave structure; opacity already quiets chrome */
+    }
+}
+
+/* ==========================================================================
+   Graphite base — the last word on type, density, icons and motion.
+
+   These rules live here (rather than in a new stylesheet) because tokens.css
+   is the authoritative layer: adding a fourth sheet on top is exactly the
+   habit that made the palette unownable in the first place.
+   ========================================================================== */
+
+/* --- Type: one stack, tabular figures everywhere ------------------------- */
+
+html,
+body {
+    font-family: var(--font-body);
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
+    color: var(--text);
+    /* This app is mostly counts, sizes, seeds, percentages and progress.
+       Proportional digits make those jitter as they update; lining tabular
+       figures keep every column and every live counter still. */
+    font-variant-numeric: tabular-nums lining-nums;
+    -webkit-font-feature-settings: "tnum" 1, "lnum" 1;
+    font-feature-settings: "tnum" 1, "lnum" 1;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+}
+
+/* Controls do not inherit font in every engine — restate it once. */
+button,
+input,
+select,
+textarea,
+optgroup {
+    font-family: inherit;
+    font-variant-numeric: inherit;
+}
+
+code,
+pre,
+kbd,
+samp,
+.mono,
+[class*="-seed"],
+[class*="-path"] {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums lining-nums;
+}
+
+/* Screen titles: one per view, carried by weight rather than colour. */
+.view-title,
+.page-title,
+.workspace-title {
+    font-size: var(--fs-screen-title);
+    font-weight: 600;
+    letter-spacing: 0;
+    color: var(--text);
+}
+
+/* --- Icons: one stroke set, 16px default, 20px for primary chrome -------- */
+
+.icon {
+    width: 16px;
+    height: 16px;
+    flex: 0 0 auto;
+    display: inline-block;
+    vertical-align: -0.15em;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    pointer-events: none;
+}
+
+.icon-20 {
+    width: 20px;
+    height: 20px;
+}
+
+.icon-14 {
+    width: 14px;
+    height: 14px;
+}
+
+/* The sprite itself must never occupy layout. */
+#icon-sprite {
+    position: absolute;
+    width: 0;
+    height: 0;
+    overflow: hidden;
+}
+
+/* Buttons that carry an icon + label keep them on one optical baseline. */
+.btn > .icon,
+.nav-tab > .icon,
+.chip > .icon {
+    margin-right: 6px;
+}
+
+.btn > .icon:only-child,
+.nav-tab > .icon:only-child {
+    margin-right: 0;
+}
+
+/* The wrappers that used to hold an emoji glyph sized it with font-size.
+   An <svg> ignores font-size, so give those wrappers a real box and centre
+   the icon inside it. */
+.tab-icon,
+.brand-icon,
+.btn-icon,
+.nav-library-chip-icon,
+.entry-fn-icon,
+.mission-icon,
+.pns-icon,
+.btn-icon-only span[aria-hidden] {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 0;
+}
+
+.tab-icon > .icon,
+.btn-icon-only span[aria-hidden] > .icon,
+.pns-icon > .icon,
+.btn-icon > .icon {
+    width: 18px;
+    height: 18px;
+}
+
+.nav-bar.nav-tabs-icon-only .nav-tab .tab-icon > .icon {
+    width: 20px;
+    height: 20px;
+}
+
+.brand-icon > .icon {
+    width: 22px;
+    height: 22px;
+}
+
+.nav-library-chip-icon > .icon {
+    width: 14px;
+    height: 14px;
+}
+
+/* Status glyphs that were ✓ / ✕ / ⚠ inline in a sentence should track the
+   text they sit in rather than jumping to a fixed box. */
+.toast .icon,
+.empty-state .icon,
+p > .icon,
+li > .icon {
+    width: 1em;
+    height: 1em;
+}
+
+/* --- Accent budget -------------------------------------------------------
+   The accent buys attention, so it is spent only on the primary action and on
+   the active/selected state. Everything below was inheriting it for decoration
+   or for information that size and weight already carry. Measured live with
+   .plans/sd-image-sorter-release/design/accent_load.js. */
+
+/* Big numbers are the content of a stats panel, not a call to action.
+   Hierarchy here comes from size and weight. */
+.stat-number,
+.entry-stat-value,
+.similar-stat-value,
+.brush-indicator-v2,
+.autosep-action-settings-badge {
+    color: var(--text);
+}
+
+/* Status cards must not borrow the accent — amber-filled means "do this",
+   amber-outlined-with-a-glyph means "read this". Warnings get the yellow
+   status token so the two never look like the same thing. */
+.scope-status-card.is-warning,
+.gallery-banner-warning,
+.similar-workflow-compact.is-warning {
+    background: rgba(var(--warning-rgb), 0.07);
+    border-color: rgba(var(--warning-rgb), 0.38);
+}
+
+.scope-status-badge,
+.scope-status-detail,
+.gallery-banner-warning .gallery-banner-title {
+    color: var(--warning);
+}
+
+/* Passive chrome: an indicator, a dropzone and a help button are not actions. */
+.nav-library-chip,
+.similar-upload-dropzone,
+.autosep-card-scope,
+.guide-btn {
+    border-color: var(--border-strong);
+}
+
+.guide-btn {
+    background: var(--surface-2);
+    color: var(--text-2);
+    border-radius: var(--r-ctl);
+}
+
+.guide-btn:hover {
+    background: var(--surface-3);
+    color: var(--text);
+    transform: none;
+}
+
+/* --- Motion: functional only --------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+
+    *,
+    *::before,
+    *::after {
+        animation-duration: 1ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 1ms !important;
+        scroll-behavior: auto !important;
     }
 }

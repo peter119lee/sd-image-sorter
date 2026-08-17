@@ -93,7 +93,7 @@
     margin: 12px 0;
     padding: 4px;
     border-radius: var(--radius-md);
-    background: rgba(15, 30, 41, 0.55);
+    background: rgba(28, 28, 28, 0.55);
     border: 1px solid var(--border-color);
 }
 
@@ -122,11 +122,7 @@
 }
 
 .mass-tag-tab.active {
-    background: linear-gradient(
-        135deg,
-        rgba(var(--accent-primary-rgb), 0.20),
-        rgba(var(--accent-secondary-rgb), 0.14)
-    );
+    background: rgba(var(--accent-primary-rgb), 0.20);
     border-color: var(--accent-primary);
     color: var(--text-primary);
 }
@@ -154,8 +150,8 @@
 .mass-tag-result[hidden] { display: none; }
 
 .mass-tag-result.danger {
-    background: rgba(239, 68, 68, 0.06);
-    border-color: rgba(239, 68, 68, 0.30);
+    background: rgba(var(--danger-rgb), 0.06);
+    border-color: rgba(var(--danger-rgb), 0.30);
 }
 
 .mass-tag-result-summary {
@@ -193,7 +189,7 @@
     z-index: 2;
     margin: 12px -4px 0;
     padding: 12px 4px 0;
-    background: linear-gradient(180deg, rgba(15, 21, 32, 0), var(--modal-bg, var(--bg-card-solid)) 24%);
+    background: transparent;
 }
 
 /* ---- Confirm dialog -------------------------------------------------- */
@@ -233,7 +229,7 @@
 }
 
 .mass-tag-confirm-note {
-    color: rgba(239, 68, 68, 0.85);
+    color: rgba(var(--danger-rgb), 0.85);
     font-size: 0.82rem;
     line-height: 1.5;
     margin-top: 8px;

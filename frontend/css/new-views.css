@@ -22,7 +22,7 @@
 .promptlab-output-panel {
     background: var(--bg-card);
     border-radius: var(--radius-xl);
-    border: 1px solid rgba(184, 215, 233, 0.1);
+    border: 1px solid rgba(var(--accent-rgb), 0.1);
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -38,8 +38,8 @@
 .promptlab-builder-header,
 .promptlab-output-header {
     padding: 18px 18px 16px;
-    border-bottom: 1px solid rgba(184, 215, 233, 0.08);
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0));
+    border-bottom: 1px solid rgba(var(--accent-rgb), 0.08);
+    background: rgba(255, 255, 255, 0.03);
 }
 
 .promptlab-browser-header h4,
@@ -96,7 +96,7 @@
 .cat-count {
     font-size: 11px;
     color: var(--text-muted);
-    background: rgba(100, 116, 139, 0.2);
+    background: rgba(120, 120, 120, 0.2);
     padding: 2px 6px;
     border-radius: var(--radius-lg);
 }
@@ -118,7 +118,7 @@
     font-size: 11px;
     padding: 3px 8px;
     border-radius: var(--radius-sm);
-    background: rgba(100, 116, 139, 0.15);
+    background: rgba(120, 120, 120, 0.15);
     border: 1px solid transparent;
     cursor: pointer;
     transition: all var(--transition-fast);
@@ -159,8 +159,8 @@
 }
 
 .slot-row {
-    background: rgba(9, 21, 30, 0.76);
-    border: 1px solid rgba(184, 215, 233, 0.08);
+    background: rgba(20, 20, 20, 0.76);
+    border: 1px solid rgba(var(--accent-rgb), 0.08);
     border-radius: var(--radius-lg);
     padding: 12px 14px;
     margin-bottom: 10px;
@@ -171,7 +171,7 @@
 
 .slot-row.has-conflict {
     border-color: var(--accent-tertiary);
-    background: rgba(249, 115, 22, 0.05);
+    background: rgba(var(--accent-rgb), 0.05);
 }
 
 .slot-header {
@@ -198,7 +198,7 @@
     font-size: 13px;
     font-weight: 600;
     text-transform: capitalize;
-    color: #dcfff9;
+    color: #E7F4EC;
 }
 
 .conflict-icon {
@@ -255,7 +255,7 @@
     height: 4px;
     -webkit-appearance: none;
     appearance: none;
-    background: rgba(100, 116, 139, 0.3);
+    background: rgba(120, 120, 120, 0.3);
     border-radius: 2px;
     outline: none;
 }
@@ -292,8 +292,8 @@
 #promptlab-output {
     flex: 1;
     min-height: 220px;
-    background: rgba(7, 16, 23, 0.9);
-    border: 1px solid rgba(184, 215, 233, 0.12);
+    background: rgba(15, 15, 15, 0.9);
+    border: 1px solid rgba(var(--accent-rgb), 0.12);
     border-radius: var(--radius-md);
     color: var(--text-primary);
     font-family: var(--font-body);
@@ -308,14 +308,14 @@
     font-size: 12px;
     color: var(--accent-tertiary);
     padding: 4px 8px;
-    background: rgba(249, 115, 22, 0.1);
+    background: rgba(var(--accent-rgb), 0.1);
     border-radius: var(--radius-sm);
     margin-bottom: 4px;
 }
 
 .promptlab-presets-section {
     padding: 14px 16px 16px;
-    border-top: 1px solid rgba(184, 215, 233, 0.08);
+    border-top: 1px solid rgba(var(--accent-rgb), 0.08);
 }
 
 .promptlab-presets-header {
@@ -380,7 +380,7 @@
     gap: 8px;
     align-items: center;
     padding: 14px 16px 16px;
-    border-top: 1px solid rgba(184, 215, 233, 0.08);
+    border-top: 1px solid rgba(var(--accent-rgb), 0.08);
     background: rgba(255, 255, 255, 0.02);
 }
 
@@ -409,7 +409,7 @@
 .similar-header {
     background: var(--bg-card);
     border-radius: var(--radius-xl);
-    border: 1px solid rgba(184, 215, 233, 0.1);
+    border: 1px solid rgba(var(--accent-rgb), 0.1);
     padding: 18px;
     display: flex;
     align-items: center;
@@ -434,14 +434,14 @@
     flex-direction: column;
     align-items: center;
     padding: 10px 18px;
-    background: rgba(9, 21, 30, 0.72);
-    border: 1px solid rgba(184, 215, 233, 0.1);
+    background: rgba(20, 20, 20, 0.72);
+    border: 1px solid rgba(var(--accent-rgb), 0.1);
     border-radius: var(--radius-lg);
     transition: all var(--transition-fast);
 }
 
 .stat-card:hover {
-    background: rgba(12, 29, 41, 0.9);
+    background: rgba(26, 26, 26, 0.9);
     border-color: rgba(var(--accent-secondary-rgb), 0.28);
     box-shadow: 0 12px 24px rgba(0, 0, 0, 0.16);
 }
@@ -449,7 +449,7 @@
 .stat-card .stat-number {
     font-size: 20px;
     font-weight: 700;
-    color: var(--accent-primary);
+    color: var(--text);
 }
 
 .stat-card .stat-label {
@@ -481,7 +481,7 @@
     gap: 4px;
     background: var(--bg-card);
     border-radius: var(--radius-xl);
-    border: 1px solid rgba(184, 215, 233, 0.1);
+    border: 1px solid rgba(var(--accent-rgb), 0.1);
     padding: 4px;
     width: fit-content;
     box-shadow: var(--shadow-card);
@@ -501,7 +501,7 @@
 
 .similar-tab.active {
     background: rgba(var(--accent-primary-rgb), 0.16);
-    color: #ffe4cc;
+    color: #F4E7D7;
 }
 
 .similar-tab:hover:not(.active) { background: var(--bg-hover); }
@@ -514,7 +514,7 @@
 .similar-panel {
     background: var(--bg-card);
     border-radius: var(--radius-xl);
-    border: 1px solid rgba(184, 215, 233, 0.1);
+    border: 1px solid rgba(var(--accent-rgb), 0.1);
     padding: 18px;
     box-shadow: var(--shadow-card);
 }
@@ -539,12 +539,12 @@
 }
 
 .similar-result {
-    background: rgba(9, 21, 30, 0.78);
+    background: rgba(20, 20, 20, 0.78);
     border-radius: var(--radius-lg);
     overflow: hidden;
     cursor: pointer;
     transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast);
-    border: 1px solid rgba(184, 215, 233, 0.08);
+    border: 1px solid rgba(var(--accent-rgb), 0.08);
 }
 
 .similar-result:hover {
@@ -600,7 +600,7 @@
     align-items: center;
     gap: 12px;
     padding: 12px;
-    background: rgba(9, 21, 30, 0.78);
+    background: rgba(20, 20, 20, 0.78);
     border-radius: var(--radius-lg);
     margin-bottom: 8px;
 }
@@ -721,7 +721,7 @@
 
 .model-health-banner .model-health-details {
     margin-top: 10px;
-    border-top: 1px solid rgba(191, 219, 254, 0.1);
+    border-top: 1px solid rgba(var(--accent-rgb), 0.1);
     padding-top: 10px;
 }
 
@@ -750,13 +750,13 @@
 .model-health-banner.model-health-banner-warning {
     border-color: rgba(var(--accent-primary-rgb), 0.32);
     background: rgba(var(--accent-primary-rgb), 0.08);
-    color: #ffd4b0;
+    color: #EED9C1;
 }
 
 .model-health-banner.model-health-banner-danger {
-    border-color: rgba(255, 107, 107, 0.3);
-    background: rgba(255, 107, 107, 0.08);
-    color: #ffd7d7;
+    border-color: rgba(var(--danger-rgb), 0.3);
+    background: rgba(var(--danger-rgb), 0.08);
+    color: #F8DFDE;
 }
 
 .model-health-banner-compact {
@@ -782,7 +782,7 @@
     gap: 16px;
     background: var(--bg-card);
     border-radius: var(--radius-xl);
-    border: 1px solid rgba(184, 215, 233, 0.1);
+    border: 1px solid rgba(var(--accent-rgb), 0.1);
     padding: 18px;
     box-shadow: var(--shadow-card);
 }
@@ -801,7 +801,7 @@
 .artist-details {
     background: var(--bg-card);
     border-radius: var(--radius-xl);
-    border: 1px solid rgba(184, 215, 233, 0.1);
+    border: 1px solid rgba(var(--accent-rgb), 0.1);
     box-shadow: var(--shadow-card);
 }
 
@@ -861,7 +861,7 @@
     justify-content: space-between;
     align-items: center;
     padding: 18px;
-    border-bottom: 1px solid rgba(184, 215, 233, 0.08);
+    border-bottom: 1px solid rgba(var(--accent-rgb), 0.08);
 }
 
 .results-header h3 {
@@ -872,7 +872,7 @@
 .view-toggle {
     display: flex;
     gap: 2px;
-    background: rgba(9, 21, 30, 0.72);
+    background: rgba(20, 20, 20, 0.72);
     border-radius: 6px;
     padding: 2px;
 }
@@ -901,7 +901,7 @@
 
 .toggle-btn.active {
     background: rgba(var(--accent-primary-rgb), 0.16);
-    color: #ffe4cc;
+    color: #F4E7D7;
 }
 
 .artist-grid {
@@ -952,7 +952,7 @@
     align-items: flex-start;
     gap: 8px;
     padding: 10px 12px;
-    background: rgba(9, 21, 30, 0.78);
+    background: rgba(20, 20, 20, 0.78);
     border-radius: var(--radius-lg);
     cursor: pointer;
     transition: all var(--transition-fast);
@@ -969,7 +969,7 @@
 
 .artist-card:hover,
 .artist-card:focus-visible {
-    background: rgba(12, 29, 41, 0.92);
+    background: rgba(26, 26, 26, 0.92);
     border-color: rgba(var(--accent-secondary-rgb), 0.4);
 }
 
@@ -989,7 +989,7 @@
     bottom: 0;
     left: 0;
     height: 3px;
-    background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+    background: var(--accent-primary);
     opacity: 0.5;
 }
 
@@ -1006,7 +1006,7 @@
     width: 40px;
     height: 40px;
     border-radius: 50%;
-    background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+    background: var(--accent-primary);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1056,7 +1056,7 @@
     min-width: 3.5ch;
     justify-content: flex-end;
     font-weight: 700;
-    color: #fcd28b;
+    color: #E5C6A2;
 }
 
 .artist-rank {
@@ -1147,7 +1147,7 @@
 .artist-image-card:focus-visible {
     transform: translateY(-2px);
     border-color: rgba(var(--accent-secondary-rgb), 0.45);
-    background: rgba(12, 29, 41, 0.94);
+    background: rgba(26, 26, 26, 0.94);
     outline: none;
 }
 
@@ -1161,7 +1161,7 @@
 .artist-image-confidence {
     font-size: 11px;
     font-weight: 700;
-    color: #fcd28b;
+    color: #E5C6A2;
 }
 
 .artist-image-name {
@@ -1212,9 +1212,9 @@
 
 .progress-fill {
     height: 100%;
-    background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+    background: var(--accent-primary);
     border-radius: 4px;
-    transition: width 0.3s ease;
+    transition: width 160ms ease;
 }
 
 .progress-text {

@@ -8,10 +8,10 @@
     width: min(100%, 1200px);
     max-width: 1200px;
     margin: 0 auto;
-    background: var(--bg-card, rgba(13, 22, 37, 0.88));
+    background: var(--bg-card, rgba(25, 25, 25, 0.88));
     border-radius: 18px;
-    border: 1px solid rgba(191, 219, 254, 0.08);
-    box-shadow: 0 20px 48px rgba(2, 6, 23, 0.34);
+    border: 1px solid rgba(var(--accent-rgb), 0.08);
+    box-shadow: 0 20px 48px rgba(0, 0, 0, 0.34);
 }
 
 /* Drop zone */
@@ -21,14 +21,14 @@
     padding: 24px 16px;
     text-align: center;
     cursor: pointer;
-    transition: all 0.2s;
-    background: linear-gradient(135deg, rgba(var(--accent-secondary-rgb), 0.04), rgba(var(--accent-primary-rgb), 0.04));
+    transition: all 160ms;
+    background: rgba(var(--accent-secondary-rgb), 0.04);
 }
 
 .obfuscate-drop-zone:hover,
 .obfuscate-drop-zone.drag-over {
     border-color: rgba(var(--accent-primary-rgb), 0.5);
-    background: linear-gradient(135deg, rgba(var(--accent-secondary-rgb), 0.08), rgba(var(--accent-primary-rgb), 0.08));
+    background: rgba(var(--accent-secondary-rgb), 0.08);
     box-shadow: 0 0 0 4px rgba(var(--accent-primary-rgb), 0.08);
 }
 
@@ -98,7 +98,7 @@
     padding: 10px 14px;
     background: rgba(0, 0, 0, 0.2);
     border-radius: 10px;
-    border: 1px solid rgba(191, 219, 254, 0.06);
+    border: 1px solid rgba(var(--accent-rgb), 0.06);
     display: flex;
     flex-direction: column;
     gap: 8px;
@@ -162,16 +162,16 @@
 }
 
 .obfuscate-item.processing {
-    background: rgba(100, 108, 255, 0.08);
-    border-color: rgba(100, 108, 255, 0.2);
+    background: rgba(var(--accent-rgb), 0.08);
+    border-color: rgba(var(--accent-rgb), 0.2);
 }
 .obfuscate-item.done {
-    background: rgba(7, 188, 12, 0.06);
-    border-color: rgba(7, 188, 12, 0.15);
+    background: rgba(var(--success-rgb), 0.06);
+    border-color: rgba(var(--success-rgb), 0.15);
 }
 .obfuscate-item.error {
-    background: rgba(255, 68, 68, 0.06);
-    border-color: rgba(255, 68, 68, 0.15);
+    background: rgba(var(--danger-rgb), 0.06);
+    border-color: rgba(var(--danger-rgb), 0.15);
 }
 
 /* Thumbnail pair: source → result */
@@ -191,7 +191,7 @@
 }
 
 .obfuscate-thumb.result-thumb {
-    border: 2px solid rgba(34, 197, 94, 0.4);
+    border: 2px solid rgba(var(--success-rgb), 0.4);
 }
 
 .obfuscate-thumb-arrow {

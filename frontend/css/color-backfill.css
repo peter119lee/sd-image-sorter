@@ -12,14 +12,10 @@
     margin: 10px 0 14px;
     padding: 12px 16px;
     border-radius: var(--radius-md);
-    background: linear-gradient(
-        135deg,
-        rgba(var(--accent-primary-rgb), 0.10),
-        rgba(var(--accent-secondary-rgb), 0.08)
-    );
+    background: rgba(var(--accent-primary-rgb), 0.10);
     border: 1px solid rgba(var(--accent-primary-rgb), 0.28);
     box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
-    animation: color-banner-in 220ms ease-out;
+    animation: color-banner-in 160ms ease-out;
 }
 
 .color-backfill-banner[hidden] { display: none; }
@@ -84,11 +80,7 @@
     margin: 0 0 14px;
     padding: 10px 14px;
     border-radius: var(--radius-md, 12px);
-    background: linear-gradient(
-        135deg,
-        rgba(var(--accent-primary-rgb), 0.08),
-        rgba(255, 255, 255, 0.04)
-    );
+    background: rgba(var(--accent-primary-rgb), 0.08);
     border: 1px dashed rgba(var(--accent-primary-rgb), 0.36);
 }
 
@@ -163,8 +155,7 @@
     background: var(--bg-card);
     border: 1px solid var(--border-color);
     box-shadow: 0 16px 40px rgba(0, 0, 0, 0.36);
-    backdrop-filter: blur(12px);
-    animation: color-toast-in 200ms ease-out;
+    animation: color-toast-in 160ms ease-out;
 }
 
 .color-progress-toast[hidden] { display: none; }
@@ -211,12 +202,8 @@
 .color-progress-toast-fill {
     height: 100%;
     width: 0%;
-    background: linear-gradient(
-        90deg,
-        var(--accent-primary),
-        var(--accent-secondary)
-    );
-    transition: width 320ms ease;
+    background: var(--accent-primary);
+    transition: width 160ms ease;
 }
 
 .color-progress-toast-meta {

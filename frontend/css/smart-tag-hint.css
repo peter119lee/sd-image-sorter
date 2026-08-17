@@ -14,14 +14,10 @@
     margin: 10px 0 14px;
     padding: 11px 14px;
     border-radius: var(--radius-md);
-    background: linear-gradient(
-        135deg,
-        rgba(var(--accent-secondary-rgb), 0.12),
-        rgba(var(--accent-primary-rgb, 124, 139, 255), 0.08)
-    );
+    background: rgba(var(--accent-secondary-rgb), 0.12);
     border: 1px solid rgba(var(--accent-secondary-rgb), 0.32);
     box-shadow: 0 3px 12px rgba(0, 0, 0, 0.12);
-    animation: smart-tag-hint-in 220ms ease-out;
+    animation: smart-tag-hint-in 160ms ease-out;
 }
 
 .smart-tag-hint-banner[hidden] { display: none; }
@@ -162,13 +158,13 @@
     min-width: 0;
     flex-direction: column;
     gap: 6px;
-    color: var(--text-primary, #f3f4f6);
+    color: var(--text-primary, #F4F4F4);
     font-weight: 650;
 }
 
 #smart-tag-modal .form-help {
     margin: 0;
-    color: var(--text-secondary, #cbd5e1);
+    color: var(--text-secondary, #D6D6D6);
     font-size: 12px;
     line-height: 1.45;
     font-weight: 500;
@@ -186,7 +182,7 @@
     border: 1px solid var(--border-color, rgba(255, 255, 255, 0.14));
     border-radius: var(--radius-md, 8px);
     background: var(--surface-2, rgba(255, 255, 255, 0.05));
-    color: var(--text-primary, #f3f4f6);
+    color: var(--text-primary, #F4F4F4);
     padding: 12px;
 }
 
@@ -208,13 +204,13 @@
     align-items: center;
     gap: 8px;
     min-width: 0;
-    color: var(--text-primary, #f3f4f6);
+    color: var(--text-primary, #F4F4F4);
     cursor: pointer;
     font-weight: 650;
 }
 
 #smart-tag-modal .smart-tag-section-note {
-    color: var(--text-secondary, #cbd5e1);
+    color: var(--text-secondary, #D6D6D6);
     font-size: 12px;
     text-align: right;
 }
@@ -224,7 +220,7 @@
     border: 1px solid rgba(var(--accent-secondary-rgb, 51, 214, 224), 0.26);
     border-radius: var(--radius-md, 8px);
     background: rgba(var(--accent-secondary-rgb, 51, 214, 224), 0.08);
-    color: var(--text-secondary, #cbd5e1);
+    color: var(--text-secondary, #D6D6D6);
     font-size: 13px;
     line-height: 1.45;
 }
@@ -247,7 +243,7 @@
     height: 100%;
     width: 0%;
     background: var(--accent-color);
-    transition: width 0.3s;
+    transition: width 160ms;
 }
 
 #smart-tag-modal .smart-tag-progress-text {
@@ -257,7 +253,7 @@
 
 #smart-tag-modal .smart-tag-progress-preview {
     margin: 4px 0 0;
-    color: var(--text-secondary, #cbd5e1);
+    color: var(--text-secondary, #D6D6D6);
     font-size: 12px;
     font-style: italic;
 }
@@ -271,23 +267,19 @@
     bottom: -1px;
     padding-top: 10px;
     padding-bottom: 2px;
-    background: linear-gradient(
-        180deg,
-        rgba(15, 23, 42, 0),
-        var(--surface-0, #0f172a) 28%
-    );
+    background: transparent;
     z-index: 2;
 }
 
 .smart-tag-vote-details summary {
-    color: var(--text-primary, #f3f4f6);
+    color: var(--text-primary, #F4F4F4);
     cursor: pointer;
     font-weight: 600;
 }
 
 .smart-tag-vote-details .form-help {
     margin: 8px 0 0;
-    color: var(--text-secondary, #cbd5e1);
+    color: var(--text-secondary, #D6D6D6);
 }
 
 .smart-tag-vote-details.is-single-tagger .form-help {
@@ -299,8 +291,8 @@
 #smart-tag-modal select,
 #smart-tag-modal input[type="text"],
 #smart-tag-modal .form-input {
-    background: var(--input-bg, var(--surface-1, #151922));
-    color: var(--text-primary, #f3f4f6);
+    background: var(--input-bg, var(--surface-1, #1C1C1C));
+    color: var(--text-primary, #F4F4F4);
     border-color: var(--border-color, rgba(255, 255, 255, 0.16));
 }
 
@@ -319,7 +311,7 @@
     margin: 0;
     border: 1px solid rgba(255, 255, 255, 0.28);
     border-radius: 4px;
-    background: var(--input-bg, var(--surface-1, #151922));
+    background: var(--input-bg, var(--surface-1, #1C1C1C));
     color: var(--accent-primary);
 }
 

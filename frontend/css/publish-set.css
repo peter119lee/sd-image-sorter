@@ -72,11 +72,11 @@
 
 /* Insert-position markers while dragging over a row. */
 .pub-item.pub-drop-before {
-    box-shadow: 0 -2px 0 0 var(--accent-primary);
+    box-shadow: 0 -2px 0 0 rgba(0, 0, 0, 0.55);
 }
 
 .pub-item.pub-drop-after {
-    box-shadow: 0 2px 0 0 var(--accent-primary);
+    box-shadow: 0 2px 0 0 rgba(0, 0, 0, 0.55);
 }
 
 .pub-item-handle {
@@ -129,7 +129,7 @@
 }
 
 .pub-item-pair.is-paired {
-    color: var(--success, #4ade80);
+    color: var(--success, var(--success));
 }
 
 .pub-item-pair.is-unpaired {
@@ -160,7 +160,7 @@
 
 .pub-variant-btn.active {
     background: var(--accent-primary);
-    color: var(--accent-contrast, #12141A);
+    color: var(--accent-contrast, #161616);
     font-weight: 600;
 }
 
@@ -181,8 +181,8 @@
 }
 
 .pub-item-remove:hover {
-    color: #ef4444;
-    background: rgba(239, 68, 68, 0.10);
+    color: var(--danger);
+    background: rgba(var(--danger-rgb), 0.10);
 }
 
 /* --- Export panel ------------------------------------------------------ */
@@ -263,15 +263,15 @@
 }
 
 .pub-result-ok {
-    color: var(--success, #4ade80);
+    color: var(--success, var(--success));
 }
 
 .pub-result-warn {
-    color: var(--warning, #facc15);
+    color: var(--warning, #DAAC35);
 }
 
 .pub-result-error {
-    color: #ef4444;
+    color: var(--danger);
 }
 
 .pub-watermark-panel {

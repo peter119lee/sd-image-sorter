@@ -57,7 +57,7 @@
     width: 0%;
     border-radius: 999px;
     background: var(--accent-primary);
-    transition: width 300ms ease;
+    transition: width 160ms ease;
 }
 
 .dup-scan-progress-text {
@@ -76,8 +76,8 @@
     gap: 12px;
     padding: 10px 14px;
     border-radius: var(--radius-md, 10px);
-    background: rgba(92, 200, 255, 0.08);
-    border: 1px solid rgba(92, 200, 255, 0.25);
+    background: rgba(var(--accent-rgb), 0.08);
+    border: 1px solid rgba(var(--accent-rgb), 0.25);
     font-size: 0.92rem;
 }
 
@@ -149,13 +149,13 @@
 }
 
 .dup-member.is-keeper {
-    border-color: rgba(92, 200, 255, 0.55);
-    background: rgba(92, 200, 255, 0.06);
+    border-color: rgba(var(--accent-rgb), 0.55);
+    background: rgba(var(--accent-rgb), 0.06);
 }
 
 .dup-member:has(.dup-member-check:checked) {
-    border-color: rgba(239, 68, 68, 0.55);
-    background: rgba(239, 68, 68, 0.06);
+    border-color: rgba(var(--danger-rgb), 0.55);
+    background: rgba(var(--danger-rgb), 0.06);
 }
 
 .dup-member-check {
@@ -165,7 +165,7 @@
     z-index: 2;
     width: 18px;
     height: 18px;
-    accent-color: #ef4444;
+    accent-color: var(--danger);
 }
 
 .dup-member-thumb-link {
@@ -191,7 +191,7 @@
     padding: 2px 8px;
     border-radius: 999px;
     background: var(--accent-primary);
-    color: var(--accent-contrast, #12141A);
+    color: var(--accent-contrast, #161616);
 }
 
 .dup-member-meta {

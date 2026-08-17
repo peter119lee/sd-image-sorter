@@ -44,7 +44,7 @@
 
 .caption-autocomplete-count {
     font-size: 0.74rem;
-    color: var(--text-muted, #9ca3af);
+    color: var(--text-muted, #A6A6A6);
     font-variant-numeric: tabular-nums;
     flex-shrink: 0;
 }
@@ -70,7 +70,7 @@
 
 .caption-autocomplete-zh {
     font-size: 0.78rem;
-    color: var(--text-secondary, #c4c9d4);
+    color: var(--text-secondary, #CCCCCC);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -89,7 +89,7 @@
     height: 8px;
     border-radius: 50%;
     flex-shrink: 0;
-    background: #6b7280;
+    background: #767676;
 }
 
 /* v3.5.0 filter-modal dominant-hue dots: base shape + the hues the caption
@@ -100,28 +100,28 @@
     border-radius: 50%;
     display: inline-block;
     flex-shrink: 0;
-    background: #6b7280;
+    background: #767676;
 }
-.hue-dot-red    { background: #ef4444; }
-.hue-dot-green  { background: #22c55e; }
-.hue-dot-purple { background: #9333ea; } /* data-viz hue, not a UI accent (banned-accent contract) */
-.hue-dot-brown  { background: #92400e; }
-.hue-dot-white  { background: #f8fafc; border: 1px solid rgba(255, 255, 255, 0.35); }
-.hue-dot-black  { background: #0b0b0f; border: 1px solid rgba(255, 255, 255, 0.30); }
+.hue-dot-red    { background: var(--danger); }
+.hue-dot-green  { background: #4A9D69; }
+.hue-dot-purple { background: var(--accent); } /* data-viz hue, not a UI accent (banned-accent contract) */
+.hue-dot-brown  { background: #7D5323; }
+.hue-dot-white  { background: #FDFAF7; border: 1px solid rgba(255, 255, 255, 0.35); }
+.hue-dot-black  { background: #0D0D0D; border: 1px solid rgba(255, 255, 255, 0.30); }
 
 .hue-choice-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 
-.cap-ac-dot-character  { background: #f472b6; }
-.cap-ac-dot-artist     { background: #d946ef; }
-.cap-ac-dot-outfit     { background: #a78bfa; }
-.cap-ac-dot-pose       { background: #eab308; }
-.cap-ac-dot-body       { background: #fb7185; }
-.cap-ac-dot-expression { background: #f59e0b; }
-.cap-ac-dot-background { background: #2dd4bf; }
-.cap-ac-dot-action     { background: #f97316; }
-.cap-ac-dot-style      { background: #818cf8; }
-.cap-ac-dot-quality    { background: #3b82f6; }
-.cap-ac-dot-meta       { background: #64748b; }
-.cap-ac-dot-rating     { background: #ef4444; }
-.cap-ac-dot-angle      { background: #22d3ee; }
-.cap-ac-dot-unknown    { background: #6b7280; }
+.cap-ac-dot-character  { background: #DEB688; }
+.cap-ac-dot-artist     { background: #D39F62; }
+.cap-ac-dot-outfit     { background: #E4C5A1; }
+.cap-ac-dot-pose       { background: #CD9E25; }
+.cap-ac-dot-body       { background: #E58B87; }
+.cap-ac-dot-expression { background: var(--accent); }
+.cap-ac-dot-background { background: var(--accent); }
+.cap-ac-dot-action     { background: var(--accent); }
+.cap-ac-dot-style      { background: #E2BF97; }
+.cap-ac-dot-quality    { background: #D29D5F; }
+.cap-ac-dot-meta       { background: #787878; }
+.cap-ac-dot-rating     { background: var(--danger); }
+.cap-ac-dot-angle      { background: var(--accent); }
+.cap-ac-dot-unknown    { background: #767676; }

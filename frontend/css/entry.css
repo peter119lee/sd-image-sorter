@@ -46,9 +46,9 @@ body.entry-active {
     position: absolute;
     inset: 0;
     background-image:
-        radial-gradient(1100px 700px at 16% 24%, rgba(var(--blue-rgb), 0.13), transparent 62%),
-        radial-gradient(900px 620px at 34% 78%, rgba(167, 139, 250, 0.09), transparent 65%),
-        radial-gradient(720px 540px at 68% 45%, rgba(var(--blue-rgb), 0.05), transparent 60%);
+        transparent,
+        transparent,
+        transparent;
     background-position: center;
     background-size: cover;
     background-repeat: no-repeat;
@@ -63,7 +63,7 @@ body.entry-active {
     position: absolute;
     inset: 0;
     opacity: 0;
-    transition: opacity 1100ms ease;
+    transition: opacity 160ms ease;
     pointer-events: none;
 }
 
@@ -124,15 +124,8 @@ body.entry-active {
     z-index: 1;
     pointer-events: none;
     background:
-        linear-gradient(to top,
-            rgba(6, 8, 16, 0.94) 0%,
-            rgba(6, 8, 16, 0.60) 20%,
-            rgba(6, 8, 16, 0.12) 44%,
-            transparent 60%),
-        linear-gradient(to right,
-            rgba(6, 8, 16, 0.82) 0%,
-            rgba(6, 8, 16, 0.34) 26%,
-            transparent 52%);
+        transparent,
+        transparent;
 }
 
 .entry-hero .film-strip {
@@ -140,7 +133,7 @@ body.entry-active {
     flex: 0 0 auto;
     height: 19%;
     max-height: 218px;
-    background: rgba(4, 5, 8, 0.94);
+    background: rgba(6, 6, 6, 0.94);
     padding: 17px 0;
     overflow: hidden;
     box-shadow: 0 10px 34px rgba(0, 0, 0, 0.45);
@@ -154,10 +147,7 @@ body.entry-active {
     left: 0;
     right: 0;
     height: 8px;
-    background: repeating-linear-gradient(90deg,
-        transparent 0 10px,
-        rgba(237, 240, 247, 0.20) 10px 17px,
-        transparent 17px 27px);
+    background: transparent;
     z-index: 1;
 }
 
@@ -168,7 +158,7 @@ body.entry-active {
     display: flex;
     height: 100%;
     width: max-content;
-    animation: entry-film-roll var(--film-duration, 110s) linear infinite;
+    animation: none;
     will-change: transform;
 }
 
@@ -185,10 +175,7 @@ body.entry-active {
     opacity: 0.92;
 }
 
-@keyframes entry-film-roll {
-    from { transform: translateX(0); }
-    to { transform: translateX(-50%); }
-}
+
 
 @media (prefers-reduced-motion: reduce) {
     .entry-hero .film-track { animation: none; }
@@ -198,18 +185,15 @@ body.entry-active {
 .entry-veil-x {
     position: absolute;
     inset: 0;
-    background: linear-gradient(90deg,
-        rgba(16, 18, 22, 0.06) 30%,
-        rgba(16, 18, 22, 0.42) 52%,
-        rgba(16, 18, 22, 0.90) 76%);
+    background: rgba(19, 19, 19, 0.06);
 }
 
 .entry-veil-y {
     position: absolute;
     inset: 0;
     background: linear-gradient(0deg,
-        rgba(16, 18, 22, 0.78) 0%,
-        rgba(16, 18, 22, 0) 30%);
+        rgba(19, 19, 19, 0.78) 0%,
+        rgba(19, 19, 19, 0) 30%);
 }
 
 .entry-prompt-texture {
@@ -221,7 +205,7 @@ body.entry-active {
     font-size: 30px;
     line-height: 1.3;
     font-weight: 600;
-    color: rgba(237, 240, 247, 0.045);
+    color: rgba(var(--accent-rgb), 0.045);
     pointer-events: none;
     user-select: none;
     word-break: break-word;
@@ -246,8 +230,8 @@ body.entry-active {
 
 .entry-version {
     font-family: var(--font-mono);
-    font-size: 9px;
-    color: rgba(237, 240, 247, 0.4);
+    font-size: var(--fs-footnote);
+    color: rgba(var(--accent-rgb), 0.4);
     margin-left: 10px;
 }
 
@@ -258,7 +242,7 @@ body.entry-active {
     gap: 18px;
     font-family: var(--font-mono);
     font-size: 10px;
-    color: rgba(237, 240, 247, 0.45);
+    color: rgba(var(--accent-rgb), 0.45);
 }
 
 .entry-system .sys-accent {
@@ -270,7 +254,7 @@ body.entry-active {
     border: none;
     padding: 4px 6px;
     font-size: 13px;
-    color: rgba(237, 240, 247, 0.6);
+    color: rgba(var(--accent-rgb), 0.6);
     cursor: pointer;
     border-radius: var(--r-ctl);
 }
@@ -310,14 +294,18 @@ body.entry-active {
     font-weight: 600;
     letter-spacing: 2.4px;
     text-transform: uppercase;
-    color: rgba(237, 240, 247, 0.35);
+    color: rgba(var(--accent-rgb), 0.35);
     padding: 2px 2px 0;
     margin-bottom: -6px;
     user-select: none;
 }
 
 .entry-tile {
-    background: rgba(10, 14, 18, 0.76);
+    /* The hero art sits behind this column. At 0.76 a bright cover washed the
+       tile labels out; film mode already special-cased itself to 0.93 for the
+       same reason, so the base tile now carries that opacity too. The hero
+       still reads through, the labels stay legible against any cover. */
+    background: rgba(14, 14, 14, 0.93);
     border: 1px solid rgba(255, 255, 255, 0.13);
     border-radius: var(--r-card);
     padding: 13px 16px;
@@ -331,17 +319,17 @@ body.entry-active {
 }
 
 .entry-tile:hover {
-    border-color: rgba(var(--blue-rgb), 0.45);
-    background: rgba(13, 17, 22, 0.84);
+    border-color: var(--border-strong);
+    background: rgba(24, 24, 24, 0.96);
 }
 
 /* Film mode runs bright strips behind the tiles; lift the tile surface opacity
    so the strips don't bleed through the tile labels (批量整理 / 所有功能). */
 .entry-page:has(.hero-film) .entry-tile {
-    background: rgba(9, 12, 18, 0.93);
+    background: rgba(14, 14, 14, 0.93);
 }
 .entry-page:has(.hero-film) .entry-tile:hover {
-    background: rgba(13, 17, 24, 0.95);
+    background: rgba(18, 18, 18, 0.95);
 }
 
 .entry-tile .tile-head {
@@ -358,18 +346,18 @@ body.entry-active {
 .entry-tile .tile-arrow {
     margin-left: auto;
     font-size: 14px;
-    color: rgba(237, 240, 247, 0.5);
+    color: rgba(var(--accent-rgb), 0.5);
 }
 
 .entry-tile .tile-output {
     font-size: 11px;
-    color: rgba(237, 240, 247, 0.68);
+    color: rgba(var(--accent-rgb), 0.68);
 }
 
 .entry-tile .tile-steps {
     font-family: var(--font-mono);
     font-size: 10px;
-    color: rgba(237, 240, 247, 0.5);
+    color: rgba(var(--accent-rgb), 0.5);
 }
 
 /* continue (anchor) slab — accent tier */
@@ -381,7 +369,7 @@ body.entry-active {
     align-items: center;
     gap: 14px;
     flex-wrap: wrap;
-    background: rgba(10, 14, 18, 0.6);
+    background: rgba(14, 14, 14, 0.6);
     border: 1px solid var(--hairline-2);
     border-radius: var(--r-card);
     padding: 12px 16px;
@@ -445,7 +433,7 @@ body.entry-active {
 }
 
 .entry-anchor {
-    background: rgba(10, 14, 18, 0.88);
+    background: rgba(14, 14, 14, 0.88);
     border: 1px solid rgba(var(--blue-rgb), 0.55);
     border-radius: var(--r-card);
     padding: 17px 20px 15px;
@@ -469,7 +457,7 @@ body.entry-active {
 }
 
 .entry-anchor .anchor-when {
-    color: rgba(237, 240, 247, 0.35);
+    color: rgba(var(--accent-rgb), 0.35);
 }
 
 .entry-anchor .anchor-title-row {
@@ -486,7 +474,7 @@ body.entry-active {
 
 .entry-anchor .anchor-detail {
     font-size: 12px;
-    color: rgba(237, 240, 247, 0.6);
+    color: rgba(var(--accent-rgb), 0.6);
 }
 
 .entry-anchor .anchor-progress-row {
@@ -558,7 +546,7 @@ body.entry-active {
     font-weight: 500;
     line-height: 1;
     font-size: 26px;
-    color: rgba(237, 240, 247, 0.92);
+    color: var(--text);
 }
 
 .entry-fn .fn-title {
@@ -568,13 +556,13 @@ body.entry-active {
 
 .entry-fn .fn-sub {
     font-size: 11px;
-    color: rgba(237, 240, 247, 0.55);
+    color: rgba(var(--accent-rgb), 0.55);
 }
 
 /* Empty-library scan CTA on the Library tile: lift it out of the quiet-subtitle
    grey so the first real step reads as actionable (blue = next action). */
 .entry-fn .fn-sub.is-cta {
-    color: var(--blue, #6ea8ff);
+    color: var(--blue, #DFB98E);
     font-weight: 600;
 }
 
@@ -614,7 +602,7 @@ body.entry-active {
     border: none;
     border-radius: 8px;
     background: transparent;
-    color: var(--text, #edf0f7);
+    color: var(--text, #F9F3EB);
     font: inherit;
     font-size: 18px;
     font-weight: 900;
@@ -624,7 +612,7 @@ body.entry-active {
 }
 
 .entry-library-switcher:hover {
-    color: var(--blue, #5cc8ff);
+    color: var(--blue, #DBB180);
 }
 
 .entry-library-name {
@@ -645,18 +633,18 @@ body.entry-active {
     font-weight: 500;
     font-size: 26px;
     line-height: 1;
-    color: rgba(237, 240, 247, 0.92);
+    color: rgba(var(--accent-rgb), 0.92);
 }
 
 .entry-library-sub {
     margin: 0;
     font-size: 12px;
     line-height: 1.45;
-    color: rgba(237, 240, 247, 0.55);
+    color: rgba(var(--accent-rgb), 0.55);
 }
 
 .entry-library-sub.is-cta {
-    color: var(--blue, #5cc8ff);
+    color: var(--blue, #DBB180);
     font-weight: 600;
 }
 
@@ -672,8 +660,8 @@ body.entry-active {
     border: none;
     border-radius: var(--r-ctl, 10px);
     padding: 9px 18px;
-    background: var(--blue, #5cc8ff);
-    color: var(--on-accent, #12141a);
+    background: var(--blue, #DBB180);
+    color: var(--on-accent, #161616);
     font: inherit;
     font-size: 14px;
     font-weight: 800;
@@ -681,7 +669,7 @@ body.entry-active {
 }
 
 .entry-library-enter:hover {
-    background: var(--blue-hover, #7dd3ff);
+    background: var(--blue-hover, #E2C19A);
 }
 
 .entry-library-manage {
@@ -689,7 +677,7 @@ body.entry-active {
     border-radius: var(--r-ctl, 10px);
     padding: 8px 12px;
     background: transparent;
-    color: rgba(237, 240, 247, 0.7);
+    color: rgba(var(--accent-rgb), 0.7);
     font: inherit;
     font-size: 12px;
     font-weight: 600;
@@ -697,7 +685,7 @@ body.entry-active {
 }
 
 .entry-library-manage:hover {
-    color: var(--text, #edf0f7);
+    color: var(--text, #F9F3EB);
     border-color: rgba(255, 255, 255, 0.22);
     background: rgba(255, 255, 255, 0.04);
 }
@@ -714,7 +702,7 @@ body.entry-active {
     padding: 8px;
     border-radius: 12px;
     border: 1px solid rgba(255, 255, 255, 0.12);
-    background: rgba(24, 27, 35, 0.98);
+    background: rgba(30, 30, 30, 0.98);
     box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
 }
 
@@ -730,7 +718,7 @@ body.entry-active {
     border: none;
     border-radius: 8px;
     background: transparent;
-    color: var(--text, #edf0f7);
+    color: var(--text, #F9F3EB);
     font: inherit;
     font-size: 13px;
     font-weight: 600;
@@ -778,11 +766,11 @@ body.entry-active {
 }
 
 .entry-library-menu-delete {
-    color: rgba(255, 122, 118, 0.85);
+    color: rgba(var(--danger-rgb), 0.85);
 }
 
 .entry-library-menu-delete:hover {
-    background: rgba(255, 122, 118, 0.12);
+    background: rgba(var(--danger-rgb), 0.12);
 }
 
 .entry-library-menu-create {
@@ -793,7 +781,7 @@ body.entry-active {
     border: 1px dashed rgba(255, 255, 255, 0.16);
     border-radius: 8px;
     background: transparent;
-    color: var(--blue, #5cc8ff);
+    color: var(--blue, #DBB180);
     font: inherit;
     font-size: 12px;
     font-weight: 700;
@@ -811,7 +799,7 @@ body.entry-active {
     border-top: 1px solid rgba(255, 255, 255, 0.08);
     font-size: 11px;
     line-height: 1.45;
-    color: rgba(237, 240, 247, 0.45);
+    color: rgba(var(--accent-rgb), 0.45);
 }
 
 /* model-center tile — the new-user starting point (owner FB 2026-07-06).
@@ -820,7 +808,7 @@ body.entry-active {
 .entry-fn-models .fn-models-badge {
     margin-left: auto;
     font-family: var(--font-mono);
-    font-size: 9px;
+    font-size: var(--fs-footnote);
     font-weight: 700;
     letter-spacing: 1px;
     text-transform: uppercase;
@@ -873,7 +861,7 @@ body.entry-active {
     font-weight: 700;
     letter-spacing: 2px;
     text-transform: uppercase;
-    color: rgba(237, 240, 247, 0.45);
+    color: rgba(var(--accent-rgb), 0.45);
     margin: 10px 2px 2px;
 }
 
@@ -922,13 +910,13 @@ body.entry-active {
 
 .catalog-desc {
     font-size: 11px;
-    color: rgba(237, 240, 247, 0.55);
+    color: rgba(var(--accent-rgb), 0.55);
 }
 
 .catalog-arrow {
     margin-left: auto;
     font-size: 14px;
-    color: rgba(237, 240, 247, 0.4);
+    color: rgba(var(--accent-rgb), 0.4);
 }
 
 .catalog-item:hover .catalog-arrow {
@@ -937,7 +925,7 @@ body.entry-active {
 
 .entry-free-all .free-all-label {
     font-size: 12px;
-    color: rgba(237, 240, 247, 0.6);
+    color: rgba(var(--accent-rgb), 0.6);
 }
 
 /* --- bottom-left identity block (FB-2: greeting + live stat row) --- */
@@ -962,10 +950,7 @@ body.entry-active {
     padding: 20px 26px 18px;
     margin: -20px -26px -18px;
     border-radius: 22px;
-    background: radial-gradient(120% 130% at 0% 100%,
-        rgba(8, 12, 19, 0.82) 0%,
-        rgba(8, 12, 19, 0.62) 45%,
-        rgba(8, 12, 19, 0) 100%);
+    background: transparent;
 }
 
 .entry-identity .identity-greeting {
@@ -975,7 +960,7 @@ body.entry-active {
     font-weight: 700;
     line-height: 1.25;
     color: var(--text);
-    text-shadow: 0 2px 18px rgba(16, 18, 22, 0.65);
+    text-shadow: 0 2px 18px rgba(19, 19, 19, 0.65);
 }
 
 .entry-identity .identity-stats {
@@ -1001,13 +986,13 @@ body.entry-active {
 .entry-identity .stat-label {
     font-size: 11px;
     letter-spacing: 0.4px;
-    color: rgba(237, 240, 247, 0.55);
+    color: rgba(var(--accent-rgb), 0.55);
     white-space: nowrap;
 }
 
 .entry-identity .streak-today {
     font-size: 12px;
-    color: rgba(237, 240, 247, 0.5);
+    color: rgba(var(--accent-rgb), 0.5);
 }
 
 .entry-identity .identity-hero-line {
@@ -1016,7 +1001,7 @@ body.entry-active {
     gap: 12px;
     font-family: var(--font-mono);
     font-size: 10px;
-    color: rgba(237, 240, 247, 0.45);
+    color: rgba(var(--accent-rgb), 0.45);
 }
 
 .entry-identity .hero-link {
@@ -1024,7 +1009,7 @@ body.entry-active {
     border: none;
     padding: 0;
     font: inherit;
-    color: rgba(237, 240, 247, 0.6);
+    color: rgba(var(--accent-rgb), 0.6);
     text-decoration: underline;
     cursor: pointer;
 }
@@ -1047,7 +1032,7 @@ body.entry-active {
     background: none;
     border: none;
     font: inherit;
-    color: rgba(237, 240, 247, 0.55);
+    color: rgba(var(--accent-rgb), 0.55);
     padding: 2px 9px;
     border-radius: var(--r-pill);
     cursor: pointer;

@@ -60,7 +60,7 @@
 
 .dataset-tab[aria-selected="true"] .dataset-tab-num {
     background: var(--accent-primary);
-    color: #1f1307;
+    color: #1E1408;
 }
 
 /* ============== Tab-visibility (data-active-tab on .dataset-maker) ============== */
@@ -243,11 +243,11 @@
     justify-content: space-between;
     gap: 14px;
     padding: 14px;
-    border: 1px solid rgba(191, 219, 254, 0.10);
+    border: 1px solid rgba(var(--accent-rgb), 0.10);
     border-radius: 14px;
     background:
-        linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.018)),
-        var(--surface-1, rgba(15, 23, 42, 0.5));
+        rgba(255,255,255,0.045),
+        var(--surface-1, rgba(28, 28, 28, 0.5));
     box-shadow: 0 10px 30px rgba(0,0,0,0.12);
 }
 .dataset-import-card-gallery { grid-area: gallery; }
@@ -255,8 +255,8 @@
 .dataset-import-card-audit { grid-area: audit; }
 .dataset-import-card-folder {
     background:
-        linear-gradient(135deg, rgba(var(--accent-primary-rgb, 124, 139, 255), 0.10), rgba(255,255,255,0.02)),
-        var(--surface-1, rgba(15, 23, 42, 0.5));
+        rgba(var(--accent-primary-rgb, 124, 139, 255), 0.10),
+        var(--surface-1, rgba(28, 28, 28, 0.5));
 }
 .dataset-import-card-copy {
     display: flex;
@@ -276,12 +276,12 @@
     text-transform: uppercase;
 }
 .dataset-import-card-copy strong {
-    color: var(--text-primary, #f8fafc);
+    color: var(--text-primary, #FDFAF7);
     font-size: 15px;
 }
 .dataset-import-card-copy p {
     margin: 0;
-    color: var(--text-secondary, #94a3b8);
+    color: var(--text-secondary, #A6A6A6);
     font-size: 12px;
     line-height: 1.45;
 }
@@ -298,7 +298,7 @@
 .dataset-import-card-benefits li {
     min-width: 0;
     padding: 2px 0;
-    color: var(--text-secondary, #94a3b8);
+    color: var(--text-secondary, #A6A6A6);
     font-size: 12px;
     line-height: 1.35;
 }
@@ -323,7 +323,7 @@
     flex-wrap: wrap;
     gap: 8px;
     padding: 8px 10px;
-    background: rgba(15, 23, 42, 0.55);
+    background: rgba(28, 28, 28, 0.55);
     border: 1px solid var(--border-color, rgba(255,255,255,0.12));
     border-radius: 8px;
     min-width: 0;
@@ -374,7 +374,7 @@
     border: 1px solid rgba(var(--accent-primary-rgb), 0.28);
     border-radius: 8px;
     background: rgba(var(--accent-primary-rgb), 0.10);
-    color: var(--text-secondary, #94a3b8);
+    color: var(--text-secondary, #A6A6A6);
     font-size: 12px;
     line-height: 1.4;
 }
@@ -388,7 +388,7 @@
     align-items: center;
     gap: 10px;
     min-height: 28px;
-    color: var(--text-secondary, #94a3b8);
+    color: var(--text-secondary, #A6A6A6);
     font-size: 12px;
 }
 
@@ -460,10 +460,10 @@
 .dataset-dropzone-hint { color: var(--text-secondary); font-size: 12px; }
 
 .dataset-sidecar-import-notice {
-    border: 1px solid rgba(59, 130, 246, 0.28);
-    border-left: 3px solid rgba(59, 130, 246, 0.72);
+    border: 1px solid rgba(var(--accent-rgb), 0.28);
+    border-left: 3px solid rgba(var(--accent-rgb), 0.72);
     border-radius: 8px;
-    background: rgba(59, 130, 246, 0.08);
+    background: rgba(var(--accent-rgb), 0.08);
     padding: 10px 12px;
     color: var(--text-secondary);
     font-size: 12px;
@@ -498,7 +498,7 @@
     position: sticky;
     top: 0;
     z-index: 4;
-    background: var(--surface-0, #0f172a);
+    background: var(--surface-0, #1C1C1C);
 }
 .dataset-import-gallery-actions {
     display: flex;
@@ -590,7 +590,7 @@
     justify-content: center;
     border-radius: 4px;
     background: rgba(var(--accent-secondary-rgb), 0.86);
-    color: #031b1a;
+    color: #0F0F0F;
     font-size: 11px;
     font-weight: 900;
     box-shadow: 0 6px 16px rgba(0,0,0,0.25);
@@ -610,7 +610,7 @@
     justify-content: center;
     border: 1px solid rgba(255,255,255,0.16);
     border-radius: 999px;
-    background: rgba(15, 23, 42, 0.82);
+    background: rgba(28, 28, 28, 0.82);
     color: var(--text-primary);
     font: 750 11px/1 var(--font-mono);
     box-shadow: 0 5px 16px rgba(0,0,0,0.24);
@@ -625,7 +625,7 @@
     bottom: 6px;
     padding: 2px 7px;
     border-radius: 999px;
-    background: rgba(15, 23, 42, 0.82);
+    background: rgba(28, 28, 28, 0.82);
     color: var(--text-primary);
     font-size: 11px;
     font-weight: 600;
@@ -639,13 +639,13 @@
     height: 24px;
     border: 0;
     border-radius: 50%;
-    background: rgba(15, 23, 42, 0.82);
+    background: rgba(28, 28, 28, 0.82);
     color: var(--text-primary);
     cursor: pointer;
     line-height: 1;
 }
 .dataset-import-gallery-grid .import-thumb-remove:hover {
-    background: rgba(239, 68, 68, 0.86);
+    background: rgba(var(--danger-rgb), 0.86);
     color: white;
 }
 .dataset-import-gallery-grid .thumb-missing::after {
@@ -657,14 +657,14 @@
     justify-content: center;
     color: var(--text-secondary);
     font-size: 12px;
-    background: linear-gradient(135deg, rgba(239,68,68,0.16), rgba(15,23,42,0.55));
+    background: rgba(var(--danger-rgb), 0.16);
 }
 .dataset-import-gallery-grid .import-thumb.flagged::after {
     content: '';
     position: absolute;
     inset: 0;
-    background: rgba(239, 68, 68, 0.3);
-    border: 2px solid rgba(239, 68, 68, 0.6);
+    background: rgba(var(--danger-rgb), 0.3);
+    border: 2px solid rgba(var(--danger-rgb), 0.6);
     border-radius: 6px;
 }
 
@@ -769,22 +769,22 @@
     width: 7px;
     height: 7px;
     border-radius: 50%;
-    background: #94a3b8;
+    background: #A6A6A6;
     content: '';
 }
 
-.dataset-readiness-state.state-checking::before { background: #38bdf8; }
-.dataset-readiness-state.state-ready::before { background: #34d399; }
-.dataset-readiness-state.state-warnings::before { background: #fbbf24; }
+.dataset-readiness-state.state-checking::before { background: #D29C5E; }
+.dataset-readiness-state.state-ready::before { background: var(--success); }
+.dataset-readiness-state.state-warnings::before { background: var(--warning); }
 .dataset-readiness-state.state-blocked::before,
 .dataset-readiness-state.state-error::before,
-.dataset-readiness-state.state-lost::before { background: #f87171; }
+.dataset-readiness-state.state-lost::before { background: #E58884; }
 .dataset-readiness-state.state-stale::before,
-.dataset-readiness-state.state-cancelled::before { background: #fb923c; }
+.dataset-readiness-state.state-cancelled::before { background: #D39F64; }
 
 .dataset-readiness-message,
 .dataset-readiness-counts {
-    color: var(--text-muted, #9ca3af);
+    color: var(--text-muted, #A6A6A6);
     font-size: 0.75rem;
     line-height: 1.35;
     overflow-wrap: anywhere;
@@ -800,7 +800,7 @@
     display: block;
     width: 0;
     height: 100%;
-    background: var(--accent-secondary, #38bdf8);
+    background: var(--accent-secondary, #D29C5E);
     transition: width 160ms ease;
 }
 
@@ -820,9 +820,9 @@
     gap: 2px;
     padding: 7px 8px;
     border: 0;
-    border-left: 3px solid #fbbf24;
+    border-left: 3px solid var(--warning);
     border-radius: 0;
-    background: rgba(251, 191, 36, 0.07);
+    background: rgba(var(--warning-rgb), 0.07);
     color: var(--text-primary);
     font: inherit;
     text-align: left;
@@ -833,16 +833,16 @@ button.dataset-readiness-issue {
 }
 
 button.dataset-readiness-issue:hover {
-    background: rgba(251, 191, 36, 0.13);
+    background: rgba(var(--warning-rgb), 0.13);
 }
 
 .dataset-readiness-issue.severity-blocker {
-    border-left-color: #f87171;
-    background: rgba(248, 113, 113, 0.08);
+    border-left-color: #E58884;
+    background: rgba(var(--danger-rgb), 0.08);
 }
 
 button.dataset-readiness-issue.severity-blocker:hover {
-    background: rgba(248, 113, 113, 0.14);
+    background: rgba(var(--danger-rgb), 0.14);
 }
 
 .dataset-readiness-issue strong,
@@ -903,7 +903,7 @@ button.dataset-readiness-issue.severity-blocker:hover {
 }
 .dataset-audit-summary-hint {
     flex: 1 1 auto;
-    color: var(--text-muted, #9ca3af);
+    color: var(--text-muted, #A6A6A6);
     font-size: 0.82rem;
 }
 
@@ -932,7 +932,7 @@ button.dataset-readiness-issue.severity-blocker:hover {
     padding: 10px;
     border: 1px solid var(--surface-border, rgba(255, 255, 255, 0.10));
     border-radius: 8px;
-    background: rgba(15, 23, 42, 0.45);
+    background: rgba(28, 28, 28, 0.45);
 }
 
 .dataset-audit-option-main {
@@ -960,7 +960,7 @@ button.dataset-readiness-issue.severity-blocker:hover {
 }
 
 .dataset-audit-option small {
-    color: var(--text-muted, #9ca3af);
+    color: var(--text-muted, #A6A6A6);
     font-size: 0.74rem;
     line-height: 1.35;
 }
@@ -1068,7 +1068,7 @@ button.dataset-readiness-issue.severity-blocker:hover {
     display: none !important;
 }
 .dataset-audit-status {
-    color: var(--text-muted, #9ca3af);
+    color: var(--text-muted, #A6A6A6);
     font-size: 0.82rem;
 }
 
@@ -1105,9 +1105,9 @@ button.dataset-readiness-issue.severity-blocker:hover {
     font-size: 0.78rem;
 }
 .dataset-audit-phash-status.is-error {
-    border: 1px solid rgba(239, 68, 68, 0.35);
-    background: rgba(239, 68, 68, 0.10);
-    color: #fecaca;
+    border: 1px solid rgba(var(--danger-rgb), 0.35);
+    background: rgba(var(--danger-rgb), 0.10);
+    color: #F5D4D3;
 }
 .dataset-audit-badge:hover { background: rgba(var(--accent-secondary-rgb), 0.22); }
 .dataset-audit-badge.active {
@@ -1122,14 +1122,14 @@ button.dataset-readiness-issue.severity-blocker:hover {
    caveat, not a clickable filter. */
 .dataset-audit-badge-limited {
     cursor: help;
-    background: rgba(245, 158, 11, 0.12);
-    border-color: rgba(245, 158, 11, 0.35);
-    color: #fde68a;
+    background: rgba(var(--accent-rgb), 0.12);
+    border-color: rgba(var(--accent-rgb), 0.35);
+    color: #EDD69A;
 }
-.dataset-audit-badge-limited:hover { background: rgba(245, 158, 11, 0.18); }
+.dataset-audit-badge-limited:hover { background: rgba(var(--accent-rgb), 0.18); }
 
 .dataset-audit-hint {
-    color: var(--text-muted, #9ca3af);
+    color: var(--text-muted, #A6A6A6);
     font-size: 0.78rem;
     margin: 0;
 }
@@ -1161,7 +1161,7 @@ button.dataset-readiness-issue.severity-blocker:hover {
 }
 
 .dataset-audit-next-warning {
-    color: #fed7aa;
+    color: #ECD6BC;
     font-size: 0.78rem;
     line-height: 1.45;
     margin: 0;
@@ -1215,7 +1215,7 @@ button.dataset-readiness-issue.severity-blocker:hover {
 .dataset-vocab-summary > :first-child { font-size: 1.05rem; }
 .dataset-vocab-count {
     margin-left: auto;
-    color: var(--text-muted, #9ca3af);
+    color: var(--text-muted, #A6A6A6);
     font-size: 0.78rem;
 }
 
@@ -1275,7 +1275,7 @@ button.dataset-readiness-issue.severity-blocker:hover {
 }
 
 .dataset-vocab-tag .dataset-vocab-tag-count {
-    color: var(--text-muted, #9ca3af);
+    color: var(--text-muted, #A6A6A6);
     font-size: 0.74rem;
 }
 
@@ -1290,7 +1290,7 @@ button.dataset-readiness-issue.severity-blocker:hover {
     padding: 0 7px;
     border-radius: 5px;
     border: 1px solid var(--surface-border, rgba(255, 255, 255, 0.12));
-    background: rgba(15, 23, 42, 0.78);
+    background: rgba(28, 28, 28, 0.78);
     color: var(--text-secondary);
     font-size: 0.72rem;
     line-height: 1;
@@ -1308,8 +1308,8 @@ button.dataset-readiness-issue.severity-blocker:hover {
     color: var(--text-primary);
 }
 .dataset-vocab-tag.state-blacklist {
-    background: rgba(239, 68, 68, 0.18);
-    border-color: rgba(239, 68, 68, 0.45);
+    background: rgba(var(--danger-rgb), 0.18);
+    border-color: rgba(var(--danger-rgb), 0.45);
     color: var(--text-primary);
     text-decoration: line-through;
 }
@@ -1325,8 +1325,8 @@ button.dataset-readiness-issue.severity-blocker:hover {
 }
 
 .dataset-vocab-action.active-blacklist {
-    background: rgba(239, 68, 68, 0.20);
-    border-color: rgba(239, 68, 68, 0.50);
+    background: rgba(var(--danger-rgb), 0.20);
+    border-color: rgba(var(--danger-rgb), 0.50);
     color: var(--text-primary);
 }
 
@@ -1371,13 +1371,13 @@ button.dataset-readiness-issue.severity-blocker:hover {
 }
 
 .dataset-pair-chip-plus {
-    color: var(--text-muted, #9ca3af);
+    color: var(--text-muted, #A6A6A6);
     font-weight: 600;
     flex-shrink: 0;
 }
 
 .dataset-pair-chip-suffix {
-    color: var(--text-muted, #9ca3af);
+    color: var(--text-muted, #A6A6A6);
     font-size: 0.76rem;
     flex-basis: 100%;
 }
@@ -1428,7 +1428,7 @@ button.dataset-readiness-issue.severity-blocker:hover {
 
 .dataset-confidence-summary-hint {
     margin-left: auto;
-    color: var(--text-muted, #9ca3af);
+    color: var(--text-muted, #A6A6A6);
     font-size: 0.78rem;
 }
 
@@ -1479,11 +1479,11 @@ button.dataset-readiness-issue.severity-blocker:hover {
     background: rgba(var(--accent-primary-rgb), 0.10);
 }
 .dataset-confidence-pill.conf-low {
-    border-color: rgba(239, 68, 68, 0.55);
-    background: rgba(239, 68, 68, 0.12);
+    border-color: rgba(var(--danger-rgb), 0.55);
+    background: rgba(var(--danger-rgb), 0.12);
 }
 .dataset-confidence-pill-conf {
-    color: var(--text-muted, #9ca3af);
+    color: var(--text-muted, #A6A6A6);
     font-size: 0.72rem;
     font-variant-numeric: tabular-nums;
 }
@@ -1500,7 +1500,7 @@ button.dataset-readiness-issue.severity-blocker:hover {
     font-size: 0.68rem;
 }
 .dataset-confidence-pill-x:hover {
-    background: rgba(239, 68, 68, 0.30);
+    background: rgba(var(--danger-rgb), 0.30);
     color: #fff;
 }
 
@@ -1518,7 +1518,6 @@ button.dataset-readiness-issue.severity-blocker:hover {
     padding: 2px 6px;
     min-width: unset;
     opacity: 0.7;
-    backdrop-filter: blur(4px);
     background: rgba(0,0,0,0.4);
     border-radius: 4px;
 }
@@ -1543,8 +1542,8 @@ button.dataset-readiness-issue.severity-blocker:hover {
     line-height: 1.4;
     white-space: pre-wrap;
     word-break: break-word;
-    background: var(--bg-surface, #1e293b);
-    border: 1px solid var(--border-color, #334155);
+    background: var(--bg-surface, #2C2C2C);
+    border: 1px solid var(--border-color, #444444);
     border-radius: 6px;
     box-shadow: 0 4px 12px rgba(0,0,0,0.3);
     z-index: 10;
@@ -1564,11 +1563,11 @@ button.dataset-readiness-issue.severity-blocker:hover {
 }
 .dataset-audit-remove-btn {
     margin-top: 4px;
-    color: var(--error, #ef4444);
-    border-color: rgba(239, 68, 68, 0.3);
+    color: var(--error, var(--danger));
+    border-color: rgba(var(--danger-rgb), 0.3);
 }
 .dataset-audit-remove-btn:hover {
-    background: rgba(239, 68, 68, 0.12);
+    background: rgba(var(--danger-rgb), 0.12);
 }
 
 @media (max-width: 640px) {
