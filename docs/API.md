@@ -629,7 +629,7 @@ Return `{ "active", "job_id", "job" }` for the running duplicate scan (if any) s
 Page through the last completed duplicate scan. Query: `offset`, `limit` (1-200). Returns `{ "available", "scanned_at", "threshold", "summary": { "embedded_count", "group_count", "redundant_count", "reclaimable_bytes" }, "groups": [{ "group_id", "similarity", "members": [{ "id", "path", "filename", "width", "height", "file_size", "aesthetic_score", "user_rating", "suggested_keep" }] }], "total_groups", "has_more" }`. Deletion reuses the existing delete endpoints.
 
 #### GET /api/metadata/health
-Per-generator prompt-parse coverage (metadata L3, v3.5.0). Returns `{ "generators": [{ "generator", "total", "missing_prompt", "with_raw" }], "totals": { "total", "missing_prompt", "with_raw" } }`. `missing_prompt` counts readable+unreadable rows with an empty positive prompt; `with_raw` counts rows carrying a stored raw metadata envelope (re-parseable without the original file). Drives the settings-page metadata health row.
+Per-generator text-parse coverage (metadata L3, v3.5.0). Returns `{ "generators": [{ "generator", "total", "missing_prompt", "missing_text", "with_raw" }], "totals": { "total", "missing_prompt", "missing_text", "with_raw" }, "scope": "readable_images", "excluded_unreadable" }`. Every counter describes the same population as the recovery job — readable rows only (`COALESCE(is_readable, 1) = 1`) — because these numbers sit beside the button that runs it: `missing_prompt` is exactly the set a run retries, `missing_text` (neither a prompt nor a sidecar caption) is the subset a run can still change, and `with_raw` counts rows carrying a stored raw metadata envelope (re-parseable without the original file). `excluded_unreadable` reports the indexed rows left out; whole-library composition is `GET /api/library-health`. Drives the settings-page metadata health row.
 
 #### POST /api/metadata/reparse
 Re-parse missing-prompt images through the current parser (metadata L3, v3.5.0). Body: `{ "scope": "missing_prompt" }` (only supported scope, 422 otherwise). For every readable image with an empty positive prompt, replays the gzipped raw metadata envelope stored at scan time first (`used_raw`), then falls back to fully re-parsing the file if it still exists (`used_file`); rows with neither count as `missing_source`. Runs as a bulk background job — poll `GET /api/bulk-jobs/{job_id}`; 409 while another re-parse runs. Job result: `{ "recovered", "still_missing", "used_raw", "used_file", "missing_source" }`.
@@ -899,9 +899,14 @@ Response includes:
     "actionable_count": 320
   },
   "issue_counts": {
-    "missing_prompt": 120,
+    "missing_text": 120,
+    "sd_missing_checkpoint": 14,
     "untagged": 240,
     "unreadable": 3
+  },
+  "statistics": {
+    "missing_prompt": 4180,
+    "missing_checkpoint": 4302
   },
   "duplicate_filenames": {
     "groups": 12,
@@ -913,6 +918,8 @@ Response includes:
   "recommendations": []
 }
 ```
+
+`issue_counts` is the actionable vocabulary — every key is something a user can do something about, and it is what feeds `summary.actionable_count`. `statistics` holds counts that are true but are not defects: `missing_prompt` and `missing_checkpoint` say how much of the library carries real SD generation parameters, which stays high forever for images Stable Diffusion never made. Their actionable counterparts are `issue_counts.missing_text` (neither a prompt nor a sidecar caption — the set the L3 recovery job can change) and `issue_counts.sd_missing_checkpoint` (readable rows a generator actually claimed that still record no model name). Do not render a `statistics` key as an issue or attach a fix to one.
 
 Clients should present this as guidance, not as an automatic cleanup operation. Use it to decide whether to re-import, re-parse, tag, or avoid flattening archives with duplicate filenames.
 
