@@ -5,11 +5,13 @@ Why this exists instead of ``tempfile``
 ``tempfile.NamedTemporaryFile(dir=target.parent)`` / ``tempfile.mkstemp(dir=...)``
 **cannot** be used to stage a write. On Windows ``mkstemp`` treats a
 ``PermissionError`` as "that random name is already taken" and retries up to
-``TMP_MAX`` (10,000) times, because ``os.access`` only inspects the read-only
-attribute and reports an ACL-protected folder such as ``C:\\Windows\\System32``
-as writable. Staging into a folder the process cannot write to therefore never
-returns — measured stalling a test for over 30 minutes — so a clean error turns
-into a hang, the one failure the user cannot even diagnose.
+``TMP_MAX`` — measured at 2,147,483,647 on the shipped interpreter, not the
+10,000 the docs imply, so the retry is effectively unbounded — because
+``os.access`` only inspects the read-only attribute and reports an ACL-protected
+folder such as ``C:\\Windows\\System32`` as writable. Staging into a folder the
+process cannot write to therefore never returns — measured stalling a test for
+over 30 minutes without finishing — so a clean error turns into a hang, the one
+failure the user cannot even diagnose.
 
 ``O_CREAT | O_EXCL`` surfaces the real error on the first attempt. The
 deterministic ``.<name>.tmp<suffix>`` name matches

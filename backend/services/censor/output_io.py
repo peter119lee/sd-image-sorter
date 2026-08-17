@@ -77,8 +77,9 @@ def _save_pillow_image_atomically(
 
     Staging goes through ``utils.atomic_staging`` rather than ``tempfile``: on
     Windows ``mkstemp`` reads a ``PermissionError`` as a name collision and
-    retries it up to 10,000 times, so aiming this writer at a folder it cannot
-    write to used to hang instead of failing. Publishing goes through the same
+    retries it up to ``TMP_MAX`` — 2,147,483,647 on the shipped interpreter, not
+    the 10,000 the docs imply — so aiming this writer at a folder it cannot write
+    to used to hang instead of failing. Publishing goes through the same
     module because ``os.replace`` severs a hard link — over a linked destination
     the alias would keep the UNcensored image, which is the opposite of what
     this feature exists to do.

@@ -7,6 +7,7 @@ import json
 import os
 import shutil
 import threading
+import tomllib
 from pathlib import Path
 from typing import Mapping, Sequence
 
@@ -40,6 +41,24 @@ def _anima_payload(sources: list[Path], output_folder: Path) -> dict[str, object
         "trainer_config": "anima_lora_toml",
         "mask_export": "none",
     }
+
+
+def _assigned_toml_keys(node: object) -> set[str]:
+    """Every key actually assigned in a parsed config, at any depth.
+
+    Substring checks against the rendered text cannot answer "is this key set":
+    the generated config explains ``class_tokens`` in a comment, and the spacing
+    around ``=`` is the writer's formatting rather than the contract.
+    """
+    keys: set[str] = set()
+    if isinstance(node, dict):
+        keys |= set(node)
+        for value in node.values():
+            keys |= _assigned_toml_keys(value)
+    elif isinstance(node, list):
+        for item in node:
+            keys |= _assigned_toml_keys(item)
+    return keys
 
 
 def _read_inventory(output_folder: Path) -> list[dict[str, object]]:
@@ -1801,8 +1820,9 @@ def test_kohya_masked_package_with_trigger_completes_and_verifies(
     body = response.json()
     assert body["package_status"] == "complete"
     config = (output_folder / "dataset_config.toml").read_text(encoding="utf-8")
-    assert "conditioning_data_dir" in config
-    assert "class_tokens =" not in config
+    assigned = _assigned_toml_keys(tomllib.loads(config))
+    assert "conditioning_data_dir" in assigned
+    assert "class_tokens" not in assigned
     verified = _verify_package(
         test_client,
         output_folder,

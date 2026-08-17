@@ -598,11 +598,13 @@ def _create_staging_file(target: Path) -> Tuple[Path, int]:
 
     ``tempfile.NamedTemporaryFile(dir=...)`` cannot be used here. On Windows
     ``mkstemp`` treats ``PermissionError`` as "that random name is already
-    taken" and retries up to ``TMP_MAX`` (10,000) times, because ``os.access``
-    only inspects the read-only attribute and reports an ACL-protected folder
-    such as ``C:\\Windows\\System32`` as writable. Saving into a folder the
-    process cannot write to therefore HANGS instead of failing, turning a clean
-    403 into a stuck request.
+    taken" and retries up to ``TMP_MAX`` — measured at 2,147,483,647 on the
+    shipped interpreter, not the 10,000 the docs imply, so the retry is
+    effectively unbounded — because ``os.access`` only inspects the read-only
+    attribute and reports an ACL-protected folder such as
+    ``C:\\Windows\\System32`` as writable. Saving into a folder the process
+    cannot write to therefore HANGS instead of failing, turning a clean 403 into
+    a stuck request.
 
     ``O_CREAT | O_EXCL`` surfaces the real error on the first attempt, and the
     deterministic name matches ``tag_export.sidecars._write_sidecar_atomically``.

@@ -232,9 +232,10 @@ class TestStagingCannotHangOnAnUnwritableFolder:
     """Staging must report an unwritable folder, not retry until the app stalls.
 
     ``tempfile.mkstemp`` treats a Windows ``PermissionError`` as "that random
-    name is taken" and retries up to ``TMP_MAX`` (10,000) times, because
-    ``os.access`` reports an ACL-protected folder as writable. Staging through
-    it turned a clean 403 into a request that never returned.
+    name is taken" and retries up to ``TMP_MAX`` — measured at 2,147,483,647 on
+    this interpreter, not the 10,000 the docs imply — because ``os.access``
+    reports an ACL-protected folder as writable. Staging through it turned a
+    clean 403 into a request that never returned.
     """
 
     def test_a_permission_error_is_not_retried(self, monkeypatch, tmp_path):

@@ -159,8 +159,9 @@ def _write_pillow_image_atomic(image: Image.Image, target: Path) -> None:
 
     Both steps go through ``utils.atomic_staging``: ``tempfile`` cannot be used
     to stage beside a destination because on Windows ``mkstemp`` reads a
-    ``PermissionError`` as a name collision and retries it up to 10,000 times,
-    so an output folder this process cannot write to used to hang the export job
+    ``PermissionError`` as a name collision and retries it up to ``TMP_MAX`` —
+    2,147,483,647 on the shipped interpreter, not the 10,000 the docs imply — so
+    an output folder this process cannot write to used to hang the export job
     instead of failing it.
 
     Every caller passes a staging path allocated by

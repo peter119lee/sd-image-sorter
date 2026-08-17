@@ -1,4 +1,4 @@
-"""Staging contracts for the two Pillow writers that publish beside a destination.
+"""Staging contracts for the writers that publish beside a user's destination.
 
 Two hazards, both measured on Windows and both closed by
 ``utils.atomic_staging``:
@@ -10,8 +10,8 @@ Two hazards, both measured on Windows and both closed by
    ACL-protected folder as writable. Staging an atomic write into a folder the
    process cannot write to therefore never returned. The tests below reproduce
    the mechanism by refusing every create in one directory and asserting the
-   ATTEMPT COUNT, which bounds the run instead of waiting out 10,000 real
-   syscalls.
+   ATTEMPT COUNT, which bounds the run instead of waiting out a retry loop with
+   no practical ceiling.
 2. ``os.replace`` publishes a new inode, which severs a hard link and leaves
    every other name for that file holding the pre-write bytes (dd11296).
 """
@@ -83,6 +83,21 @@ def _refuse_creates_in(
 
     monkeypatch.setattr(os, "open", guarded_open)
     return attempts
+
+
+def _watermark_config() -> Any:
+    """The publish tab's default text watermark, enabled."""
+    from services.watermark_service import TextWatermarkConfig
+
+    return TextWatermarkConfig(
+        enabled=True,
+        text="sample",
+        position="bottom_right",
+        opacity=80,
+        size_percent=8,
+        margin_percent=2,
+        color="#FFFFFF",
+    )
 
 
 class TestStagingNeverRetriesAnUnwritableFolder:
@@ -335,6 +350,47 @@ class TestStagingNeverRetriesAnUnwritableFolder:
         assert "PermissionError" in str(raised.value)
         assert target.read_text(encoding="utf-8") == kept
 
+    def test_the_watermark_export_reports_an_unwritable_folder(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        """A watermarked publish is the FIRST write into the folder the user picked.
+
+        ``publish_service.export_set`` calls ``os.makedirs(..., exist_ok=True)``,
+        which returns cleanly on an existing read-only folder, so the plain
+        ``shutil.copy2`` branch fails fast while this branch staged first and hung.
+        """
+        from services.watermark_service import (
+            WatermarkServiceError,
+            write_text_watermarked_copy,
+        )
+
+        locked = tmp_path / "publish-out"
+        locked.mkdir()
+        source = tmp_path / "source.png"
+        Image.new("RGB", (24, 24), color=(70, 80, 90)).save(source)
+        target = locked / "01.png"
+        kept = b"bytes the user already had"
+        target.write_bytes(kept)
+        attempts = _refuse_creates_in(
+            monkeypatch, locked, PermissionError(13, "Permission denied")
+        )
+
+        with pytest.raises(WatermarkServiceError) as raised:
+            write_text_watermarked_copy(str(source), str(target), _watermark_config())
+
+        assert len(attempts) == 1, (
+            f"the watermarked export retried an unwritable folder {len(attempts)} "
+            "times; the publish request would never return"
+        )
+        # The wrapper reports the refusal by message rather than by class name,
+        # so pin the cause's type as well as the text the user is shown.
+        assert isinstance(raised.value.__cause__, PermissionError)
+        assert "Permission denied" in str(raised.value)
+        assert target.read_bytes() == kept
+        assert not list(locked.glob(".01.png*")), (
+            "the refused export left a staging file in the user's folder"
+        )
+
 
 class TestPublishKeepsHardLinks:
     def test_saving_over_a_hardlinked_destination_keeps_the_link(
@@ -397,7 +453,10 @@ class TestPublishKeepsHardLinks:
         assert not list(tmp_path.glob(".*.bak")), (
             "the restored image left its backup behind"
         )
-        assert not list(tmp_path.glob(".restore.png.tmp*")), (
+        # Any dot-prefixed sibling, not just the current ``.tmp`` marker: a guard
+        # keyed on the staging name's own spelling stops checking the moment that
+        # spelling changes.
+        assert not list(tmp_path.glob(".restore.png*")), (
             "the failed save left its staging file behind"
         )
 
@@ -435,7 +494,7 @@ class TestPublishKeepsHardLinks:
         assert target.read_bytes() == published
         assert alias.read_bytes() == published
         assert not list(root.glob(".*.bak")), "a backup was left behind"
-        assert not list(root.glob(".row.png.tmp*")), "a staging file was left behind"
+        assert not list(root.glob(".row.png*")), "a staging file was left behind"
 
     def test_a_failed_package_copy_restores_the_previous_bytes_on_both_names(
         self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
@@ -476,7 +535,7 @@ class TestPublishKeepsHardLinks:
         assert not list(root.glob(".*.bak")), (
             "the restored file left its backup behind"
         )
-        assert not list(root.glob(".row.png.tmp*")), (
+        assert not list(root.glob(".row.png*")), (
             "the failed copy left its staging file behind"
         )
 
@@ -502,6 +561,90 @@ class TestPublishKeepsHardLinks:
         assert os.path.samefile(target, alias)
         assert alias.read_text(encoding="utf-8") == content
         assert not list(tmp_path.glob(".*.bak")), "a backup was left behind"
-        assert not list(tmp_path.glob(".dataset_config.toml.tmp*")), (
+        assert not list(tmp_path.glob(".dataset_config.toml*")), (
             "a staging file was left behind"
+        )
+
+    def test_watermarking_over_a_hardlinked_destination_keeps_the_link(
+        self, tmp_path: Path
+    ) -> None:
+        """A publish with ``overwrite`` lands on files the user already has.
+
+        ``publish_service.export_set`` writes fixed sequential names and only
+        skips an existing destination while ``overwrite`` is off, so re-publishing
+        a set republishes over the previous run's images — and hardlinking an
+        image set into a second folder is a real space-saving practice. A
+        rename-publish here would leave the alias holding the UNwatermarked copy,
+        the opposite of what the option was switched on for.
+        """
+        from services.watermark_service import write_text_watermarked_copy
+
+        source = tmp_path / "source.png"
+        Image.new("RGB", (24, 24), color=(70, 80, 90)).save(source)
+        target = tmp_path / "01.png"
+        original = b"bytes from the previous publish"
+        target.write_bytes(original)
+        alias = tmp_path / "01-alias.png"
+        try:
+            os.link(target, alias)
+        except (OSError, NotImplementedError, AttributeError) as exc:
+            pytest.skip(f"filesystem cannot create hard links: {exc}")
+
+        write_text_watermarked_copy(str(source), str(target), _watermark_config())
+
+        assert os.stat(target).st_nlink == 2, (
+            "the watermarked publish severed the user's hard link; the other name "
+            "kept the image without the watermark"
+        )
+        assert os.path.samefile(target, alias)
+        published = target.read_bytes()
+        assert published != original
+        assert alias.read_bytes() == published
+        with Image.open(alias) as opened:
+            assert opened.size == (24, 24)
+        assert not list(tmp_path.glob(".*.bak")), "a backup was left behind"
+        assert not list(tmp_path.glob(".01.png*")), "a staging file was left behind"
+
+    def test_a_failed_watermark_publish_restores_the_previous_image(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        from services.watermark_service import (
+            WatermarkServiceError,
+            write_text_watermarked_copy,
+        )
+
+        source = tmp_path / "source.png"
+        Image.new("RGB", (24, 24), color=(70, 80, 90)).save(source)
+        target = tmp_path / "01.png"
+        original = b"bytes from the previous publish"
+        target.write_bytes(original)
+        alias = tmp_path / "01-alias.png"
+        try:
+            os.link(target, alias)
+        except (OSError, NotImplementedError, AttributeError) as exc:
+            pytest.skip(f"filesystem cannot create hard links: {exc}")
+
+        real_overwrite = atomic_staging._overwrite_in_place
+        calls: List[Path] = []
+
+        def failing_overwrite(destination: Path, staged: Path) -> None:
+            calls.append(staged)
+            if len(calls) == 1:
+                raise OSError(5, "simulated device failure")
+            real_overwrite(destination, staged)
+
+        monkeypatch.setattr(atomic_staging, "_overwrite_in_place", failing_overwrite)
+
+        with pytest.raises(WatermarkServiceError):
+            write_text_watermarked_copy(str(source), str(target), _watermark_config())
+
+        assert target.read_bytes() == original
+        assert alias.read_bytes() == original
+        assert os.stat(target).st_nlink == 2
+        assert os.path.samefile(target, alias)
+        assert not list(tmp_path.glob(".*.bak")), (
+            "the restored image left its backup behind"
+        )
+        assert not list(tmp_path.glob(".01.png*")), (
+            "the failed publish left its staging file behind"
         )

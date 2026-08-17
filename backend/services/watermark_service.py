@@ -4,10 +4,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import os
-import tempfile
-from typing import Literal
+from pathlib import Path
+from typing import Literal, Optional
 
 from PIL import Image, ImageColor, ImageDraw, ImageFont
+
+from utils.atomic_staging import (
+    create_staging_sibling,
+    discard_staging_file,
+    publish_staging_file,
+)
 
 
 WatermarkPosition = Literal[
@@ -197,7 +203,23 @@ def write_text_watermarked_copy(
     destination_path: str,
     config: TextWatermarkConfig,
 ) -> None:
-    """Render a text watermark into a destination without touching the source."""
+    """Render a text watermark into a destination without touching the source.
+
+    Staging and publishing both go through ``utils.atomic_staging``.
+    ``tempfile.mkstemp(dir=...)`` cannot stage here: ``publish_service`` aims this
+    writer at the folder the user picked for a publish, and its
+    ``os.makedirs(..., exist_ok=True)`` returns cleanly on an existing read-only
+    folder, so this was the FIRST write into that folder — and ``mkstemp`` read
+    the folder's refusal as a name collision and retried it up to
+    ``tempfile.TMP_MAX`` (2,147,483,647 on the shipped interpreter), turning a
+    per-image error into an export that never answered. The plain copy branch
+    beside this one failed fast all along.
+
+    Publishing is shared for the same reason as the censor writer: sequential
+    output names plus ``overwrite`` mean this lands on images the user already
+    has, and a bare ``os.replace`` would sever a hard link and leave the alias
+    holding the copy WITHOUT the watermark (``dd11296``).
+    """
     source = os.path.abspath(source_path)
     destination = os.path.abspath(destination_path)
     if os.path.exists(destination):
@@ -224,7 +246,8 @@ def write_text_watermarked_copy(
         raise WatermarkServiceError(
             f"watermark export does not support image extension {suffix!r}"
         )
-    temporary_path: str | None = None
+    destination_path = Path(destination)
+    staging_path: Optional[Path] = None
     try:
         with Image.open(source) as opened:
             opened.load()
@@ -233,12 +256,6 @@ def write_text_watermarked_copy(
                 transformed = transformed.convert("RGB")
             elif image_format == "PNG":
                 transformed = transformed.convert("RGBA")
-            fd, temporary_path = tempfile.mkstemp(
-                prefix=f".{os.path.basename(destination)}.",
-                suffix=suffix,
-                dir=parent,
-            )
-            os.close(fd)
             save_options: dict[str, int | bool] = {}
             if image_format == "JPEG":
                 save_options = {"quality": 95, "subsampling": 0, "optimize": True}
@@ -246,19 +263,28 @@ def write_text_watermarked_copy(
                 save_options = {"compress_level": 9, "optimize": True}
             elif image_format == "WEBP":
                 save_options = {"lossless": True, "quality": 100, "method": 6}
-            transformed.save(temporary_path, format=image_format, **save_options)
-        os.replace(temporary_path, destination)
-        temporary_path = None
+            staging_path, descriptor = create_staging_sibling(destination_path)
+            try:
+                handle = os.fdopen(descriptor, "wb")
+            except BaseException:
+                os.close(descriptor)
+                raise
+            with handle:
+                transformed.save(handle, format=image_format, **save_options)
+                handle.flush()
+                try:
+                    os.fsync(handle.fileno())
+                except OSError:
+                    pass
+        publish_staging_file(staging_path, destination_path)
+        staging_path = None
     except (OSError, ValueError) as exc:
         raise WatermarkServiceError(
             f"failed to write watermarked image: source={source!r}, destination={destination!r}, error={exc}"
         ) from exc
     finally:
-        if temporary_path is not None:
-            try:
-                os.unlink(temporary_path)
-            except OSError:
-                pass
+        if staging_path is not None:
+            discard_staging_file(staging_path)
 
 
 def _region_box(
