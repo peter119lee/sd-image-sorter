@@ -2893,6 +2893,113 @@ def test_multi_tagger_krea_profile_all_caption_failures_end_failed(monkeypatch) 
     assert provider_error in job.message
 
 
+_TAGGER_LOAD_ERROR = (
+    "Download failed for model.onnx via huggingface.co and hf-mirror.com: "
+    "offline"
+)
+
+
+class _UnloadableTagger:
+    """Tagger whose weights cannot be loaded (not downloaded / no network)."""
+
+    def __init__(self, model_name: str) -> None:
+        self.model_name = model_name
+
+    def load(self) -> None:
+        raise RuntimeError(_TAGGER_LOAD_ERROR)
+
+
+def test_multi_tagger_load_failure_is_reported_not_counted_as_success(
+    monkeypatch,
+) -> None:
+    """A run whose only tagger cannot load must not report success.
+
+    Real trigger: the model was never prepared, or HuggingFace *and* the
+    hf-mirror.com fallback are unreachable, so ``load()`` raises. The user
+    used to get status ``completed`` / "Done. 2 ok, 0 failed." with zero
+    tags written and the reason only in a log line they never see.
+    """
+    persisted = []
+    monkeypatch.setattr(
+        smart_tag_service,
+        "_append_caption_result",
+        lambda job, path, caption, booru_text, nl_text: persisted.append(path),
+    )
+    monkeypatch.setattr(
+        smart_tag_service,
+        "_resolve_tagger_by_model",
+        lambda model_name, **_kwargs: _UnloadableTagger(model_name),
+    )
+
+    job = SmartTagJobState(job_id="multi-tagger-load-failure")
+    req = SmartTagRequest(
+        image_paths=["/tmp/load-fail-0.png", "/tmp/load-fail-1.png"],
+        enable_wd14=True,
+        enable_vlm=False,
+        taggers=[
+            {
+                "model": "wd-swinv2-tagger-v3",
+                "general_threshold": 0.35,
+                "character_threshold": 0.85,
+            }
+        ],
+        consensus_min=1,
+    )
+
+    smart_tag_service._run_pipeline(job, req)
+
+    # The user-visible outcome, not an internal counter: the job is not a
+    # success, nothing was written, and the reason reaches the message.
+    assert job.status == "failed"
+    assert job.succeeded == 0
+    assert persisted == []
+    assert "wd-swinv2-tagger-v3" in job.message
+    assert _TAGGER_LOAD_ERROR in job.message
+
+
+def test_multi_tagger_partial_load_failure_warns_and_names_the_model(
+    monkeypatch,
+) -> None:
+    """One of two requested taggers failing to load is a degraded run.
+
+    The images do get tags (from the tagger that loaded), so this is the
+    existing ``warning`` status rather than ``failed`` — but "Done. 2 ok,
+    0 failed." on its own would hide that half the requested models never
+    ran and therefore that the consensus is not what was asked for.
+    """
+    monkeypatch.setattr(
+        smart_tag_service,
+        "_append_caption_result",
+        lambda job, path, caption, booru_text, nl_text: None,
+    )
+
+    def fake_resolve(model_name, **_kwargs):
+        if model_name == "tagger-b":
+            return _UnloadableTagger(model_name)
+        return _FakeBatchTagger(model_name)
+
+    monkeypatch.setattr(smart_tag_service, "_resolve_tagger_by_model", fake_resolve)
+
+    job = SmartTagJobState(job_id="multi-tagger-partial-load-failure")
+    req = SmartTagRequest(
+        image_paths=["/tmp/partial-load-0.png", "/tmp/partial-load-1.png"],
+        enable_wd14=True,
+        enable_vlm=False,
+        taggers=[
+            {"model": "tagger-a", "general_threshold": 0.35},
+            {"model": "tagger-b", "general_threshold": 0.35},
+        ],
+        consensus_min=1,
+    )
+
+    smart_tag_service._run_pipeline(job, req)
+
+    assert job.status == "warning"
+    assert job.succeeded == 2
+    assert "tagger-b" in job.message
+    assert any("tagger-b" in error.get("error", "") for error in job.errors)
+
+
 # ---------------------------------------------------------------------------
 # Job hygiene: registry pruning + results-file cleanup + total-failure handling
 # ---------------------------------------------------------------------------

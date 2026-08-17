@@ -34,6 +34,7 @@ from services.smart_tag.consensus import compute_consensus_tags
 from services.smart_tag.jobs import (
     SmartTagJobState,
     _fail_missing_source,
+    _record_job_error,
 )
 from services.smart_tag.pipeline_stages import (
     _process_one_image as _process_one_image,  # re-export: facade + test surface
@@ -230,6 +231,21 @@ def _run_windowed_pipeline(
         _run_caption_phase(job, req, items, ctx)
 
     job.status, job.message = _terminal_job_outcome(job, req)
+
+
+# How many failed model names to spell out before summarising the rest, so a
+# ten-tagger run cannot turn the job message into a wall of stack text.
+_TAGGER_LOAD_ERROR_NAMES_IN_MESSAGE = 3
+
+
+def _describe_tagger_load_failures(failures: List[Tuple[str, str]]) -> str:
+    """Render "model: reason" for the first few failed loads."""
+    shown = failures[:_TAGGER_LOAD_ERROR_NAMES_IN_MESSAGE]
+    detail = "; ".join(f"{model}: {reason}" for model, reason in shown)
+    remaining = len(failures) - len(shown)
+    if remaining > 0:
+        detail = f"{detail}; and {remaining} more"
+    return detail
 
 
 def _persist_booru_only(
@@ -480,6 +496,10 @@ def _run_pipeline(job: SmartTagJobState, req: SmartTagRequest) -> None:
             tagger_count = len(req.taggers)
             total_tagger_steps = max(1, len(all_sources) * tagger_count)
             used_taggers: List[Any] = []
+            # (model, reason) for every tagger whose weights would not load.
+            # A model that never loaded contributes no tags, so the run must
+            # not present its empty output as a success.
+            tagger_load_failures: List[Tuple[str, str]] = []
 
             for tagger_idx, entry in enumerate(req.taggers):
                 if job.cancel_requested:
@@ -506,6 +526,12 @@ def _run_pipeline(job: SmartTagJobState, req: SmartTagRequest) -> None:
                     used_taggers.append(one_tagger)
                 except Exception as exc:  # noqa: BLE001
                     logger.warning("smart-tag: failed to load tagger %s: %s", model_name, exc)
+                    tagger_load_failures.append((model_name, str(exc)))
+                    _record_job_error(
+                        job,
+                        f"tagger:{model_name}",
+                        f"Could not load tagger {model_name}: {exc}",
+                    )
                     continue
 
                 tagger_batch_size = _recommended_tag_batch_size(
@@ -552,6 +578,18 @@ def _run_pipeline(job: SmartTagJobState, req: SmartTagRequest) -> None:
                     job.phase_completion = min(1.0, steps_done / total_tagger_steps)
                     job.processed = job.skipped + min(len(all_sources), steps_done // tagger_count)
                     job.message = f"Tagging ({model_name}) {images_done}/{len(all_sources)}"
+
+            if tagger_load_failures and not used_taggers and not job.cancel_requested:
+                # Not one requested model loaded, so the booru phase produced
+                # nothing for any image. Fail the way the single-tagger path
+                # already does — there _resolve_tagger()/load() raises into the
+                # _run_pipeline handler — instead of persisting empty tag sets
+                # and counting each one as a success.
+                raise RuntimeError(
+                    f"Could not load any of the {tagger_count} selected tagger "
+                    "model(s), so no tags were written. "
+                    f"{_describe_tagger_load_failures(tagger_load_failures)}"
+                )
 
             if job.cancel_requested:
                 job.status = "cancelled"
@@ -624,7 +662,19 @@ def _run_pipeline(job: SmartTagJobState, req: SmartTagRequest) -> None:
                         ctx,
                     )
 
-                job.status, job.message = _terminal_job_outcome(job, req)
+                # Some models loaded and some did not: the images were tagged,
+                # but by fewer models than the user selected, so the consensus
+                # is not the one they asked for. Downgrade the clean success.
+                degraded_reason = ""
+                if tagger_load_failures:
+                    degraded_reason = (
+                        f"{len(tagger_load_failures)} of {tagger_count} selected "
+                        "tagger model(s) could not be loaded and contributed no "
+                        f"tags: {_describe_tagger_load_failures(tagger_load_failures)}"
+                    )
+                job.status, job.message = _terminal_job_outcome(
+                    job, req, degraded_reason=degraded_reason
+                )
         elif req.enable_vlm and req.natural_language_mode == "toriigate":
             # Single-tagger + local ToriiGate: two-phase (tag all → release
             # booru session → load ToriiGate → caption all) so the two heavy

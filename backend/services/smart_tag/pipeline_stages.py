@@ -52,8 +52,16 @@ logger = logging.getLogger("services.smart_tag_service")
 def _terminal_job_outcome(
     job: SmartTagJobState,
     req: SmartTagRequest,
+    *,
+    degraded_reason: str = "",
 ) -> Tuple[str, str]:
-    """Return the terminal status and user-facing message without mutating state."""
+    """Return the terminal status and user-facing message without mutating state.
+
+    ``degraded_reason`` describes work the run was asked to do but could not
+    (currently: a selected tagger model that would not load). Every image may
+    still have been persisted, so this is not a per-image failure — but it
+    must stop the run from reporting an unqualified success.
+    """
     if job.cancel_requested:
         return "cancelled", "Cancelled by user."
     if job.status != "running":
@@ -80,8 +88,9 @@ def _terminal_job_outcome(
             "failed",
             f"Smart Tag failed for all {job.failed} image(s).{detail}",
         )
-    if job.failed > 0:
-        return "warning", f"Completed with warning. {_completion_message(job)}"
+    suffix = f" {degraded_reason}" if degraded_reason else ""
+    if job.failed > 0 or degraded_reason:
+        return "warning", f"Completed with warning. {_completion_message(job)}{suffix}"
     return "completed", _completion_message(job)
 
 
