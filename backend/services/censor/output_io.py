@@ -21,7 +21,6 @@ import base64
 import binascii
 import logging
 import os
-import tempfile
 from io import BytesIO
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional
@@ -32,6 +31,11 @@ from PIL import Image, PngImagePlugin
 import database as db
 from services.image_metadata_writer import prepare_image_for_save
 from services.indexed_file_mutation_service import save_and_reconcile_checked
+from utils.atomic_staging import (
+    create_staging_sibling,
+    discard_staging_file,
+    publish_staging_file,
+)
 from utils.source_paths import resolve_existing_indexed_image_path
 
 if TYPE_CHECKING:  # annotation-only; never imported at runtime (no facade cycle)
@@ -65,40 +69,44 @@ def _save_pillow_image_atomically(
     image_format: str,
     save_kwargs: Dict[str, object],
 ) -> None:
-    """Encode to a sibling temp file, then publish it with ``os.replace``.
+    """Encode to a sibling staging file, then publish it over the destination.
 
     ``Image.save`` opens the destination with ``w+b`` and only removes the file
     on failure when it created it, so encoding straight at the destination left
     an overwritten original truncated to 0 bytes with no backup and no undo.
-    Same temp-then-replace convention as ``image_manager._copy_file_atomically``
-    and ``dataset_export.engine._write_pillow_image_atomic``.
+
+    Staging goes through ``utils.atomic_staging`` rather than ``tempfile``: on
+    Windows ``mkstemp`` reads a ``PermissionError`` as a name collision and
+    retries it up to 10,000 times, so aiming this writer at a folder it cannot
+    write to used to hang instead of failing. Publishing goes through the same
+    module because ``os.replace`` severs a hard link — over a linked destination
+    the alias would keep the UNcensored image, which is the opposite of what
+    this feature exists to do.
     """
     target = Path(output_path)
     target.parent.mkdir(parents=True, exist_ok=True)
-    temp_path: Optional[Path] = None
+    staging, descriptor = create_staging_sibling(target)
     try:
-        with tempfile.NamedTemporaryFile(
-            mode="w+b",
-            prefix=f".{target.name}.",
-            suffix=target.suffix or ".tmp",
-            dir=str(target.parent),
-            delete=False,
-        ) as handle:
-            temp_path = Path(handle.name)
+        handle = os.fdopen(descriptor, "wb")
+    except BaseException:
+        try:
+            os.close(descriptor)
+        except OSError:
+            pass
+        discard_staging_file(staging)
+        raise
+    try:
+        with handle:
             image.save(handle, format=image_format, **save_kwargs)
             handle.flush()
             try:
                 os.fsync(handle.fileno())
             except OSError:
                 pass
-        os.replace(str(temp_path), str(target))
-        temp_path = None
-    finally:
-        if temp_path is not None:
-            try:
-                temp_path.unlink(missing_ok=True)
-            except OSError:
-                pass
+        publish_staging_file(staging, target)
+    except BaseException:
+        discard_staging_file(staging)
+        raise
 
 
 def _resolve_censor_output_format(source_format: Optional[str]) -> tuple[CensorOutputFormat, str]:

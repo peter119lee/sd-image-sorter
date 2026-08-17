@@ -718,9 +718,15 @@ def test_backup_cleanup_warning_is_returned_by_the_export(
         path: Path,
         missing_ok: bool = False,
     ) -> None:
+        # Identified by what makes it a backup — a dot-prefixed sibling of the
+        # caption target still holding the PREVIOUS caption. The former
+        # ``.subject.txt.row-`` infix was only ``tempfile``'s random-name
+        # prefix; row staging moved to utils.atomic_staging's deterministic
+        # ``.tmp`` names when tempfile's Windows retry storm was removed, so
+        # that infix was a value-of-the-moment and never the contract.
         if (
             path.suffix == ".txt"
-            and path.name.startswith(".subject.txt.row-")
+            and path.name.startswith(f".{existing_caption.name}")
             and path.exists()
             and path.read_text(encoding="utf-8") == "old caption"
         ):
