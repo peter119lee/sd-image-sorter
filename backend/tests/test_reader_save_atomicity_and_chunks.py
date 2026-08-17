@@ -1,0 +1,291 @@
+"""Reader metadata save: crash safety, embedded-chunk preservation, animation.
+
+Three defects this pins, all reproduced before the fix:
+
+R1 (P0) ``services/image/serving.py`` ``_write_edited_image`` handed the final
+    destination straight to ``Image.save``, which opens it ``w+b`` and therefore
+    truncates it before the first new byte exists. An interrupted overwrite left
+    the user's own image as undecodable garbage with no backup. Every other
+    user-file writer here stages a temp sibling and publishes with
+    ``os.replace`` (``dataset_export.engine._write_pillow_image_atomic``).
+
+Fault-injection note: patch the ``Image.SAVE`` / ``Image.SAVE_ALL`` **registry
+entry**, never ``PngImagePlugin._save``. The registries captured the original
+function object at import, so a module-attribute patch injects nothing and the
+bug looks absent. Same class of trap as ``shutil.copy2`` routing through
+``_winapi.CopyFile2`` on Windows CPython 3.12.
+"""
+from __future__ import annotations
+
+import json
+import os
+from pathlib import Path
+
+import pytest
+from PIL import Image, ImageDraw
+from PIL.PngImagePlugin import PngInfo
+
+import metadata_parser
+
+
+COMFY_API_GRAPH = {
+    "3": {
+        "class_type": "KSampler",
+        "inputs": {"seed": 42, "steps": 20, "cfg": 7.0, "positive": ["6", 0], "negative": ["7", 0]},
+    },
+    "4": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": "anima_v3.safetensors"}},
+    "6": {"class_type": "CLIPTextEncode", "inputs": {"text": "ORIGINAL comfy positive"}},
+    "7": {"class_type": "CLIPTextEncode", "inputs": {"text": "ORIGINAL comfy negative"}},
+}
+COMFY_UI_GRAPH = {"last_node_id": 9, "nodes": [{"id": 3, "type": "KSampler"}], "links": []}
+NAI_COMMENT = {
+    "prompt": "ORIGINAL nai positive",
+    "uc": "ORIGINAL nai negative",
+    "steps": 28,
+    "sampler": "k_euler_ancestral",
+    "seed": 111222333,
+}
+WEBUI_PARAMETERS = (
+    "ORIGINAL webui prompt\n"
+    "Negative prompt: ORIGINAL webui negative\n"
+    "Steps: 20, Sampler: Euler a, CFG scale: 7, Seed: 42, Size: 32x32, Model: anima_v3"
+)
+
+
+# ---------------------------------------------------------------------------
+# helpers
+# ---------------------------------------------------------------------------
+
+def _write_png(path: Path, chunks: dict[str, str], *, size: tuple[int, int] = (32, 32)) -> Path:
+    image = Image.new("RGB", size, (10, 20, 30))
+    info = PngInfo()
+    for key, value in chunks.items():
+        info.add_text(key, value)
+    image.save(path, pnginfo=info)
+    return path
+
+
+def _animation_frames(count: int, *, mode: str = "RGB") -> list[Image.Image]:
+    frames = []
+    for index in range(count):
+        frame = Image.new("RGB", (32, 32), (0, 0, 0))
+        draw = ImageDraw.Draw(frame)
+        draw.rectangle([index * 5, index * 5, index * 5 + 9, index * 5 + 9], fill=(255, 40 * index, 10))
+        if mode == "P":
+            frame = frame.convert("P", palette=Image.Palette.ADAPTIVE)
+        frames.append(frame)
+    return frames
+
+
+def _write_animation(path: Path, count: int, *, mode: str = "RGB", pnginfo: PngInfo | None = None) -> Path:
+    frames = _animation_frames(count, mode=mode)
+    extra = {"pnginfo": pnginfo} if pnginfo is not None else {}
+    frames[0].save(path, save_all=True, append_images=frames[1:], duration=120, loop=0, **extra)
+    return path
+
+
+def _frame_count(path: Path) -> int:
+    with Image.open(path) as image:
+        return getattr(image, "n_frames", 1)
+
+
+def _text_chunks(path: Path) -> dict[str, str]:
+    with Image.open(path) as image:
+        return {key: value for key, value in image.info.items() if isinstance(value, str)}
+
+
+def _reparse_chunk_through_app_parser(tmp_path: Path, name: str, chunks: dict[str, str]) -> dict:
+    """Re-parse harvested chunks in isolation with the app's own parser.
+
+    A preserved chunk is only worth anything if the app can still READ it. The
+    saved file's own parse is dominated by the edited ``parameters`` block, so
+    the surviving generation record is carried into a probe PNG and parsed
+    there — proving it is still a machine-readable workflow, not just a string
+    that happens to sit in the file.
+    """
+    probe = _write_png(tmp_path / name, chunks)
+    return metadata_parser.parse_image(str(probe))
+
+
+def _inject_encode_failure(monkeypatch, pil_format: str = "PNG", *, animated: bool = False) -> None:
+    """Make Pillow fail part-way through encoding.
+
+    Patches the SAVE registry entry, which is what ``Image.save`` dispatches
+    through. ``monkeypatch.setitem`` restores it after the test.
+    """
+    Image.init()
+    registry = Image.SAVE_ALL if animated else Image.SAVE
+    assert pil_format in registry, f"{pil_format} missing from {'SAVE_ALL' if animated else 'SAVE'}"
+
+    def exploding_encoder(image, fp, filename, **kwargs):
+        fp.write(b"\x89PNG\r\n\x1a\n" + b"truncated-garbage" * 64)
+        raise OSError(28, "No space left on device")
+
+    monkeypatch.setitem(registry, pil_format, exploding_encoder)
+
+
+def _post_save(test_client, source: Path, output: Path, fmt: str, metadata: dict, *, overwrite: bool):
+    return test_client.post(
+        "/api/image-metadata/save-edited",
+        json={
+            "source_path": str(source),
+            "output_path": str(output),
+            "format": fmt,
+            "metadata": metadata,
+            "allow_overwrite": overwrite,
+        },
+    )
+
+
+# ---------------------------------------------------------------------------
+# R1 — a failed save must not destroy the file it was overwriting
+# ---------------------------------------------------------------------------
+
+class TestFailedSaveLeavesTheOriginalIntact:
+    def test_interrupted_overwrite_leaves_the_original_byte_identical(
+        self, test_client, tmp_path, monkeypatch
+    ):
+        source = _write_png(
+            tmp_path / "victim.png",
+            {"parameters": WEBUI_PARAMETERS, "workflow": json.dumps(COMFY_UI_GRAPH)},
+        )
+        original_bytes = source.read_bytes()
+
+        _inject_encode_failure(monkeypatch)
+        response = _post_save(
+            test_client, source, source, "png", {"prompt": "edited prompt"}, overwrite=True
+        )
+
+        assert response.status_code == 400, response.text
+        assert source.exists(), "the user's image was removed entirely"
+        assert source.read_bytes() == original_bytes, (
+            "a failed save rewrote the user's original image; it must be untouched"
+        )
+        # Still a real image, and still the SAME image, per the app's own parser.
+        reparsed = metadata_parser.parse_image(str(source))
+        assert reparsed.get("parse_error") in (None, ""), reparsed.get("parse_error")
+        assert reparsed["prompt"] == "ORIGINAL webui prompt"
+
+    def test_interrupted_overwrite_leaves_no_staging_files_behind(
+        self, test_client, tmp_path, monkeypatch
+    ):
+        folder = tmp_path / "library"
+        folder.mkdir()
+        source = _write_png(folder / "victim.png", {"parameters": WEBUI_PARAMETERS})
+
+        _inject_encode_failure(monkeypatch)
+        _post_save(test_client, source, source, "png", {"prompt": "edited"}, overwrite=True)
+
+        assert sorted(entry.name for entry in folder.iterdir()) == ["victim.png"], (
+            "a temp sibling or backup was abandoned in the user's own image folder"
+        )
+
+    def test_interrupted_overwrite_of_a_hardlinked_image_keeps_both_names_readable(
+        self, test_client, tmp_path, monkeypatch
+    ):
+        source = _write_png(tmp_path / "linked.png", {"parameters": WEBUI_PARAMETERS})
+        alias = tmp_path / "linked-alias.png"
+        try:
+            os.link(source, alias)
+        except (OSError, NotImplementedError, AttributeError) as exc:
+            pytest.skip(f"filesystem cannot create hard links: {exc}")
+
+        original_bytes = source.read_bytes()
+        _inject_encode_failure(monkeypatch)
+        _post_save(test_client, source, source, "png", {"prompt": "edited"}, overwrite=True)
+
+        assert source.read_bytes() == original_bytes
+        assert alias.read_bytes() == original_bytes
+        assert metadata_parser.parse_image(str(alias))["prompt"] == "ORIGINAL webui prompt"
+
+    def test_successful_overwrite_of_a_hardlinked_image_keeps_the_link(
+        self, test_client, tmp_path
+    ):
+        source = _write_png(tmp_path / "shared.png", {"parameters": WEBUI_PARAMETERS})
+        alias = tmp_path / "shared-alias.png"
+        try:
+            os.link(source, alias)
+        except (OSError, NotImplementedError, AttributeError) as exc:
+            pytest.skip(f"filesystem cannot create hard links: {exc}")
+
+        response = _post_save(
+            test_client, source, source, "png", {"prompt": "edited prompt", "steps": 20},
+            overwrite=True,
+        )
+        assert response.status_code == 200, response.text
+
+        # Publishing a new inode would leave the alias holding the stale image.
+        assert os.path.samefile(source, alias), (
+            "the save severed the user's hard link; the other name kept stale metadata"
+        )
+        assert metadata_parser.parse_image(str(alias))["prompt"] == "edited prompt"
+
+
+class TestStagingCannotHangOnAnUnwritableFolder:
+    """Staging must report an unwritable folder, not retry until the app stalls.
+
+    ``tempfile.mkstemp`` treats a Windows ``PermissionError`` as "that random
+    name is taken" and retries up to ``TMP_MAX`` (10,000) times, because
+    ``os.access`` reports an ACL-protected folder as writable. Staging through
+    it turned a clean 403 into a request that never returned.
+    """
+
+    def test_a_permission_error_is_not_retried(self, monkeypatch, tmp_path):
+        from services import image_metadata_writer
+
+        attempts = []
+
+        def refusing_open(path, flags, *args, **kwargs):
+            attempts.append(path)
+            raise PermissionError(13, "Permission denied")
+
+        monkeypatch.setattr(image_metadata_writer.os, "open", refusing_open)
+        with pytest.raises(PermissionError):
+            image_metadata_writer._create_staging_file(tmp_path / "target.png")
+
+        assert len(attempts) == 1, (
+            f"a permission error was retried {len(attempts)} times; an unwritable "
+            "destination folder must fail immediately, not stall the save"
+        )
+
+    def test_the_staging_name_search_is_bounded(self, monkeypatch, tmp_path):
+        from services import image_metadata_writer
+
+        attempts = []
+
+        def always_taken(path, flags, *args, **kwargs):
+            attempts.append(path)
+            raise FileExistsError(17, "File exists")
+
+        monkeypatch.setattr(image_metadata_writer.os, "open", always_taken)
+        with pytest.raises(FileExistsError):
+            image_metadata_writer._create_staging_file(tmp_path / "target.png")
+
+        assert len(attempts) == image_metadata_writer.STAGING_NAME_ATTEMPTS
+        assert len(set(attempts)) == len(attempts), "the search reused a name"
+
+    def test_an_unwritable_destination_still_fails_fast_end_to_end(
+        self, test_client, tmp_path
+    ):
+        import platform
+        import time
+
+        source = _write_png(tmp_path / "src.png", {"parameters": WEBUI_PARAMETERS})
+        unwritable = (
+            "C:\\Windows\\System32\\readerfix-guard.png"
+            if platform.system() == "Windows"
+            else "/proc/readerfix-guard.png"
+        )
+
+        started = time.monotonic()
+        response = _post_save(
+            test_client, source, Path(unwritable), "png", {"prompt": "edited"},
+            overwrite=True,
+        )
+        elapsed = time.monotonic() - started
+
+        assert response.status_code in (400, 403), response.text
+        assert elapsed < 60, (
+            f"the save took {elapsed:.0f}s to reject an unwritable folder; "
+            "staging is retrying instead of reporting the error"
+        )

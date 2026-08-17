@@ -37,6 +37,7 @@ from services.image_metadata_writer import (
     build_sd_parameters_text,
     normalize_edited_metadata,
     prepare_image_for_save,
+    write_image_atomically,
 )
 from thumbnail_cache import (
     generate_placeholder_thumbnail,
@@ -217,6 +218,11 @@ class ServingMixin:
             warnings.append(JPEG_LIMITATION_WARNING)
 
         def _write_edited_image(final_output_path: str, _overwrite_requested: bool) -> None:
+            # Everything the write needs is detached from the source inside this
+            # block, so the source handle is released before the publish below.
+            # An in-place overwrite replaces the very file just read, and
+            # os.replace needs FILE_SHARE_DELETE on every open handle — which
+            # the Windows CRT does not grant.
             with Image.open(source) as image:
                 save_image = prepare_image_for_save(image, pil_format, warnings)
                 save_kwargs: Dict[str, Any] = {}
@@ -232,10 +238,10 @@ class ServingMixin:
                         save_kwargs["exif"] = exif_bytes
                     save_kwargs["quality"] = int(quality if quality is not None else (92 if pil_format == "JPEG" else 95))
 
-                try:
-                    save_image.save(final_output_path, format=pil_format, **save_kwargs)
-                finally:
-                    save_image.close()
+            try:
+                write_image_atomically(save_image, final_output_path, pil_format, save_kwargs)
+            finally:
+                save_image.close()
 
         write_result = save_and_reconcile_checked(
             str(output.path),
