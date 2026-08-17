@@ -501,11 +501,28 @@ class _DuplicateGroup(BaseModel):
 class _DuplicateState(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
-    version: Literal[2]
+    version: StrictInt
     scanned_at: float
     threshold: float
     summary: _DuplicateSummary
     groups: List[_DuplicateGroup]
+
+    @field_validator("version")
+    @classmethod
+    def validate_version(cls, value: int) -> int:
+        """Accept exactly the payload version the scan writes today.
+
+        Bound to the writer's constant rather than repeated as a literal: a
+        second copy of the number goes stale the moment the payload is
+        versioned forward, and this reader would then reject every scan as
+        invalid without anyone noticing.
+        """
+        expected = duplicate_group_service._RESULT_VERSION
+        if value != expected:
+            raise ValueError(
+                f"unsupported duplicate scan payload version {value}; expected {expected}"
+            )
+        return value
 
     @field_validator("scanned_at")
     @classmethod

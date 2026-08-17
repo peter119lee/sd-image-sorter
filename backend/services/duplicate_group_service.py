@@ -45,7 +45,10 @@ _ANN_NEIGHBOR_K = 24          # neighbors fetched per item on the ANN path
 _MATMUL_CHUNK = 512           # rows per chunk on the exact path
 _EMBEDDING_FINGERPRINT_BYTES = 16
 _GROUP_CANCEL_CHECK_INTERVAL = 256
-_RESULT_VERSION = 2
+# v3: the summary gained the coverage fields. A v2 result cannot say how much
+# of the library its verdict covered, so it is discarded and rescanned rather
+# than shown as a "0 duplicates" answer nobody can vouch for.
+_RESULT_VERSION = 3
 _STATE_FILENAME = "duplicate-groups.json"
 
 _SCAN_LOCK = threading.Lock()
@@ -127,6 +130,31 @@ def _load_embeddings(handle) -> tuple:
     norms = np.linalg.norm(vectors, axis=1, keepdims=True)
     norms[norms == 0] = 1.0
     return ids, vectors / norms
+
+
+def _coverage_summary(embedded_count: int) -> Dict[str, Any]:
+    """Describe how much of the library the scan was actually able to compare.
+
+    A scan only sees images that already have a CLIP embedding, so "0
+    duplicate groups" over a partly-embedded library is not a statement about
+    the library. Field names mirror SimilarityService.get_stats(); ``exact``
+    is the same partial-result flag the gallery count endpoint uses, and is
+    False whenever readable images were left out of the comparison.
+    """
+    import database as db
+
+    with db.get_db() as conn:
+        row = conn.execute(
+            "SELECT COUNT(*) FROM images WHERE COALESCE(is_readable, 1) = 1"
+        ).fetchone()
+    total = int(row[0] or 0) if row else 0
+    pending = max(0, total - embedded_count)
+    return {
+        "total_images": total,
+        "pending_count": pending,
+        "coverage": round(embedded_count / total * 100, 1) if total > 0 else 0,
+        "exact": pending == 0,
+    }
 
 
 def _embedding_fingerprint(vector: np.ndarray) -> bytes:
@@ -601,6 +629,7 @@ def run_duplicate_scan(handle, threshold: float = DEFAULT_THRESHOLD) -> None:
             "redundant_count": redundant,
             "reclaimable_bytes": int(reclaimable),
             "threshold": threshold,
+            **_coverage_summary(len(ids)),
         },
         "groups": groups,
     }
@@ -620,6 +649,7 @@ def _empty_result(threshold: float, embedded_count: int) -> Dict[str, Any]:
             "redundant_count": 0,
             "reclaimable_bytes": 0,
             "threshold": threshold,
+            **_coverage_summary(embedded_count),
         },
         "groups": [],
     }

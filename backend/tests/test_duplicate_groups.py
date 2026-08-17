@@ -1,6 +1,7 @@
 """Tests for the duplicate-group scan service (v3.5.0 Tier 1 cleanup workflow)."""
 from __future__ import annotations
 
+import json
 import threading
 from pathlib import Path
 
@@ -16,6 +17,16 @@ from similarity import embedding_to_bytes
 
 
 _THREAD_TIMEOUT_SECONDS = 3.0
+
+# A previously persisted result that load_result() still accepts. Built from
+# the live constant so "the last good result survived" stays the assertion
+# even when the payload shape is versioned forward.
+_PREVIOUS_RESULT = {
+    "version": dgs._RESULT_VERSION,
+    "groups": [],
+    "marker": "previous",
+}
+_PREVIOUS_RESULT_JSON = json.dumps(_PREVIOUS_RESULT, separators=(",", ":"))
 
 
 class FakeHandle:
@@ -262,10 +273,7 @@ def test_cancel_during_grouping_preserves_last_persisted_result(
     monkeypatch.setattr("similarity_ann.hnswlib_available", lambda: False)
     _seed_library(dup_env)
     state_path = dgs._state_path()
-    state_path.write_text(
-        '{"version":2,"groups":[],"marker":"previous"}',
-        encoding="utf-8",
-    )
+    state_path.write_text(_PREVIOUS_RESULT_JSON, encoding="utf-8")
     handle = FakeHandle()
 
     def cancel_on_clustering(
@@ -279,11 +287,7 @@ def test_cancel_during_grouping_preserves_last_persisted_result(
 
     dgs.run_duplicate_scan(handle, threshold=0.95)
 
-    assert dgs.load_result() == {
-        "version": 2,
-        "groups": [],
-        "marker": "previous",
-    }
+    assert dgs.load_result() == _PREVIOUS_RESULT
     assert handle.result is None
 
 
@@ -298,7 +302,7 @@ def test_scan_builds_one_group_with_rating_first_keeper(dup_env, monkeypatch):
     assert job["processed"] == 100
     assert job["message"] == "Done"
     assert data is not None
-    assert data["version"] == 2
+    assert data["version"] == dgs._RESULT_VERSION
     assert data["summary"]["group_count"] == 1
     assert data["summary"]["redundant_count"] == 2
     group = data["groups"][0]
@@ -402,7 +406,7 @@ def test_scan_with_too_few_embeddings_persists_empty_result(dup_env):
     assert job["processed"] == 100
     assert job["message"] == "Done"
     assert job["result"]["summary"]["embedded_count"] == 0
-    assert data["version"] == 2
+    assert data["version"] == dgs._RESULT_VERSION
     assert data["summary"]["embedded_count"] == 0
     assert data["summary"]["group_count"] == 0
 
@@ -441,10 +445,7 @@ def test_cancel_before_result_commit_preserves_old_file_and_cleans_temp(
     monkeypatch.setattr("similarity_ann.hnswlib_available", lambda: False)
     _seed_library(dup_env)
     state_path = dgs._state_path()
-    state_path.write_text(
-        '{"version":2,"groups":[],"marker":"previous"}',
-        encoding="utf-8",
-    )
+    state_path.write_text(_PREVIOUS_RESULT_JSON, encoding="utf-8")
     temp_path = state_path.with_suffix(".tmp")
     temp_written = threading.Event()
     allow_commit = threading.Event()
@@ -480,11 +481,7 @@ def test_cancel_before_result_commit_preserves_old_file_and_cleans_temp(
     assert job is not None
     assert job["status"] == "cancelled"
     assert job["result"] == {}
-    assert dgs.load_result() == {
-        "version": 2,
-        "groups": [],
-        "marker": "previous",
-    }
+    assert dgs.load_result() == _PREVIOUS_RESULT
     assert temp_path.exists() is False
 
 
@@ -494,10 +491,7 @@ def test_replace_failure_preserves_old_file_marks_error_and_cleans_temp(
     monkeypatch.setattr("similarity_ann.hnswlib_available", lambda: False)
     _seed_library(dup_env)
     state_path = dgs._state_path()
-    state_path.write_text(
-        '{"version":2,"groups":[],"marker":"previous"}',
-        encoding="utf-8",
-    )
+    state_path.write_text(_PREVIOUS_RESULT_JSON, encoding="utf-8")
     temp_path = state_path.with_suffix(".tmp")
 
     def fail_replace(source: Path, destination: Path) -> None:
@@ -514,11 +508,7 @@ def test_replace_failure_preserves_old_file_marks_error_and_cleans_temp(
     assert job["error_count"] == 1
     assert job["message"] == "Result publish failed"
     assert "injected replace denial" in job["error_samples"][0]
-    assert dgs.load_result() == {
-        "version": 2,
-        "groups": [],
-        "marker": "previous",
-    }
+    assert dgs.load_result() == _PREVIOUS_RESULT
     assert temp_path.exists() is False
 
 
@@ -689,3 +679,84 @@ def test_ann_path_never_suggests_transitive_only_duplicate_for_deletion(dup_env)
     dgs.run_duplicate_scan(FakeHandle(), threshold=0.95)
 
     _assert_transitive_chain_is_safe(dgs.load_result())
+
+
+# ---------------------------------------------------------------------------
+# Coverage: "0 duplicates" must not be readable as a whole-library verdict
+# ---------------------------------------------------------------------------
+
+def _insert_unembedded_image(conn, image_id: int, filename: str) -> None:
+    conn.execute(
+        """
+        INSERT INTO images (id, path, filename, width, height, file_size, is_readable)
+        VALUES (?, ?, ?, 512, 512, 1000, 1)
+        """,
+        (image_id, f"C:/t/{filename}", filename),
+    )
+
+
+def _seed_mostly_unembedded_library(db, *, embedded: int, unembedded: int) -> None:
+    """Mirror the real library: a handful embedded, almost everything not."""
+    conn = db.get_connection()
+    try:
+        for index in range(embedded):
+            _insert_image(conn, 100 + index, f"emb-{index}.png", _angle_vector(index * 40.0))
+        for index in range(unembedded):
+            _insert_unembedded_image(conn, 200 + index, f"plain-{index}.png")
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def test_scan_result_states_how_much_of_the_library_was_compared(dup_env):
+    """2 of 10 images have embeddings and neither matches.
+
+    Reporting only "0 groups" here reads as "your library has no
+    duplicates" when 80% of it was never looked at.
+    """
+    _seed_mostly_unembedded_library(dup_env, embedded=2, unembedded=8)
+
+    dgs.run_duplicate_scan(FakeHandle(), threshold=0.95)
+    summary = dgs.load_result()["summary"]
+
+    assert summary["group_count"] == 0
+    assert summary["embedded_count"] == 2
+    # The denominator, so the numerator can be read at all.
+    assert summary["total_images"] == 10
+    assert summary["pending_count"] == 8
+    assert summary["coverage"] == 20.0
+    # Same partial-result vocabulary the gallery count endpoint already uses.
+    assert summary["exact"] is False
+
+
+def test_scan_result_reports_coverage_even_when_nothing_is_embedded(dup_env):
+    """The worst case must be the loudest, not the quietest.
+
+    With fewer than two embeddings the scan short-circuits to an empty
+    result — the exact path where "0 duplicates found" is least earned.
+    """
+    _seed_mostly_unembedded_library(dup_env, embedded=0, unembedded=6)
+
+    dgs.run_duplicate_scan(FakeHandle(), threshold=0.95)
+    summary = dgs.load_result()["summary"]
+
+    assert summary["group_count"] == 0
+    assert summary["embedded_count"] == 0
+    assert summary["total_images"] == 6
+    assert summary["pending_count"] == 6
+    assert summary["coverage"] == 0
+    assert summary["exact"] is False
+
+
+def test_fully_embedded_library_reports_an_exact_verdict(dup_env):
+    """A complete scan must not be hedged."""
+    _seed_mostly_unembedded_library(dup_env, embedded=4, unembedded=0)
+
+    dgs.run_duplicate_scan(FakeHandle(), threshold=0.95)
+    summary = dgs.load_result()["summary"]
+
+    assert summary["total_images"] == 4
+    assert summary["embedded_count"] == 4
+    assert summary["pending_count"] == 0
+    assert summary["coverage"] == 100.0
+    assert summary["exact"] is True

@@ -88,6 +88,11 @@ Returns the persisted result of the most recent scan: summary counts
 (groups / redundant images / reclaimable bytes) plus a page of groups.
 Each group lists members sorted best-first with `suggested_keep` flags.
 `available: false` means no scan has completed yet.
+
+The summary also carries coverage: `total_images`, `embedded_count`,
+`pending_count` and `coverage`. `exact: false` means only the embedded
+subset was compared, so a `group_count` of 0 is not a whole-library
+verdict — the pending images need embeddings before it can be.
     """,
 )
 def get_duplicate_groups(

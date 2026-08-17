@@ -185,10 +185,14 @@ def _write_duplicate_state(
     groups: List[Dict[str, Any]],
     scanned_at: float,
 ) -> None:
+    from services.duplicate_group_service import _RESULT_VERSION
+
     path.write_text(
         json.dumps(
             {
-                "version": 2,
+                # Bound to the live constant: this fixture stands for "a
+                # persisted scan the loader still accepts", not one shape of it.
+                "version": _RESULT_VERSION,
                 "scanned_at": scanned_at,
                 "threshold": 0.95,
                 "summary": {
