@@ -36,6 +36,8 @@ export write goes to the gitignored data dir and is cleaned up).
 
 from __future__ import annotations
 
+import builtins
+import errno
 import inspect
 import json
 import os
@@ -73,6 +75,31 @@ def _img(**kw):
 
 def _tags(*names):
     return [{"tag": n} for n in names]
+
+
+class _HandleThatDiesOnWrite:
+    """A text handle that writes a partial prefix and then fails.
+
+    Models a disk-full / power-loss write: some bytes reach the file before the
+    error, which is what turns a non-atomic sidecar write into a truncated one.
+    """
+
+    def __init__(self, handle):
+        self._handle = handle
+
+    def __enter__(self):
+        self._handle.__enter__()
+        return self
+
+    def __exit__(self, *exc_info):
+        return self._handle.__exit__(*exc_info)
+
+    def write(self, text):
+        self._handle.write(str(text)[:4])
+        raise OSError(errno.ENOSPC, "simulated drive full mid-write")
+
+    def __getattr__(self, name):
+        return getattr(self._handle, name)
 
 
 # =========================================================================== #
@@ -747,6 +774,51 @@ class TestExportTagsBatch:
         with pytest.raises(HTTPException) as exc:
             tes.export_tags_batch_request(req, id_chunks=iter([[1]]), total=1)
         assert exc.value.status_code == 400
+
+    def test_beside_image_write_that_dies_midway_keeps_the_existing_caption(
+        self, monkeypatch, tmp_path
+    ):
+        """beside_image writes into the user's own image folders, so an
+        interrupted write must not truncate a caption already sitting there."""
+        library = tmp_path / "library"
+        library.mkdir()
+        image_path = library / "hero.png"
+        image_path.write_bytes(b"the writer never opens the image itself")
+        sidecar = library / "hero.txt"
+        sidecar.write_text("a caption the user wrote by hand", encoding="utf-8")
+        original_bytes = sidecar.read_bytes()
+
+        images = {1: _img(id=1, filename="hero.png", path=str(image_path))}
+        self._patch_db(monkeypatch, images, {1: _tags("1girl")})
+
+        real_open = builtins.open
+
+        def open_that_dies_writing_into_the_library(file, mode="r", *args, **kwargs):
+            handle = real_open(file, mode, *args, **kwargs)
+            if "w" in str(mode) and Path(str(file)).parent == library:
+                return _HandleThatDiesOnWrite(handle)
+            return handle
+
+        monkeypatch.setattr(builtins, "open", open_that_dies_writing_into_the_library)
+
+        req = SimpleNamespace(
+            image_ids=[1],
+            output_folder="",
+            blacklist=[],
+            prefix="",
+            content_mode="tags",
+            overwrite_policy="overwrite",
+            output_mode="beside_image",
+        )
+        result = tes.export_tags_batch_request(req, id_chunks=iter([[1]]), total=1)
+
+        assert result["exported"] == 0
+        assert result["error_count"] == 1
+        assert sidecar.read_bytes() == original_bytes
+        assert sorted(entry.name for entry in library.iterdir()) == [
+            "hero.png",
+            "hero.txt",
+        ]
 
     def test_batch_cancel_check_short_circuits(self, monkeypatch, tmp_path):
         images = {1: _img(id=1, filename="one.png", path=str(tmp_path / "one.png"))}

@@ -265,6 +265,33 @@ def _allocate_output_path(
     return _SidecarAllocation("write", path=primary_path)
 
 
+def _write_sidecar_atomically(path: str, content: str) -> None:
+    """Write one caption sidecar through a sibling temp file.
+
+    ``beside_image`` mode writes into the user's own image folders, so writing
+    straight at the target truncated whatever caption was already there for the
+    whole duration of the write. Same temp-then-``replace`` convention the
+    combined export below already uses.
+
+    newline="\\n" (P3-14): keep sidecars LF on Windows too — some trainer
+    stacks treat a CRLF caption line as content.
+    """
+    target = Path(path)
+    temp_path = target.with_name(f".{target.name}.tmp")
+    try:
+        with open(temp_path, "w", encoding="utf-8", newline="\n") as handle:
+            handle.write(content)
+            handle.flush()
+            try:
+                os.fsync(handle.fileno())
+            except OSError:
+                pass
+        temp_path.replace(target)
+    except BaseException:
+        temp_path.unlink(missing_ok=True)
+        raise
+
+
 def export_tags_batch_request(
     request: Any,
     *,
@@ -531,10 +558,7 @@ def export_tags_batch_request(
                         raise HTTPException(status_code=400, detail=f"Cannot create output folder: {exc}") from exc
                     output_folder_ready = True
 
-                # newline="\n" (P3-14): keep sidecars LF on Windows too —
-                # some trainer stacks treat a CRLF caption line as content.
-                with open(output_path, "w", encoding="utf-8", newline="\n") as handle:
-                    handle.write(file_content)
+                _write_sidecar_atomically(output_path, file_content)
 
                 output_owner = str(image.get("path") or image.get("filename") or "")
                 used_output_paths.update(
@@ -548,8 +572,7 @@ def export_tags_batch_request(
                 )
 
                 if nl_twin_path:
-                    with open(nl_twin_path, "w", encoding="utf-8", newline="\n") as handle:
-                        handle.write(nl_twin_content)
+                    _write_sidecar_atomically(nl_twin_path, nl_twin_content)
                     used_output_paths.update(
                         _output_path_claims(nl_twin_path, output_owner)
                     )
