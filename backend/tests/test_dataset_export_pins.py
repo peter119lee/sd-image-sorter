@@ -296,17 +296,36 @@ class TestPureHelpers:
         err = des._reconcile_moved_image_path(5, "/old.png", "/new.png")
         assert err == "db down"
 
-    def test_reconcile_moved_image_path_success_unlinks_old_sidecar(
+    def test_reconcile_moved_image_path_sends_the_old_sidecar_to_the_recycle_bin(
         self, tmp_path, monkeypatch
     ):
+        """A move export must not permanently delete a caption the user wrote.
+
+        The cleanup cannot tell an app-generated sidecar from a hand-written
+        one, and every other user-facing delete in this app goes through
+        ``move_file_to_trash`` so the file stays recoverable.
+        """
+        import services.image_service as image_service
+
+        trashed: list[str] = []
+
+        def record_trash(path: str) -> None:
+            trashed.append(str(path))
+            Path(path).unlink()
+
         monkeypatch.setattr(des.db, "update_image_path", lambda *a, **k: None)
-        old_img = tmp_path / "old.png"
+        monkeypatch.setattr(image_service, "move_file_to_trash", record_trash)
+
+        old_img = tmp_path / "hero_shot.png"
         old_sidecar = old_img.with_suffix(".txt")
-        old_sidecar.write_text("stale", encoding="utf-8")
+        old_sidecar.write_text("a hand written caption", encoding="utf-8")
+
         err = des._reconcile_moved_image_path(
-            5, str(old_img), str(tmp_path / "new.png")
+            5, str(old_img), str(tmp_path / "out" / "hero_shot.png")
         )
+
         assert err is None
+        assert trashed == [str(old_sidecar)]
         assert not old_sidecar.exists()  # stale sidecar cleaned
 
     def test_toml_path_literal_forward_slashes(self):

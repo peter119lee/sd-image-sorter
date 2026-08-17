@@ -97,6 +97,17 @@ def _iter_chunks(values: Iterable[Any], chunk_size: int) -> Iterator[List[Any]]:
         yield chunk
 
 
+def _move_file_to_trash(path: str) -> None:
+    """Recycle-bin seam (tests patch services.image_service.move_file_to_trash).
+
+    Resolved lazily through the facade module so the patch lands and so the
+    dataset-export package keeps no load-time dependency on the image service.
+    """
+    import services.image_service as image_service
+
+    image_service.move_file_to_trash(path)
+
+
 def _iter_unique_image_ids(values: Iterable[Any]) -> Iterator[int]:
     seen: set[int] = set()
     for raw in values or []:
@@ -151,14 +162,24 @@ def _reconcile_moved_image_path(
     # keyed against the old location. We intentionally do not fail the
     # export if this cleanup misses something — the primary contract is
     # the DB row pointing at the new path.
+    #
+    # This cannot tell an app-generated caption from one the user wrote by
+    # hand, so it goes to the Recycle Bin like every other user-facing delete
+    # in this app rather than being unlinked permanently.
     try:
         old_sidecar = Path(src_image_path).with_suffix(".txt")
         if old_sidecar.exists() and str(old_sidecar) != str(
             Path(dst_image_path).with_suffix(".txt")
         ):
-            old_sidecar.unlink(missing_ok=True)
-    except OSError:
-        pass
+            _move_file_to_trash(str(old_sidecar))
+    except Exception as exc:  # noqa: BLE001 - trash failures must never delete
+        # Never fall back to a permanent delete, and never stay silent about
+        # the leftover: the file is still where the user left it.
+        logger.warning(
+            "dataset-export: could not move the stale caption %s to the Recycle Bin "
+            "after moving image %s; it was left in place: %s",
+            Path(src_image_path).with_suffix(".txt"), image_id, exc,
+        )
     return None
 
 
