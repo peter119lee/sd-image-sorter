@@ -26,6 +26,7 @@ from services.tagging_pipeline_service import (
 from services.tag_export_service import combined_export_path
 from services.trait_pruning_service import TraitCandidatesRequest
 from services.dataset_consistency_service import ConsistencyReportRequest
+from services.single_image_tag_service import SingleImageTagRequest
 from services.tipo_service import TipoSuggestRequest
 from services.tag_score_service import (
     CoverageGapsRequest,
@@ -478,6 +479,32 @@ async def start_tagging(
 ):
     """Start tagging images with WD14 tagger."""
     return pipeline.start_gallery_tagging(request, background_tasks, legacy_service=service)
+
+
+@router.post(
+    "/tag/single",
+    summary="Tag one arbitrary image file",
+    description=(
+        "Run the WD14 tagger against ONE file and return its tags inline. "
+        "Takes a filesystem path, not an ``images.id``: the file may be "
+        "un-indexed, and no database row is read, created or updated "
+        "(``stored`` is always false). Accepts the ``source_temp_path`` that "
+        "``POST /api/parse-image`` returns for a retained upload, so a "
+        "drop-one-image page needs no second upload route. Unlike "
+        "``POST /api/tag`` this is synchronous — there is no job to poll."
+    ),
+    responses={
+        400: {"description": "Unsafe or unsupported image path"},
+        404: {"description": "The file does not exist"},
+        422: {"description": "The file exists but could not be tagged"},
+        503: {"description": "The tagger runtime could not run"},
+    },
+)
+def tag_single_image(request: SingleImageTagRequest):
+    """Tag one file on disk without indexing it."""
+    from services import single_image_tag_service
+
+    return single_image_tag_service.tag_single_image(request)
 
 
 @router.get("/tagger/models")
