@@ -27,7 +27,7 @@ from obfuscation import (
     decode_image_bytes,
     encode_image,
     encode_image_bytes,
-    extract_png_text_chunks_from_bytes,
+    extract_source_text_chunks_from_bytes,
     normalize_compat_mode,
 )
 from utils.path_validation import (
@@ -246,7 +246,7 @@ async def preview_process(
     try:
         normalized_mode = normalize_compat_mode(compat_mode)
         content = await _read_preview_upload(file)
-        text_chunks = extract_png_text_chunks_from_bytes(content) if preserve_metadata and normalized_mode == BIG_TOMATO_MODE else []
+        text_chunks = extract_source_text_chunks_from_bytes(content) if preserve_metadata else []
 
         with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as tmp_out:
             tmp_out_path = tmp_out.name

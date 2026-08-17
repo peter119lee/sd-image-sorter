@@ -1330,11 +1330,21 @@ Clear artist predictions.
 
 ### Obfuscation
 
+Output is always a PNG, so generation metadata survives the protect/restore
+round trip for every source format (PNG tEXt, plus JPEG/WebP/TIFF EXIF
+`UserComment`, `ImageDescription`, and XMP) and in both compatibility modes.
+Harvested EXIF/XMP text is re-keyed to the PNG chunk the reader expects
+(`parameters`, `prompt`, or `Comment`), or carried under `UserComment` when it
+matches none of those, so nothing is dropped. In the protected copy the value is
+encrypted with the same scheme as the reference site; `preserve_metadata: false`
+still strips everything.
+
 #### POST /api/obfuscate/encode
-Encode image with obfuscation algorithm.
+Encode image with obfuscation algorithm. The result reports `metadata_preserved`
+and `metadata_chunks_carried` (how many text values actually moved across).
 
 #### POST /api/obfuscate/decode
-Decode obfuscated image.
+Decode obfuscated image. Same result fields as encode.
 
 #### POST /api/obfuscate/batch
 Run encode/decode in batch mode.

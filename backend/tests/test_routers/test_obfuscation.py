@@ -97,7 +97,14 @@ class TestObfuscationPreview:
         assert decoded_image.size == (24, 24)
         assert decoded_image.info.get("prompt") == "legacy prompt text"
 
-    def test_preview_small_tomato_roundtrip_restores_pixels_without_metadata(self, test_client, tmp_path):
+    def test_preview_small_tomato_roundtrip_restores_pixels_and_metadata(self, test_client, tmp_path):
+        # Audit F5: this case previously asserted that small_tomato DROPS the
+        # prompt ("prompt" not in ...), pinning a silent data loss - the user
+        # protected an image to share it, restored it later, and their
+        # generation parameters were gone. The output container is a PNG in
+        # both directions and a PNG can always carry tEXt, so the loss was a
+        # gate, not a format limit. The pixel round-trip assertions below are
+        # unchanged; only the metadata expectation is inverted.
         source_path = tmp_path / "source.png"
         _create_png_with_metadata(source_path, "small tomato prompt")
 
@@ -114,7 +121,9 @@ class TestObfuscationPreview:
         assert encoded.status_code == 200
         encoded_image = Image.open(io.BytesIO(encoded.content))
         assert encoded_image.size == (24, 24)
-        assert "prompt" not in encoded_image.info
+        assert encoded_image.info.get("prompt") not in (None, "small tomato prompt"), (
+            "the shared copy must carry the prompt in its encrypted form"
+        )
 
         decode_payload = io.BytesIO(encoded.content)
         with decode_payload:
@@ -127,7 +136,7 @@ class TestObfuscationPreview:
         assert decoded.status_code == 200
         decoded_image = Image.open(io.BytesIO(decoded.content))
         assert decoded_image.size == (24, 24)
-        assert "prompt" not in decoded_image.info
+        assert decoded_image.info.get("prompt") == "small tomato prompt"
         assert decoded_image.convert("RGBA").tobytes() == original_rgba
 
     def test_preview_rejects_unknown_compat_mode(self, test_client, tmp_path):

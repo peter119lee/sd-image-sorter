@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import base64
 import io
+import json
 import math
 import struct
 import zlib
@@ -30,6 +31,10 @@ BIG_TOMATO_MODE = "big_tomato"
 SMALL_TOMATO_MODE = "small_tomato"
 MAX_OBFUSCATE_SOURCE_BYTES = 50 * 1024 * 1024
 MAX_OBFUSCATE_SOURCE_PIXELS = 40_000_000
+# Ceiling on a single harvested EXIF/XMP text value. Real A1111 parameter
+# blocks are a few kB; an XMP packet large enough to exceed this is a hostile
+# or broken file, and carrying it would balloon the protected PNG.
+_MAX_CARRIED_TEXT_BYTES = 1024 * 1024
 
 COMPAT_MODE_ALIASES = {
     "": BIG_TOMATO_MODE,
@@ -99,10 +104,6 @@ def normalize_compat_mode(compat_mode: str = "") -> str:
     if normalized:
         return normalized
     raise ValueError(f"Unsupported compat mode: {compat_mode}")
-
-
-def _supports_metadata(compat_mode: str) -> bool:
-    return normalize_compat_mode(compat_mode) == BIG_TOMATO_MODE
 
 
 def _resolve_password(password: str, compat_mode: str) -> ObfuscationPassword:
@@ -384,6 +385,120 @@ def extract_png_text_chunks_from_bytes(data: bytes) -> List[Tuple[str, str]]:
     return chunks
 
 
+def _decode_exif_user_comment(value: object) -> str:
+    """Decode an EXIF UserComment payload the way SD tools write it.
+
+    Mirrors metadata_parser's decoder for the shapes that matter here. It is
+    reimplemented rather than imported so the obfuscation round trip, which only
+    needs to move text from one container to another, does not pull the whole
+    metadata-parsing stack in behind it.
+    """
+    if isinstance(value, str):
+        text = value
+        if text.startswith("ASCII") or text.startswith("UNICODE"):
+            text = text[7:]
+        return text.strip("\0 ")
+    if not isinstance(value, (bytes, bytearray)):
+        return ""
+
+    raw = bytes(value)
+    if raw.startswith(b"UNICODE\x00"):
+        payload = raw[8:]
+        if payload.startswith(b"\xff\xfe") or payload.startswith(b"\xfe\xff"):
+            text = payload.decode("utf-16", errors="replace")
+        elif len(payload) >= 2 and payload[1:2] == b"\x00":
+            text = payload.decode("utf-16-le", errors="replace")
+        else:
+            text = payload.decode("utf-16-be", errors="replace")
+    elif raw.startswith(b"ASCII\x00\x00\x00") or raw.startswith(b"\x00" * 8):
+        text = raw[8:].decode("utf-8", errors="replace")
+    else:
+        text = raw.decode("utf-8", errors="replace")
+    return text.strip("\0 ")
+
+
+def _text_chunk_key_for(text: str) -> str:
+    """Pick the PNG text-chunk key that carries ``text`` back to the parser.
+
+    The obfuscated and restored files are always PNGs, so metadata harvested
+    from a JPEG's or WebP's EXIF/XMP has to be re-keyed to whatever the PNG
+    reader looks for. Unrecognised text is still carried, under UserComment, so
+    a round trip never silently drops something it could not classify.
+    """
+    stripped = text.strip()
+    if "Steps:" in stripped and "Sampler:" in stripped:
+        return "parameters"
+    if stripped.startswith("{"):
+        try:
+            payload = json.loads(stripped)
+        except (ValueError, TypeError):
+            return "UserComment"
+        if isinstance(payload, dict):
+            if any(isinstance(v, dict) and "class_type" in v for v in payload.values()):
+                return "prompt"
+            if "prompt" in payload and "uc" in payload:
+                return "Comment"
+    return "UserComment"
+
+
+def _harvest_non_png_text_chunks(data: bytes) -> List[Tuple[str, str]]:
+    """Collect SD metadata that a JPEG/WebP/TIFF source carries in EXIF or XMP."""
+    chunks: List[Tuple[str, str]] = []
+    seen: set = set()
+
+    def _add(key: str, text: str) -> None:
+        cleaned = str(text or "").strip()
+        if not cleaned or len(cleaned.encode("utf-8", errors="ignore")) > _MAX_CARRIED_TEXT_BYTES:
+            return
+        if key in seen:
+            return
+        seen.add(key)
+        chunks.append((key, cleaned))
+
+    try:
+        with Image.open(io.BytesIO(data)) as image:
+            xmp = image.info.get("xmp")
+            exif = image.getexif()
+    except Exception:  # noqa: BLE001 - an unreadable source simply carries nothing
+        return chunks
+
+    try:
+        user_comment = exif.get_ifd(0x8769).get(0x9286) if exif else None
+    except Exception:  # noqa: BLE001 - malformed Exif IFD
+        user_comment = None
+    if user_comment:
+        decoded = _decode_exif_user_comment(user_comment)
+        if decoded:
+            _add(_text_chunk_key_for(decoded), decoded)
+
+    try:
+        description = exif.get(0x010E) if exif else None
+    except Exception:  # noqa: BLE001
+        description = None
+    if isinstance(description, str) and "Steps:" in description and "Sampler:" in description:
+        _add("parameters", description)
+
+    if xmp:
+        text = xmp.decode("utf-8", errors="replace") if isinstance(xmp, (bytes, bytearray)) else str(xmp)
+        if "Steps:" in text and "Sampler:" in text:
+            _add("parameters", text)
+
+    return chunks
+
+
+def extract_source_text_chunks_from_bytes(data: bytes) -> List[Tuple[str, str]]:
+    """Collect the SD metadata a source image carries, whatever its container.
+
+    PNG sources keep their tEXt/iTXt chunks verbatim. JPEG, WebP and TIFF
+    sources carry the same information in EXIF or XMP instead, which the
+    PNG-only reader used to return ``[]`` for - that is how the prompt went
+    missing across a protect/restore round trip for those formats.
+    """
+    if data.startswith(PNG_SIGNATURE):
+        return extract_png_text_chunks_from_bytes(data)
+    return _harvest_non_png_text_chunks(data)
+
+
 def write_png_text_chunks(
     png_bytes: bytes,
     text_chunks: Sequence[Tuple[str, str]],
@@ -451,7 +566,6 @@ def encode_image_bytes(
     _validate_obfuscation_source_bytes(image_bytes)
     normalized_mode = normalize_compat_mode(compat_mode)
     parsed_password = _resolve_password(password, normalized_mode)
-    should_preserve_metadata = preserve_metadata and _supports_metadata(normalized_mode)
     with Image.open(io.BytesIO(image_bytes)) as image:
         rgba_image = image.convert("RGBA")
         width, height = rgba_image.size
@@ -465,7 +579,7 @@ def encode_image_bytes(
     output_image = image_from_rgba(encoded_rgba, encoded_width, encoded_height)
     png_bytes = _image_to_png_bytes(output_image)
 
-    if should_preserve_metadata and text_chunks:
+    if preserve_metadata and text_chunks:
         png_bytes = write_png_text_chunks(
             png_bytes,
             text_chunks,
@@ -488,7 +602,6 @@ def decode_image_bytes(
     _validate_obfuscation_source_bytes(image_bytes)
     normalized_mode = normalize_compat_mode(compat_mode)
     parsed_password = _resolve_password(password, normalized_mode)
-    should_preserve_metadata = preserve_metadata and _supports_metadata(normalized_mode)
     with Image.open(io.BytesIO(image_bytes)) as image:
         rgba_image = image.convert("RGBA")
         width, height = rgba_image.size
@@ -502,7 +615,7 @@ def decode_image_bytes(
     output_image = image_from_rgba(decoded_rgba, decoded_width, decoded_height)
     png_bytes = _image_to_png_bytes(output_image)
 
-    if should_preserve_metadata and text_chunks:
+    if preserve_metadata and text_chunks:
         png_bytes = write_png_text_chunks(
             png_bytes,
             text_chunks,
@@ -534,7 +647,7 @@ def encode_image(
     _validate_obfuscation_source_file(input_path)
     source_bytes = Path(input_path).read_bytes()
     normalized_mode = normalize_compat_mode(compat_mode)
-    text_chunks = extract_png_text_chunks_from_bytes(source_bytes) if preserve_metadata and _supports_metadata(normalized_mode) else []
+    text_chunks = extract_source_text_chunks_from_bytes(source_bytes) if preserve_metadata else []
     output_bytes = encode_image_bytes(
         source_bytes,
         password=password,
@@ -564,8 +677,9 @@ def encode_image(
         "input": input_path,
         "output": output_path,
         "dimensions": f"{width}x{height}",
-        "metadata_preserved": preserve_metadata and _supports_metadata(normalized_mode),
-        "legacy_pnginfo": legacy_pnginfo and _supports_metadata(normalized_mode),
+        "metadata_preserved": bool(preserve_metadata),
+        "metadata_chunks_carried": len(text_chunks),
+        "legacy_pnginfo": bool(legacy_pnginfo),
         "compat_mode": normalized_mode,
         "warnings": write_result.warnings or [],
         "overwrote_existing": bool(write_result.target_existed),
@@ -586,7 +700,7 @@ def decode_image(
     _validate_obfuscation_source_file(input_path)
     source_bytes = Path(input_path).read_bytes()
     normalized_mode = normalize_compat_mode(compat_mode)
-    text_chunks = extract_png_text_chunks_from_bytes(source_bytes) if preserve_metadata and _supports_metadata(normalized_mode) else []
+    text_chunks = extract_source_text_chunks_from_bytes(source_bytes) if preserve_metadata else []
     output_bytes = decode_image_bytes(
         source_bytes,
         password=password,
@@ -616,8 +730,9 @@ def decode_image(
         "input": input_path,
         "output": output_path,
         "dimensions": f"{width}x{height}",
-        "metadata_preserved": preserve_metadata and _supports_metadata(normalized_mode),
-        "legacy_pnginfo": legacy_pnginfo and _supports_metadata(normalized_mode),
+        "metadata_preserved": bool(preserve_metadata),
+        "metadata_chunks_carried": len(text_chunks),
+        "legacy_pnginfo": bool(legacy_pnginfo),
         "compat_mode": normalized_mode,
         "warnings": write_result.warnings or [],
         "overwrote_existing": bool(write_result.target_existed),
@@ -674,6 +789,6 @@ def batch_process(
         "errors": errors,
         "results": results,
         "output_folder": output_folder,
-        "legacy_pnginfo": legacy_pnginfo and _supports_metadata(normalized_mode),
+        "legacy_pnginfo": bool(legacy_pnginfo),
         "compat_mode": normalized_mode,
     }

@@ -173,7 +173,7 @@ def artist_confidence_advisory(level: str, *, vocabulary_size: int = 0) -> str:
         return (
             "Confident match. Measured on a ground-truth sample, about 1 in 13 "
             "matches at this confidence is still wrong. / "
-            f"高置信度匹配。在实测样本中，这一档仍约有 1/13 是错的。"
+            "高置信度匹配。在实测样本中，这一档仍约有 1/13 是错的。"
         )
     if level == ARTIST_CONFIDENCE_LOW:
         return (
