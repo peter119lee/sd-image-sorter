@@ -190,6 +190,10 @@ class ScanProgressResponse(BaseModel):
     # scan that found nothing missing.
     metadata_prompt_total: Optional[int] = None
     metadata_missing_prompt: Optional[int] = None
+    # Recoverable shortfall: no prompt AND no sidecar caption. Distinct from
+    # metadata_missing_prompt, which since migration 042 counts every downloaded
+    # image whose text lives in a .txt beside it — those need no repair.
+    metadata_missing_text: Optional[int] = None
     message: str
     current_item: Optional[str]
     started_at: Optional[float]

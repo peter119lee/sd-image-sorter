@@ -38,15 +38,19 @@ from utils.path_validation import (
 logger = logging.getLogger("services.sorting_service")
 
 
-# Any real folder holds some images that legitimately carry no prompt
+# Any real folder holds some images that legitimately carry no text of their own
 # (screenshots, hand-drawn art, photos). Only call the shortfall out in the
 # summary once it is a large enough share of the folder that the user should
 # suspect a metadata problem rather than a mixed folder.
-SCAN_MISSING_PROMPT_NOTICE_RATIO = 0.10
+SCAN_MISSING_TEXT_NOTICE_RATIO = 0.10
 
 
 def _prompt_coverage_for_scope(folder_path: str, recursive: bool) -> dict:
-    """How many indexed images in this scan's scope ended up with no prompt.
+    """How much text the images in this scan's scope actually ended up with.
+
+    ``missing_prompt`` is a statistic (no SD generation parameters);
+    ``missing_text`` is the recoverable shortfall (no prompt AND no sidecar
+    caption) and is the only one the summary may point the user at.
 
     Advisory only: a failure here must not turn an otherwise-successful scan
     into an error, but it must not be reported as "zero missing" either — the
@@ -58,10 +62,11 @@ def _prompt_coverage_for_scope(folder_path: str, recursive: bool) -> dict:
         return {
             "total": int(counts.get("total") or 0),
             "missing_prompt": int(counts.get("missing_prompt") or 0),
+            "missing_text": int(counts.get("missing_text") or 0),
         }
     except (sqlite3.Error, RuntimeError, ValueError) as exc:
         logger.warning("Could not measure prompt coverage for %s: %s", folder_path, exc)
-        return {"total": None, "missing_prompt": None}
+        return {"total": None, "missing_prompt": None, "missing_text": None}
 
 
 def _svc():
@@ -226,6 +231,7 @@ class ScanMixin:
                 "metadata_pending": 0,
                 "metadata_prompt_total": None,
                 "metadata_missing_prompt": None,
+                "metadata_missing_text": None,
                 "message": "正在同步文件夹索引 / Syncing folder index..." if request.cleanup_missing else "导入前统计图片数量 / Counting images before import...",
                 "current_item": None,
                 "recent_errors": [],
@@ -419,6 +425,7 @@ class ScanMixin:
                 )
                 prompt_total = prompt_coverage["total"]
                 missing_prompt = prompt_coverage["missing_prompt"]
+                missing_text = prompt_coverage["missing_text"]
                 summary = f"完成！已索引 {new_count} 张图片 / Done! {new_count} images indexed."
                 if updated_count:
                     summary += f" 更新 {updated_count} 张 / {updated_count} updated."
@@ -427,17 +434,25 @@ class ScanMixin:
                 if errors:
                     summary += f" {errors} 个问题 / {errors} scan issue(s)."
                 # "Done! N indexed." on its own reads as a clean success even
-                # when most of those rows stored no prompt at all.
+                # when most of those rows stored no text at all.
+                #
+                # Gated on missing_text, not missing_prompt: since migration 042
+                # a folder of downloaded images with .txt sidecars stores its
+                # text in sidecar_caption and leaves prompt empty, so every row
+                # is "missing a prompt" while Recover Missing Text has nothing
+                # left to find. Naming the action off missing_prompt reported a
+                # problem that does not exist and prescribed a run that could
+                # not change the number.
                 if (
                     prompt_total
-                    and missing_prompt
-                    and missing_prompt >= prompt_total * SCAN_MISSING_PROMPT_NOTICE_RATIO
+                    and missing_text
+                    and missing_text >= prompt_total * SCAN_MISSING_TEXT_NOTICE_RATIO
                 ):
                     summary += (
-                        f" {missing_prompt}/{prompt_total} 张没有生成提示词，"
+                        f" {missing_text}/{prompt_total} 张既没有提示词也没有描述文本，"
                         "可在设置中运行「找回缺失文字」/ "
-                        f"{missing_prompt} of {prompt_total} images have no generation "
-                        "prompt — run Recover Missing Text in Settings."
+                        f"{missing_text} of {prompt_total} images have no prompt and no "
+                        "caption text — run Recover Missing Text in Settings."
                     )
                 recent_errors = result.get("recent_errors") or []
                 if recent_errors:
@@ -475,7 +490,7 @@ class ScanMixin:
                             ) from exc
 
                 logger.info(
-                    "Scan completed: folder=%s files=%s indexed_new=%s unchanged_or_updated=%s removed=%s metadata=%s/%s missing_prompt=%s/%s errors=%s duration=%.1fs",
+                    "Scan completed: folder=%s files=%s indexed_new=%s unchanged_or_updated=%s removed=%s metadata=%s/%s missing_prompt=%s/%s missing_text=%s errors=%s duration=%.1fs",
                     normalized_folder_path,
                     result.get("total", 0),
                     new_count,
@@ -485,6 +500,7 @@ class ScanMixin:
                     metadata_total,
                     missing_prompt,
                     prompt_total,
+                    missing_text,
                     errors,
                     duration_seconds,
                 )
@@ -529,6 +545,7 @@ class ScanMixin:
                         "metadata_pending": 0,
                         "metadata_prompt_total": prompt_total,
                         "metadata_missing_prompt": missing_prompt,
+                        "metadata_missing_text": missing_text,
                         "message": summary,
                         "current_item": None,
                         "started_at": self._scan_progress.get("started_at"),
@@ -573,6 +590,7 @@ class ScanMixin:
                             "metadata_pending": current_state.get("metadata_pending", 0),
                             "metadata_prompt_total": current_state.get("metadata_prompt_total"),
                             "metadata_missing_prompt": current_state.get("metadata_missing_prompt"),
+                            "metadata_missing_text": current_state.get("metadata_missing_text"),
                             "message": (
                                 f"扫描已取消（{current_state.get('processed', current_state.get('current', 0))}/{current_state.get('total', 0)}）/ Scan cancelled at {current_state.get('processed', current_state.get('current', 0))}/{current_state.get('total', 0)}."
                                 if current_state.get("total_final", False) and current_state.get("total", 0)
@@ -623,6 +641,7 @@ class ScanMixin:
                             "metadata_pending": current_state.get("metadata_pending", 0),
                             "metadata_prompt_total": current_state.get("metadata_prompt_total"),
                             "metadata_missing_prompt": current_state.get("metadata_missing_prompt"),
+                            "metadata_missing_text": current_state.get("metadata_missing_text"),
                             "message": failure_message,
                             "current_item": current_state.get("current_item"),
                             "recent_errors": current_state.get("recent_errors", []),

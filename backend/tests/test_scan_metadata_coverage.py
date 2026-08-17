@@ -84,3 +84,47 @@ def test_scan_completion_stays_quiet_when_metadata_coverage_is_good(
     assert progress["metadata_prompt_total"] == 10
     assert progress["metadata_missing_prompt"] == 0
     assert "no prompt" not in progress["message"].lower()
+
+
+def test_scan_does_not_send_the_user_after_text_that_is_already_there(
+    test_client, test_db, tmp_path
+):
+    """A folder of sidecar-captioned images is not a metadata problem.
+
+    This is the owner's folder: 8 images with no SD parameters at all, each with
+    a ``.txt`` beside it. Migration 042 stores that text in
+    ``images.sidecar_caption`` and leaves ``prompt`` empty, so every one of them
+    counts as "no prompt" — yet "Recover Missing Text" has nothing left to find
+    for any of them. Naming that action here is a report of a problem that does
+    not exist plus an instruction that cannot succeed.
+    """
+    sandbox = _build_sandbox(tmp_path, with_prompt=2, without_prompt=8)
+    for path in sorted(sandbox.glob("no-prompt-*.png")):
+        path.with_suffix(".txt").write_text(
+            "1girl, solo, silver hair, looking at viewer", encoding="utf-8"
+        )
+
+    progress = _scan_and_wait(test_client, sandbox)
+
+    assert progress["status"] == "done"
+    # The summary the user reads must not send them after text that is there.
+    assert "recover missing text" not in progress["message"].lower()
+    # The rows really are promptless — that statistic still travels...
+    assert progress["metadata_prompt_total"] == 10
+    assert progress["metadata_missing_prompt"] == 8
+    # ...and their text really did land in the caption column.
+    assert progress["metadata_missing_text"] == 0
+
+
+def test_scan_still_calls_out_a_folder_with_no_text_at_all(
+    test_client, test_db, tmp_path
+):
+    """The advisory must survive: 8 of 10 images with neither prompt nor caption."""
+    sandbox = _build_sandbox(tmp_path, with_prompt=2, without_prompt=8)
+
+    progress = _scan_and_wait(test_client, sandbox)
+
+    assert progress["status"] == "done"
+    assert progress["metadata_missing_text"] == 8
+    assert "recover missing text" in progress["message"].lower()
+    assert "8" in progress["message"]
