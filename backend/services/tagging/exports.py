@@ -5,10 +5,11 @@ Moved verbatim from services/tagging_service.py (decomposition 2026-07).
 
 import logging
 import time
-from typing import Any, Dict
+from typing import Any, Callable, Dict, Optional
 
 from fastapi import HTTPException
 
+from config import read_float_env
 from services.bulk_job_service import JOB_KIND_EXPORT_SIDECARS, get_bulk_job_service
 from services.tag_export_service import (
     count_selection_token_ids,
@@ -27,18 +28,57 @@ from services.tagging.request import (
 # and output stay byte-identical after the services/tagging split.
 logger = logging.getLogger("services.tagging_service")
 
+# The export worker publishes its own heartbeat, throttled to this interval so
+# a large selection does not pay a lock per image. Without a real heartbeat
+# "stalled" would only ever mean "has been running a while", which is exactly
+# the kind of statement that trains a user to ignore a warning.
+EXPORT_HEARTBEAT_MIN_INTERVAL_SECONDS = max(
+    0.0, read_float_env("SD_IMAGE_SORTER_EXPORT_HEARTBEAT_INTERVAL_SECONDS", 0.25)
+)
+# Advisory only, like the scan job's SCAN_UI_STALLED_SECONDS.
+EXPORT_STALLED_SECONDS = max(
+    5.0, read_float_env("SD_IMAGE_SORTER_EXPORT_STALLED_SECONDS", 45.0)
+)
+# How long a queued background task may take to begin before a run with no
+# worker behind it is treated as abandoned.
+EXPORT_WORKER_START_GRACE_SECONDS = max(
+    1.0, read_float_env("SD_IMAGE_SORTER_EXPORT_WORKER_START_GRACE_SECONDS", 30.0)
+)
+
+
+def _elapsed_since(stamp: Any, now: float) -> Optional[float]:
+    """Seconds since ``stamp``, or ``None`` when it cannot be read as a time."""
+    try:
+        return max(0.0, now - float(stamp))
+    except (TypeError, ValueError):
+        return None
+
 
 class ExportsMixin:
     """Export slice of TaggingService (assembled in services.tagging.service)."""
 
-    def export_tags_batch(self, request: BatchTagExportRequest) -> Dict[str, Any]:
-        """Export tags for each image to individual .txt files."""
+    def export_tags_batch(
+        self,
+        request: BatchTagExportRequest,
+        *,
+        progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+    ) -> Dict[str, Any]:
+        """Export tags for each image to individual .txt files.
+
+        ``progress_callback`` is how the background job gets a heartbeat; the
+        synchronous endpoint leaves it unset and behaves exactly as before.
+        """
         id_chunks = None
         total = None
         if request.selection_token:
             id_chunks = iter_selection_token_id_chunks(request.selection_token)
             total = count_selection_token_ids(request.selection_token)
-        result = export_tags_batch_request(request, id_chunks=id_chunks, total=total)
+        result = export_tags_batch_request(
+            request,
+            id_chunks=id_chunks,
+            total=total,
+            progress_callback=progress_callback,
+        )
         error_count = int(result.get("error_count", 0) or 0)
         exported = int(result.get("exported", 0) or 0)
         skipped = int(result.get("skipped", 0) or 0)
@@ -88,36 +128,129 @@ class ExportsMixin:
             "updated_at": None,
         }
 
+    def _mark_export_worker(self, run_id: int, *, running: bool) -> None:
+        """Record whether a worker is currently inside this run's export."""
+        with self._export_lock:
+            if running:
+                self._export_worker_run_id = run_id
+                self._export_worker_running = True
+            elif self._export_worker_run_id == run_id:
+                self._export_worker_running = False
+
+    def _describe_export_liveness_locked(
+        self, progress: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Derive stall and abandonment facts for a progress snapshot.
+
+        Split the way the scan job splits them: ``stalled_seconds`` /
+        ``attention_required`` are advisory (``_with_scan_attention_fields``),
+        while only the absence of a live worker permits a reset
+        (``reset_scan_progress``). A slow export keeps its run however long it
+        has been quiet, because clearing it would let a second export run
+        against files the first is still writing.
+        """
+        if progress.get("status") != "running":
+            return {
+                "stalled_seconds": 0,
+                "attention_required": False,
+                "attention_message": "",
+                "abandoned": False,
+            }
+
+        now = time.time()
+        quiet_for = _elapsed_since(
+            progress.get("updated_at") or progress.get("started_at"), now
+        )
+        stalled_seconds = int(quiet_for) if quiet_for is not None else 0
+
+        worker_entered = self._export_worker_run_id == self._export_run_id
+        if worker_entered and self._export_worker_running:
+            abandoned = False
+        elif worker_entered:
+            # The worker left run_export without publishing a terminal state,
+            # so nothing will ever finish this run.
+            abandoned = True
+        else:
+            # No worker ever entered. Starlette runs a background task only
+            # after the response body has been sent, so a client that
+            # disappears first leaves "running" published with nothing behind
+            # it. An unreadable start time proves nothing, so it is not
+            # abandonment.
+            since_start = _elapsed_since(progress.get("started_at"), now)
+            abandoned = (
+                since_start is not None
+                and since_start >= EXPORT_WORKER_START_GRACE_SECONDS
+            )
+
+        if abandoned:
+            message = (
+                f"No worker is running this tag export, and nothing has reported progress "
+                f"for {stalled_seconds}s. Reset it to start a new export."
+            )
+        elif quiet_for is not None and quiet_for >= EXPORT_STALLED_SECONDS:
+            message = (
+                f"No visible tag-export progress for {stalled_seconds}s. The export may be "
+                "waiting on a slow or unresponsive output folder; it can only be cleared "
+                "once it stops."
+            )
+        else:
+            message = ""
+
+        return {
+            "stalled_seconds": stalled_seconds,
+            "attention_required": bool(message),
+            "attention_message": message,
+            "abandoned": abandoned,
+        }
+
     def get_export_progress(self) -> Dict[str, Any]:
         with self._export_lock:
-            return self._export_progress.copy()
+            progress = self._export_progress.copy()
+            return {**progress, **self._describe_export_liveness_locked(progress)}
+
+    def _clear_export_progress_locked(self) -> None:
+        """Publish idle export progress and abandon the current run."""
+        self._export_run_id += 1
+        self._export_progress = {
+            **self._build_default_export_progress_state(),
+            "message": "Reset by user",
+            "updated_at": time.time(),
+        }
 
     def reset_export_progress(self) -> Dict[str, Any]:
-        """Reset a stuck batch tag-export job back to idle (refused while running).
+        """Reset a stuck batch tag-export job back to idle.
 
         Same contract as the move / batch-move / delete / remove resets
         (d7013e2, 2e2ae37): 409 on a genuinely running job, "Nothing to reset"
         only when it really was already idle, and a distinct ``reset`` answer
-        when it cleared something. It used to refuse with a 200 dict, which
-        reads as success to any caller checking the status code, and to report
-        "Nothing to reset" even when it had just cleared a terminal export.
-        Bumping the run id neutralizes an abandoned worker that later wakes up,
-        so it cannot overwrite what this reset just published.
+        when it cleared something. Bumping the run id neutralizes an abandoned
+        worker that later wakes up, so it cannot overwrite what this reset just
+        published.
+
+        Unlike those four, this job never publishes ``cancelling``, so
+        ``running`` is the only state that blocks a new export — which made a
+        reset that refused every ``running`` job a recovery path that could not
+        recover anything. It now clears a ``running`` job whose worker is
+        provably gone, and still refuses one that is merely slow.
         """
         with self._export_lock:
             status = self._export_progress["status"]
             if status == "running":
-                raise HTTPException(
-                    status_code=409, detail="Cannot reset the tag export while it is still running"
-                )
+                if not self._describe_export_liveness_locked(self._export_progress)[
+                    "abandoned"
+                ]:
+                    raise HTTPException(
+                        status_code=409,
+                        detail="Cannot reset the tag export while it is still running",
+                    )
+                self._clear_export_progress_locked()
+                return {
+                    "status": "reset",
+                    "message": "Abandoned tag export cleared. You can start a new export.",
+                }
             if status == "idle":
                 return {"status": "idle", "message": "Nothing to reset"}
-            self._export_run_id += 1
-            self._export_progress = {
-                **self._build_default_export_progress_state(),
-                "message": "Reset by user",
-                "updated_at": time.time(),
-            }
+            self._clear_export_progress_locked()
             return {"status": "reset", "message": "Tag export progress reset to idle"}
 
     def _set_export_progress_if_current(
@@ -129,13 +262,42 @@ class ExportsMixin:
             self._export_progress = state
             return True
 
+    def _publish_export_heartbeat(
+        self, run_id: int, processed: int, total: int
+    ) -> None:
+        """Publish the worker's own progress so a stall is a measured fact.
+
+        Without this the job would only ever stamp ``updated_at`` at start, and
+        "no progress for N seconds" would just be restating how long the export
+        has been running.
+        """
+        now = time.time()
+        with self._export_lock:
+            if run_id != self._export_run_id:
+                return
+            if self._export_progress.get("status") != "running":
+                return
+            since_last = _elapsed_since(self._export_progress.get("updated_at"), now)
+            if (
+                processed < total
+                and since_last is not None
+                and since_last < EXPORT_HEARTBEAT_MIN_INTERVAL_SECONDS
+            ):
+                return
+            self._export_progress = {
+                **self._export_progress,
+                "current": processed,
+                "updated_at": now,
+            }
+
     def start_export_tags_batch_job(
         self, request: BatchTagExportRequest, background_tasks: Any
     ) -> Dict[str, Any]:
         """v3.3.2 Phase-1: run ``export_tags_batch`` as a background job so large
-        exports don't freeze the request. The export pipeline is monolithic, so
-        progress is coarse (running -> done) with no mid-run cancel; the terminal
-        payload embeds the full export result under ``result`` for the frontend.
+        exports don't freeze the request. There is still no mid-run cancel, but
+        the worker now publishes a per-image heartbeat, so a run that has
+        stopped advancing can be told apart from one that is simply large. The
+        terminal payload embeds the full export result under ``result``.
         """
         with self._export_lock:
             if self._export_progress["status"] == "running":
@@ -162,9 +324,19 @@ class ExportsMixin:
                 "updated_at": time.time(),
             }
 
+        def on_progress(update: Dict[str, Any]) -> None:
+            self._publish_export_heartbeat(
+                run_id,
+                int(update.get("processed") or 0),
+                int(update.get("total") or total),
+            )
+
         def run_export():
+            self._mark_export_worker(run_id, running=True)
             try:
-                result = self.export_tags_batch(request)
+                result = self.export_tags_batch(
+                    request, progress_callback=on_progress
+                )
                 self._set_export_progress_if_current(
                     run_id,
                     {
@@ -205,6 +377,10 @@ class ExportsMixin:
                         "updated_at": time.time(),
                     },
                 )
+            finally:
+                # Leaving without a terminal state is what a stranded export
+                # looks like; the reset needs to be able to see that happen.
+                self._mark_export_worker(run_id, running=False)
 
         background_tasks.add_task(run_export)
         return {

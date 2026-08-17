@@ -42,13 +42,19 @@ class TaggingService(
         self._pending_run_id: Optional[int] = None
         # v3.3.2 Phase-1: background batch tag-export job. The underlying
         # export_tags_batch is monolithic, so this runs it off the request thread
-        # to avoid freezing the browser; progress is coarse (running -> done),
-        # no mid-run cancel. The terminal payload embeds the full export result.
+        # to avoid freezing the browser; no mid-run cancel. The terminal payload
+        # embeds the full export result.
         self._export_progress: Dict[str, Any] = (
             self._build_default_export_progress_state()
         )
         self._export_lock = threading.Lock()
         self._export_run_id = 0
+        # Which run a worker has entered, and whether it is still inside. This
+        # is what lets the reset tell an abandoned run from a slow one; a
+        # FastAPI background task runs on a pooled anyio thread that outlives
+        # it, so thread liveness cannot answer that question.
+        self._export_worker_run_id: Optional[int] = None
+        self._export_worker_running = False
 
     def set_tagger_getter(self, tagger_getter: Callable) -> None:
         """Set the tagger getter function from main module."""

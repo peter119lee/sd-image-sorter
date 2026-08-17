@@ -732,7 +732,11 @@ def test_start_export_job_409_when_already_running() -> None:
 def test_export_job_terminal_done_embeds_full_result(monkeypatch) -> None:
     service = TaggingService()
     fake_result = {"status": "ok", "exported": 3, "errors": 0, "skipped": 0}
-    monkeypatch.setattr(service, "export_tags_batch", lambda request: fake_result)
+    # The job now hands export_tags_batch a heartbeat callback; the stub has to
+    # accept it or it would raise into the failure branch instead of exporting.
+    monkeypatch.setattr(
+        service, "export_tags_batch", lambda request, **_kwargs: fake_result
+    )
     _, background_tasks, _ = _start_export_job(service)
 
     background_tasks.tasks[0].func()
@@ -748,7 +752,7 @@ def test_export_job_terminal_done_embeds_full_result(monkeypatch) -> None:
 def test_export_job_failure_embeds_error_result_envelope(monkeypatch) -> None:
     service = TaggingService()
 
-    def _boom(request):
+    def _boom(request, **_kwargs):
         raise RuntimeError("disk full")
 
     monkeypatch.setattr(service, "export_tags_batch", _boom)
@@ -773,7 +777,9 @@ def test_export_job_failure_embeds_error_result_envelope(monkeypatch) -> None:
 def test_export_job_stale_run_cannot_write_terminal_state(monkeypatch) -> None:
     service = TaggingService()
     monkeypatch.setattr(
-        service, "export_tags_batch", lambda request: {"status": "ok", "exported": 3}
+        service,
+        "export_tags_batch",
+        lambda request, **_kwargs: {"status": "ok", "exported": 3},
     )
     _, background_tasks, _ = _start_export_job(service)
 
