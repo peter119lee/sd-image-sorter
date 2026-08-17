@@ -322,6 +322,32 @@ SD_ATTRIBUTED_GENERATOR_SQL = (
     f"({', '.join(repr(name) for name in UNATTRIBUTED_GENERATORS)}))"
 )
 
+# "No generator was recorded at all." Deliberately NARROWER than the negation of
+# SD_ATTRIBUTED_GENERATOR_SQL, which also covers 'others': 'others' is a complete
+# verdict ("metadata was found, no detector claimed it"), whereas 'unknown' — the
+# value every parse starts at — survives only when nothing named a tool and no SD
+# field turned up at all. NULL/blank are legacy rows that predate the column.
+# Same spelling the gallery's "has SD generation parameters" filter uses
+# (db_query_filters._HAS_METADATA_CLAUSE), minus the table alias.
+NO_GENERATOR_RECORDED_SQL = "(LOWER(COALESCE(generator, '')) IN ('', 'unknown'))"
+# "This row records Stable Diffusion generation data." Any one of these is enough
+# for metadata_parser/__init__.py to promote the generator off 'unknown' (the
+# explicit-metadata branch and the closing fallback both do it), so the current
+# parser cannot store one of these against no generator.
+HAS_SD_METADATA_SQL = (
+    "((prompt IS NOT NULL AND TRIM(prompt) != '') "
+    "OR (negative_prompt IS NOT NULL AND TRIM(negative_prompt) != '') "
+    "OR (checkpoint_normalized IS NOT NULL AND TRIM(checkpoint_normalized) != '') "
+    "OR (loras IS NOT NULL AND TRIM(loras) NOT IN ('', '[]')))"
+)
+# The contradiction of those two: SD generation data stored against no generator.
+# By the parser's own rule this row cannot have been written by today's code, so
+# its attribution is stale — it is missing from the gallery's generator tabs and
+# from every SD_ATTRIBUTED_GENERATOR_SQL query — and re-parsing it derives one.
+# That makes it the actionable subset of "the generator is unknown", which as a
+# whole-library figure is a composition fact rather than a defect.
+UNATTRIBUTED_SD_METADATA_SQL = f"{NO_GENERATOR_RECORDED_SQL} AND {HAS_SD_METADATA_SQL}"
+
 
 def normalize_prompt_token(token: str) -> str:
     """Normalize a prompt token for consistent matching.

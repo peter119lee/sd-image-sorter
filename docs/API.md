@@ -901,12 +901,17 @@ Response includes:
   "issue_counts": {
     "missing_text": 120,
     "sd_missing_checkpoint": 14,
+    "unattributed_sd_metadata": 2,
+    "missing_dimensions": 0,
+    "missing_file_size": 0,
     "untagged": 240,
     "unreadable": 3
   },
   "statistics": {
     "missing_prompt": 4180,
-    "missing_checkpoint": 4302
+    "missing_negative_prompt": 4390,
+    "missing_checkpoint": 4302,
+    "unknown_generator": 4180
   },
   "duplicate_filenames": {
     "groups": 12,
@@ -919,7 +924,11 @@ Response includes:
 }
 ```
 
-`issue_counts` is the actionable vocabulary — every key is something a user can do something about, and it is what feeds `summary.actionable_count`. `statistics` holds counts that are true but are not defects: `missing_prompt` and `missing_checkpoint` say how much of the library carries real SD generation parameters, which stays high forever for images Stable Diffusion never made. Their actionable counterparts are `issue_counts.missing_text` (neither a prompt nor a sidecar caption — the set the L3 recovery job can change) and `issue_counts.sd_missing_checkpoint` (readable rows a generator actually claimed that still record no model name). Do not render a `statistics` key as an issue or attach a fix to one.
+`issue_counts` is the actionable vocabulary — every key is something a user can do something about, and it is what feeds `summary.actionable_count` and the quality-score weights.
+
+`statistics` holds counts that are true but are not defects: `missing_prompt`, `missing_negative_prompt`, `missing_checkpoint` and `unknown_generator` say how much of the library carries real SD generation provenance, which stays at or near 100% forever for images Stable Diffusion never made. Three have a narrower actionable counterpart covering only the rows something can still be done for — `issue_counts.missing_text` (neither a prompt nor a sidecar caption: the set the L3 recovery job can change), `issue_counts.sd_missing_checkpoint` (readable rows a generator actually claimed that still record no model name), and `issue_counts.unattributed_sd_metadata` (readable rows that record generation data against no generator at all, which today's parser cannot produce, so the attribution is stale and a re-parse derives one). Do not render a `statistics` key as an issue or attach a fix to one.
+
+Each entry in `recommendations` carries `{kind, severity, count}`, and `count` is the number of **distinct rows** the action visits, never the sum of the issue counters it covers: `incomplete_scan_record` spans `missing_dimensions` and `missing_file_size`, which on a real library are largely the same rows.
 
 Clients should present this as guidance, not as an automatic cleanup operation. Use it to decide whether to re-import, re-parse, tag, or avoid flattening archives with duplicate filenames.
 

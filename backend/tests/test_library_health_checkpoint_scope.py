@@ -104,9 +104,18 @@ def lora_dataset_library(test_db, tmp_path: Path) -> Dict[str, Any]:
     folder = tmp_path / "training-set"
     folder.mkdir()
 
+    # Every readable row is 'others' on purpose. These rows are the subject of a
+    # simulated repair ("the checkpoint gets filled in"), and 'others' is the only
+    # unattributed label for which that is a state the parser can actually
+    # produce: metadata_parser promotes 'unknown' off itself the moment a
+    # checkpoint appears, so writing one against 'unknown' invents a row that
+    # trips issue_counts.unattributed_sd_metadata and stops the mutation
+    # isolating the checkpoint column. 'unknown' rows are exercised in
+    # test_library_health_generator_attribution.py.
     rows = [
         _seed(folder, "caption-null-prompt.png", caption=DANBOORU_CAPTION, generator="others"),
-        _seed(folder, "caption-blank-prompt.png", prompt="", caption=PROSE_CAPTION),
+        _seed(folder, "caption-blank-prompt.png", prompt="", caption=PROSE_CAPTION,
+              generator="others"),
         _seed(folder, "prompt-shaped-tags.png", prompt=DANBOORU_CAPTION, generator="others"),
         _seed(folder, "plain.png", caption=PROSE_CAPTION, generator="others"),
     ]

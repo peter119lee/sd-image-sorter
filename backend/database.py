@@ -68,11 +68,14 @@ from db_core import (
     get_db,
 )
 from db_helpers import (
+    HAS_SD_METADATA_SQL,
     MISSING_TEXT_SQL,
+    NO_GENERATOR_RECORDED_SQL,
     NO_PROMPT_SQL,
     NO_SIDECAR_CAPTION_SQL,
     SD_ATTRIBUTED_GENERATOR_SQL,
     UNATTRIBUTED_GENERATORS,
+    UNATTRIBUTED_SD_METADATA_SQL,
     _normalize_indexed_image_path,
     _path_query_match_clause,
     _folder_scope_query_match_clause,

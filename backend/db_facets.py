@@ -13,6 +13,7 @@ from db_helpers import (
     MISSING_TEXT_SQL,
     NO_PROMPT_SQL,
     SD_ATTRIBUTED_GENERATOR_SQL,
+    UNATTRIBUTED_SD_METADATA_SQL,
     escape_like_pattern,
     normalize_prompt_token,
 )
@@ -68,20 +69,26 @@ def get_library_health_report(*, sample_limit: int = 8) -> Dict[str, Any]:
     """Return a read-only quality audit for the indexed image library.
 
     ``issue_counts`` is the actionable set: every key in it is something a user
-    can do something about. ``statistics`` holds counts that are true but are
-    not defects — ``missing_prompt`` and ``missing_checkpoint``, which together
-    say how much of the library carries real SD generation parameters. They live
-    outside ``issue_counts`` deliberately: an image that Stable Diffusion never
-    made has no prompt and no checkpoint to recover, so reporting either as an
-    issue offers a repair that cannot succeed.
+    can do something about.
 
-    Each has an actionable counterpart in ``issue_counts`` covering exactly the
-    rows something can still be done for: ``missing_text`` (neither a prompt nor
-    a sidecar caption) is the set the L3 recovery job can change, and
+    ``statistics`` holds counts that are true but are not defects:
+    ``missing_prompt``, ``missing_checkpoint``, ``missing_negative_prompt`` and
+    ``unknown_generator``, which together say how much of the library carries
+    real SD generation provenance. They live outside ``issue_counts``
+    deliberately: an image Stable Diffusion never made has no prompt, no
+    checkpoint, no negative prompt and no generator to recover, so reporting any
+    of them as an issue offers a repair that cannot succeed. On a library of
+    downloaded artwork all four read at or near 100%.
+
+    Three of them have a narrower counterpart in ``issue_counts`` covering
+    exactly the rows something can still be done for: ``missing_text`` (neither a
+    prompt nor a sidecar caption) is the set the L3 recovery job can change,
     ``sd_missing_checkpoint`` is the readable rows a generator actually claimed
-    that still record no model name — a real gap in real SD output, and nothing
-    at all in a library of downloaded artwork. Same split Prompt Lab's
-    ``no_checkpoint_metadata`` reason makes before offering a scan.
+    that still record no model name, and ``unattributed_sd_metadata`` is the rows
+    that record generation data against no generator at all — impossible for
+    today's parser to write, so a stale attribution a re-parse can derive. Same
+    split Prompt Lab's ``no_checkpoint_metadata`` reason makes before offering a
+    scan.
     """
     bounded_sample_limit = max(1, min(int(sample_limit or 8), 25))
 
@@ -98,8 +105,12 @@ def get_library_health_report(*, sample_limit: int = 8) -> Dict[str, Any]:
                 SUM(CASE WHEN COALESCE(is_readable, 1) = 1 AND (negative_prompt IS NULL OR TRIM(negative_prompt) = '') THEN 1 ELSE 0 END) AS missing_negative_prompt,
                 SUM(CASE WHEN COALESCE(is_readable, 1) = 1 AND (checkpoint_normalized IS NULL OR TRIM(checkpoint_normalized) = '') THEN 1 ELSE 0 END) AS missing_checkpoint,
                 SUM(CASE WHEN COALESCE(is_readable, 1) = 1 AND (checkpoint_normalized IS NULL OR TRIM(checkpoint_normalized) = '') AND {SD_ATTRIBUTED_GENERATOR_SQL} THEN 1 ELSE 0 END) AS sd_missing_checkpoint,
+                SUM(CASE WHEN COALESCE(is_readable, 1) = 1 AND ({UNATTRIBUTED_SD_METADATA_SQL}) THEN 1 ELSE 0 END) AS unattributed_sd_metadata,
                 SUM(CASE WHEN COALESCE(is_readable, 1) = 1 AND (width IS NULL OR height IS NULL OR width <= 0 OR height <= 0) THEN 1 ELSE 0 END) AS missing_dimensions,
                 SUM(CASE WHEN COALESCE(is_readable, 1) = 1 AND (file_size IS NULL OR file_size <= 0) THEN 1 ELSE 0 END) AS missing_file_size,
+                -- One re-scan fills both columns, so the advice counts the rows
+                -- it visits once each instead of adding the two counters above.
+                SUM(CASE WHEN COALESCE(is_readable, 1) = 1 AND ((width IS NULL OR height IS NULL OR width <= 0 OR height <= 0) OR (file_size IS NULL OR file_size <= 0)) THEN 1 ELSE 0 END) AS incomplete_scan_record,
                 SUM(CASE WHEN COALESCE(is_readable, 1) = 1 AND tagged_at IS NULL THEN 1 ELSE 0 END) AS untagged,
                 SUM(CASE WHEN COALESCE(is_readable, 1) = 1 AND embedding IS NULL THEN 1 ELSE 0 END) AS missing_embedding,
                 SUM(CASE WHEN COALESCE(is_readable, 1) = 1 AND aesthetic_score IS NULL THEN 1 ELSE 0 END) AS missing_aesthetic,
@@ -116,8 +127,8 @@ def get_library_health_report(*, sample_limit: int = 8) -> Dict[str, Any]:
         issue_counts: Dict[str, int] = {
             "unreadable": int(summary_row["unreadable"] or 0) if summary_row else 0,
             "missing_text": int(summary_row["missing_text"] or 0) if summary_row else 0,
-            "missing_negative_prompt": int(summary_row["missing_negative_prompt"] or 0) if summary_row else 0,
             "sd_missing_checkpoint": int(summary_row["sd_missing_checkpoint"] or 0) if summary_row else 0,
+            "unattributed_sd_metadata": int(summary_row["unattributed_sd_metadata"] or 0) if summary_row else 0,
             "missing_dimensions": int(summary_row["missing_dimensions"] or 0) if summary_row else 0,
             "missing_file_size": int(summary_row["missing_file_size"] or 0) if summary_row else 0,
             "untagged": int(summary_row["untagged"] or 0) if summary_row else 0,
@@ -125,12 +136,16 @@ def get_library_health_report(*, sample_limit: int = 8) -> Dict[str, Any]:
             "missing_aesthetic": int(summary_row["missing_aesthetic"] or 0) if summary_row else 0,
             "metadata_pending": int(summary_row["metadata_pending"] or 0) if summary_row else 0,
             "metadata_error": int(summary_row["metadata_error"] or 0) if summary_row else 0,
-            "unknown_generator": int(summary_row["unknown_generator"] or 0) if summary_row else 0,
         }
+        incomplete_scan_record_images = (
+            int(summary_row["incomplete_scan_record"] or 0) if summary_row else 0
+        )
         # True, useful, and not a defect: see this function's docstring.
         statistics: Dict[str, int] = {
             "missing_prompt": int(summary_row["missing_prompt"] or 0) if summary_row else 0,
+            "missing_negative_prompt": int(summary_row["missing_negative_prompt"] or 0) if summary_row else 0,
             "missing_checkpoint": int(summary_row["missing_checkpoint"] or 0) if summary_row else 0,
+            "unknown_generator": int(summary_row["unknown_generator"] or 0) if summary_row else 0,
         }
 
         duplicate_filename_rows = cursor.execute(
@@ -218,6 +233,7 @@ def get_library_health_report(*, sample_limit: int = 8) -> Dict[str, Any]:
                OR LOWER(COALESCE(metadata_status, 'complete')) IN ('pending', 'error')
                OR (COALESCE(is_readable, 1) = 1 AND ({MISSING_TEXT_SQL}))
                OR (COALESCE(is_readable, 1) = 1 AND (checkpoint_normalized IS NULL OR TRIM(checkpoint_normalized) = '') AND {SD_ATTRIBUTED_GENERATOR_SQL})
+               OR (COALESCE(is_readable, 1) = 1 AND ({UNATTRIBUTED_SD_METADATA_SQL}))
                OR (COALESCE(is_readable, 1) = 1 AND (width IS NULL OR height IS NULL OR width <= 0 OR height <= 0))
                OR (COALESCE(is_readable, 1) = 1 AND tagged_at IS NULL)
             ORDER BY
@@ -227,9 +243,10 @@ def get_library_health_report(*, sample_limit: int = 8) -> Dict[str, Any]:
                     WHEN LOWER(COALESCE(metadata_status, 'complete')) = 'pending' THEN 2
                     WHEN {MISSING_TEXT_SQL} THEN 3
                     WHEN (checkpoint_normalized IS NULL OR TRIM(checkpoint_normalized) = '') AND {SD_ATTRIBUTED_GENERATOR_SQL} THEN 4
-                    WHEN width IS NULL OR height IS NULL OR width <= 0 OR height <= 0 THEN 5
-                    WHEN tagged_at IS NULL THEN 6
-                    ELSE 7
+                    WHEN {UNATTRIBUTED_SD_METADATA_SQL} THEN 5
+                    WHEN width IS NULL OR height IS NULL OR width <= 0 OR height <= 0 THEN 6
+                    WHEN tagged_at IS NULL THEN 7
+                    ELSE 8
                 END,
                 id ASC
             LIMIT ?
@@ -246,6 +263,7 @@ def get_library_health_report(*, sample_limit: int = 8) -> Dict[str, Any]:
         issue_counts["unreadable"]
         + issue_counts["missing_text"]
         + issue_counts["sd_missing_checkpoint"]
+        + issue_counts["unattributed_sd_metadata"]
         + issue_counts["missing_dimensions"]
         + issue_counts["untagged"]
         + duplicate_filename_images
@@ -258,7 +276,9 @@ def get_library_health_report(*, sample_limit: int = 8) -> Dict[str, Any]:
             + issue_counts["missing_text"] * 1.4
             + issue_counts["missing_dimensions"] * 1.3
             + issue_counts["sd_missing_checkpoint"] * 0.8
-            + issue_counts["unknown_generator"] * 0.6
+            # Inherits the weight the whole-library unknown_generator count used
+            # to carry, now charged only where an attribution can be derived.
+            + issue_counts["unattributed_sd_metadata"] * 0.6
             + min(issue_counts["untagged"], total) * 0.5
             + min(duplicate_filename_images, total) * 0.5
         )
@@ -290,6 +310,7 @@ def get_library_health_report(*, sample_limit: int = 8) -> Dict[str, Any]:
         "recommendations": _build_library_health_recommendations(
             total=total,
             issue_counts=issue_counts,
+            incomplete_scan_record_images=incomplete_scan_record_images,
             duplicate_filename_images=duplicate_filename_images,
         ),
     }
@@ -299,6 +320,7 @@ def _build_library_health_recommendations(
     *,
     total: int,
     issue_counts: Dict[str, int],
+    incomplete_scan_record_images: int,
     duplicate_filename_images: int,
 ) -> List[Dict[str, Any]]:
     recommendations: List[Dict[str, Any]] = []
@@ -335,6 +357,25 @@ def _build_library_health_recommendations(
             "kind": "sd_missing_checkpoint",
             "severity": "info",
             "count": issue_counts["sd_missing_checkpoint"],
+        })
+    # The actionable subset of "the generator is unknown": a row that records SD
+    # generation data yet names no generator is one today's parser could not have
+    # written, so re-parsing it re-derives the attribution.
+    if issue_counts.get("unattributed_sd_metadata", 0) > 0:
+        recommendations.append({
+            "kind": "unattributed_sd_metadata",
+            "severity": "info",
+            "count": issue_counts["unattributed_sd_metadata"],
+        })
+    # missing_dimensions and missing_file_size are two facets of one incomplete
+    # scan record and usually the same rows, so the offer is one re-scan and the
+    # count beside it is the rows that re-scan visits — not the two counters
+    # added together, which would advertise twice the work that exists.
+    if incomplete_scan_record_images > 0:
+        recommendations.append({
+            "kind": "incomplete_scan_record",
+            "severity": "info",
+            "count": incomplete_scan_record_images,
         })
     if issue_counts.get("untagged", 0) > 0:
         recommendations.append({
