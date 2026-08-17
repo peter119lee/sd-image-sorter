@@ -9,6 +9,8 @@ at call time so existing monkeypatches keep landing.
 
 import logging
 import os
+import re
+import shutil
 import threading
 import time
 from typing import Any, Dict, List, Optional
@@ -16,6 +18,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import BackgroundTasks, HTTPException
 
 import database as db
+from exceptions import FileOperationError
 from services import entry_stats_service
 from services.sorting_models import MoveRequest, VALID_FILE_OPERATIONS
 from utils.path_validation import normalize_user_path, validate_folder_path
@@ -24,6 +27,66 @@ from utils.path_validation import normalize_user_path, validate_folder_path
 # handlers / caplog filters to "services.sorting_service" (heartbeat pins),
 # and log routing/output must stay byte-identical after the package split.
 logger = logging.getLogger("services.sorting_service")
+
+# Keep a reported cause short enough that the shared frontend formatter
+# (frontend/js/modules/utils/errors.js) forwards it instead of collapsing it
+# to a generic sentence at its 180-character ceiling.
+_MAX_REPORTED_CAUSE_LENGTH = 140
+
+_QUOTED_PATH_PATTERN = re.compile(r"(['\"])(?P<path>[^'\"]*[\\/][^'\"]*)\1")
+_DRIVE_OR_UNC_PATH_PATTERN = re.compile(r"(?:[A-Za-z]:[\\/]|\\\\)[^\s'\"]*")
+_POSIX_PATH_PATTERN = re.compile(r"(?<![\w~])/(?:[^\s'\"/]+/)+[^\s'\"]*")
+
+
+def _path_leaf(value: str) -> str:
+    """Return the final component of a path written with either separator."""
+    parts = [part for part in re.split(r"[\\/]+", value) if part]
+    return parts[-1] if parts else value
+
+
+def _shorten_paths(text: str) -> str:
+    """Replace filesystem paths in an error message with their filename.
+
+    The cause of a failed move is worth showing the user; the absolute path it
+    happened at is not. ``frontend/js/modules/utils/errors.js`` treats any
+    message carrying a drive-qualified path as technical jargon and replaces
+    the whole thing with a generic sentence, so leaving the path in would throw
+    the diagnosis away again.
+    """
+    shortened = _QUOTED_PATH_PATTERN.sub(
+        lambda match: f"{match.group(1)}{_path_leaf(match.group('path'))}{match.group(1)}",
+        text,
+    )
+    shortened = _DRIVE_OR_UNC_PATH_PATTERN.sub(
+        lambda match: _path_leaf(match.group(0)), shortened
+    )
+    return _POSIX_PATH_PATTERN.sub(lambda match: _path_leaf(match.group(0)), shortened)
+
+
+def _is_same_existing_file(left: str, right: str) -> bool:
+    """Return whether two existing paths point at the same file on disk."""
+    try:
+        return os.path.samefile(left, right)
+    except OSError:
+        return False
+
+
+def _describe_file_operation_cause(exc: Exception) -> str:
+    """Render an exception as a single-line, path-free, user-readable cause."""
+    text = str(exc)
+    path = getattr(exc, "path", None)
+    operation = getattr(exc, "operation", None)
+    # FileOperationError prepends its own "Failed to <op> '<path>':" preamble
+    # (exceptions.py). Callers add their own sentence, so drop the duplicate.
+    if path and operation:
+        text = text.removeprefix(f"Failed to {operation} '{path}': ")
+    elif path:
+        text = text.removeprefix(f"File operation failed for '{path}': ")
+
+    cause = " ".join(_shorten_paths(text).split())
+    if len(cause) > _MAX_REPORTED_CAUSE_LENGTH:
+        cause = cause[:_MAX_REPORTED_CAUSE_LENGTH].rstrip() + "..."
+    return cause
 
 
 def _svc():
@@ -100,6 +163,72 @@ class MoveMixin:
             "new_image_id": None,
         }
 
+    @staticmethod
+    def _restore_file_to_original_path(
+        image_id: int,
+        source_path: str,
+        original_path: str,
+    ) -> str:
+        """Move a file back to the exact path a sort action took it from.
+
+        An undo restores a file to a location it already owned, so the
+        collision suffix ``move_image`` appends — correct for a forward move
+        into someone else's folder — is wrong here: it silently renamed
+        ``00042.png`` to ``00042_1.png`` and reported the undo as clean. When
+        the original path is genuinely taken by a different file we refuse
+        instead, so the caller rolls the session back and tells the user rather
+        than inventing a new name for their image.
+
+        Serialized by the caller's sort-session lock; the session is
+        single-active by design, so no extra locking is needed here.
+        """
+        restored_path = os.path.abspath(normalize_user_path(original_path))
+        current_path = os.path.abspath(source_path)
+        if os.path.normcase(current_path) == os.path.normcase(restored_path):
+            # Already home: an undo retried after a partial failure, or a move
+            # that never left the folder. Nothing to do.
+            return restored_path
+
+        destination_folder = os.path.dirname(restored_path)
+        is_valid, error = validate_folder_path(destination_folder, allow_create=True)
+        if not is_valid:
+            raise FileOperationError(
+                f"the original folder is no longer usable ({error or 'invalid path'})"
+            )
+        os.makedirs(destination_folder, exist_ok=True)
+
+        if os.path.exists(restored_path) and not _is_same_existing_file(
+            current_path, restored_path
+        ):
+            raise FileOperationError(
+                f"another file named '{os.path.basename(restored_path)}' is already in "
+                f"'{os.path.basename(destination_folder) or destination_folder}'. "
+                "Move or rename it, then undo again."
+            )
+
+        try:
+            shutil.move(current_path, restored_path)
+        except OSError as exc:
+            raise FileOperationError(_describe_file_operation_cause(exc)) from exc
+
+        try:
+            db.update_image_path(image_id, restored_path)
+        except Exception as db_error:
+            try:
+                shutil.move(restored_path, current_path)
+            except Exception as rollback_error:
+                raise FileOperationError(
+                    "the library entry could not be updated and the file could not be "
+                    f"put back ({_describe_file_operation_cause(db_error)}; "
+                    f"{_describe_file_operation_cause(rollback_error)})"
+                ) from db_error
+            raise FileOperationError(
+                "the library entry could not be updated, so the file was left in place "
+                f"({_describe_file_operation_cause(db_error)})"
+            ) from db_error
+
+        return restored_path
+
     def _undo_file_operation(self, history_entry: Dict[str, Any]) -> None:
         """Undo a previous move/copy action recorded in manual sort history."""
         operation = self._validate_file_operation(history_entry.get("operation") or history_entry.get("action"))
@@ -117,10 +246,20 @@ class MoveMixin:
             return
 
         source_path = self._resolve_image_path(image.get("path") or "")
-        original_folder = history_entry.get("original_folder") or os.path.dirname(
-            normalize_user_path(history_entry.get("original_path") or "")
-        )
-        if source_path and original_folder:
+        if not source_path:
+            return
+
+        original_path = normalize_user_path(history_entry.get("original_path") or "")
+        if original_path:
+            self._restore_file_to_original_path(
+                history_entry["image_id"], source_path, original_path
+            )
+            return
+
+        # Legacy history entries recorded before original_path existed can only
+        # be restored by folder, which is the pre-v3 behavior.
+        original_folder = history_entry.get("original_folder") or ""
+        if original_folder:
             move_image(history_entry["image_id"], original_folder, source_path)
 
     @staticmethod
