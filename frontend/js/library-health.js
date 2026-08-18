@@ -15,18 +15,32 @@
 
     var REPARSE_POLL_MS = 1200;
 
+    // Every key db_facets.ISSUE_VOCABULARY publishes in issue_counts, in the
+    // order the panel draws them. A published key with no bar here still feeds
+    // actionable_count and still earns a recommendation card, so its number
+    // reaches the page with nothing to trace it to; a key listed here that the
+    // payload no longer publishes reads a permanent zero. Both happened at once
+    // when missing_prompt / missing_checkpoint / unknown_generator moved to
+    // statistics, so the two lists are now pinned to each other by
+    // test_every_health_issue_bar_is_a_number_the_payload_actually_publishes.
     var ISSUE_KEYS = [
         'unreadable',
         'metadata_error',
         'metadata_pending',
-        'missing_prompt',
-        'missing_checkpoint',
+        'missing_text',
+        'sd_missing_checkpoint',
+        'unattributed_sd_metadata',
         'missing_dimensions',
-        'unknown_generator',
+        'missing_file_size',
         'untagged',
         'missing_embedding',
         'missing_aesthetic'
     ];
+
+    // Optional enrichment coverage rather than defects: the vocabulary declares
+    // both as reported-only, so they stay on screen at zero to say the coverage
+    // is complete instead of vanishing like a fixed problem.
+    var COVERAGE_KEYS = ['missing_embedding', 'missing_aesthetic'];
 
     function $(selector) {
         return document.querySelector(selector);
@@ -83,11 +97,16 @@
     function recommendationText(item) {
         var count = formatNumber(item && item.count);
         var key = item && item.kind;
+        // One entry per recommendation kind db_facets can publish. A kind that
+        // is missing here loses its count as well as its wording, because the
+        // generic fallback interpolates nothing.
         var fallbackMap = {
             metadata_pending: 'Wait for metadata import to finish before trusting generator counts.',
             reparse_or_reconnect: 'Re-parse or reconnect unreadable records before moving files.',
-            missing_prompt: 'Re-import or inspect files with missing prompts before dataset export.',
-            missing_checkpoint: 'Checkpoint gaps may weaken model-based filtering and archive folders.',
+            missing_text: 'Run Recover Missing Text on the images that have neither a prompt nor a caption.',
+            sd_missing_checkpoint: 'Re-scan the generated folders so the model name is read back out of the files.',
+            unattributed_sd_metadata: 'Re-parse the images that record generation data against no generator.',
+            incomplete_scan_record: 'Re-scan the folder to restore file sizes and dimensions.',
             untagged: 'Run AI tagging to unlock safer filtering, sorting, and search.',
             duplicate_filenames: 'Duplicate filenames are risky for cache, tag export, and flat archive folders.'
         };
@@ -99,10 +118,11 @@
             unreadable: 'Unreadable / missing files',
             metadata_error: 'Metadata parse errors',
             metadata_pending: 'Metadata still pending',
-            missing_prompt: 'Missing prompt',
-            missing_checkpoint: 'Missing checkpoint',
+            missing_text: 'No prompt and no caption',
+            sd_missing_checkpoint: 'Generated images missing checkpoint',
+            unattributed_sd_metadata: 'Generation data with no generator',
             missing_dimensions: 'Missing dimensions',
-            unknown_generator: 'Unknown generator',
+            missing_file_size: 'Missing file size',
             untagged: 'Not AI-tagged',
             missing_embedding: 'No similarity embedding',
             missing_aesthetic: 'No aesthetic score'
@@ -161,7 +181,7 @@
         var rows = ISSUE_KEYS.map(function (key) {
             return { key: key, count: Number(counts[key] || 0) };
         }).filter(function (item) {
-            return item.count > 0 || ['missing_embedding', 'missing_aesthetic'].indexOf(item.key) !== -1;
+            return item.count > 0 || COVERAGE_KEYS.indexOf(item.key) !== -1;
         });
 
         if (!rows.length) {

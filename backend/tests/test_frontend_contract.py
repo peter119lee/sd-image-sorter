@@ -3664,3 +3664,144 @@ def test_intake_borrows_the_readers_drop_zone_instead_of_wiring_a_second_one():
         f"_setupDropZone now reaches {sorted(reached)} on its receiver; the "
         "Reverse Prompt page only implements _handleFile"
     )
+
+
+# ---------------------------------------------------------------------------
+# Library health — every bar the panel draws is a number the payload publishes,
+# and every card it draws is a sentence somebody wrote.
+# ---------------------------------------------------------------------------
+
+
+def _library_health_source(repo_root: Path) -> str:
+    return (repo_root / "frontend" / "js" / "library-health.js").read_text(
+        encoding="utf-8"
+    )
+
+
+def _js_string_array(source: str, variable_name: str) -> list[str]:
+    match = re.search(
+        rf"\bvar {re.escape(variable_name)} = \[(?P<body>[^\]]*)\]",
+        source,
+        re.DOTALL,
+    )
+    assert match is not None, f"library-health.js no longer declares {variable_name}"
+    values = re.findall(r"'([^']+)'", match.group("body"))
+    assert values, f"{variable_name} is empty, so this guard would check nothing"
+    return values
+
+
+def _js_function_source(source: str, name: str) -> str:
+    match = re.search(
+        rf"^    function {re.escape(name)}\(.*?^    \}}$",
+        source,
+        re.MULTILINE | re.DOTALL,
+    )
+    assert match is not None, f"library-health.js no longer declares {name}()"
+    return match.group(0)
+
+
+def _js_object_keys(scope: str, variable_name: str) -> list[str]:
+    keys = re.findall(
+        r"^\s+(?P<key>[A-Za-z_][A-Za-z0-9_]*)\s*:",
+        _javascript_object_body(scope, variable_name),
+        re.MULTILINE,
+    )
+    assert keys, f"{variable_name} declares no entries"
+    return keys
+
+
+def test_every_health_issue_bar_is_a_number_the_payload_actually_publishes():
+    """A hardcoded bar list beside a declared payload is a list that drifts.
+
+    It already had: the panel still asked for ``missing_prompt``,
+    ``missing_checkpoint`` and ``unknown_generator`` after all three moved into
+    ``statistics`` as composition facts rather than defects, and it never learned
+    ``missing_text``, ``sd_missing_checkpoint``, ``unattributed_sd_metadata`` or
+    ``missing_file_size``. Both directions are user-visible: a key that is no
+    longer published draws nothing, and a key that is published without a bar
+    becomes a recommendation card and an ``actionable_count`` contribution whose
+    number has no visible source anywhere on the page.
+    """
+    repo_root = Path(__file__).resolve().parents[2]
+    source = _library_health_source(repo_root)
+
+    from db_facets import ISSUE_VOCABULARY
+
+    declared = [spec.key for spec in ISSUE_VOCABULARY]
+    rendered = _js_string_array(source, "ISSUE_KEYS")
+    assert len(set(rendered)) == len(rendered), f"ISSUE_KEYS repeats a key: {rendered}"
+    assert sorted(rendered) == sorted(declared), (
+        "library-health.js and db_facets.py disagree about issue_counts: "
+        f"drawn but not published={sorted(set(rendered) - set(declared))}, "
+        f"published but not drawn={sorted(set(declared) - set(rendered))}"
+    )
+
+    # db_facets' own comment on ``missing_embedding`` says this file "keeps it
+    # visible even at zero" because optional enrichment coverage is not a
+    # defect. Two files stating one rule is how they stop agreeing.
+    coverage = _js_string_array(source, "COVERAGE_KEYS")
+    reported_only = [spec.key for spec in ISSUE_VOCABULARY if spec.remedy is None]
+    assert sorted(coverage) == sorted(reported_only), (
+        "the rows the panel shows at zero are no longer the reported-only "
+        f"coverage keys: panel={sorted(coverage)} payload={sorted(reported_only)}"
+    )
+
+    # The English fallback map is what renders before I18n loads, so a key it
+    # misses shows the user the snake_case identifier itself.
+    labels = _js_object_keys(_js_function_source(source, "issueLabel"), "fallbackMap")
+    assert sorted(labels) == sorted(declared), (
+        "issueLabel's English fallbacks no longer cover issue_counts: "
+        f"extra={sorted(set(labels) - set(declared))}, "
+        f"missing={sorted(set(declared) - set(labels))}"
+    )
+
+
+def test_every_health_recommendation_the_payload_can_send_is_written_in_both_locales():
+    """An unrecognised card kind renders "Review this library signal." with no count.
+
+    Which is what ``incomplete_scan_record`` (63 images on the owner's library)
+    and ``unattributed_sd_metadata`` did from the moment the backend began
+    offering them: a card that names neither the number of images nor the action,
+    in the panel whose whole job is naming both.
+    """
+    repo_root = Path(__file__).resolve().parents[2]
+    source = _library_health_source(repo_root)
+    facets = (repo_root / "backend" / "db_facets.py").read_text(encoding="utf-8")
+
+    from db_facets import ISSUE_REMEDIES, ISSUE_VOCABULARY
+
+    # Every kind the payload can publish: one per declared remedy, plus any card
+    # appended with a literal kind (duplicate filenames are not an issue key).
+    literal_kinds = set(re.findall(r'"kind":\s*"(?P<kind>[a-z_]+)"', facets))
+    assert literal_kinds, (
+        "no literal recommendation kind found in db_facets.py - has the "
+        "recommendation builder moved?"
+    )
+    kinds = {remedy.kind for remedy in ISSUE_REMEDIES} | literal_kinds
+
+    fallbacks = _js_object_keys(
+        _js_function_source(source, "recommendationText"), "fallbackMap"
+    )
+    assert set(fallbacks) == kinds, (
+        "recommendationText's English fallbacks no longer cover the published "
+        f"card kinds: extra={sorted(set(fallbacks) - kinds)}, "
+        f"missing={sorted(kinds - set(fallbacks))}"
+    )
+
+    for pack_name, pack in _locale_pack_sources(repo_root).items():
+        for kind in sorted(kinds):
+            key = f"health.recommendation.{kind}"
+            match = re.search(
+                rf"^\s*'{re.escape(key)}'\s*:\s*'(?P<value>[^']*)'", pack, re.MULTILINE
+            )
+            assert match is not None, f"{pack_name} is missing {key}"
+            assert "{count}" in match.group("value"), (
+                f"{pack_name}:{key} drops the count, so the card advertises an "
+                "action over no number"
+            )
+        for spec in ISSUE_VOCABULARY:
+            key = f"health.issue.{spec.key}"
+            assert re.search(rf"^\s*'{re.escape(key)}'\s*:", pack, re.MULTILINE), (
+                f"{pack_name} is missing {key}, so the bar is labelled with its "
+                "own snake_case key"
+            )
