@@ -899,13 +899,17 @@ Response includes:
     "actionable_count": 320
   },
   "issue_counts": {
+    "unreadable": 3,
     "missing_text": 120,
     "sd_missing_checkpoint": 14,
     "unattributed_sd_metadata": 2,
     "missing_dimensions": 0,
     "missing_file_size": 0,
     "untagged": 240,
-    "unreadable": 3
+    "missing_embedding": 4800,
+    "missing_aesthetic": 4800,
+    "metadata_pending": 0,
+    "metadata_error": 3
   },
   "statistics": {
     "missing_prompt": 4180,
@@ -924,11 +928,27 @@ Response includes:
 }
 ```
 
-`issue_counts` is the actionable vocabulary — every key is something a user can do something about, and it is what feeds `summary.actionable_count` and the quality-score weights. Every member is declared in `db_facets.ISSUE_VOCABULARY` together with the remedy that names its action, so a key with no remedy carries no weight and no `actionable_count` contribution; the invariant is enforced at import and tested in `backend/tests/test_library_health_issue_vocabulary.py`.
+`issue_counts` is the issue vocabulary — every key is a claim that something is wrong that the user can do something about. Every member is declared in `db_facets.ISSUE_VOCABULARY` together with the remedy that names its action, or with a recorded reason for being reported without one; the invariant is enforced at import and tested in `backend/tests/test_library_health_issue_vocabulary.py`. Which keys carry consequence is per key, and clients must not assume all of them do:
 
-`statistics` holds counts that are true but are not defects: `missing_prompt`, `missing_negative_prompt`, `missing_checkpoint` and `unknown_generator` say how much of the library carries real SD generation provenance, which stays at or near 100% forever for images Stable Diffusion never made. Three have a narrower actionable counterpart covering only the rows something can still be done for — `issue_counts.missing_text` (neither a prompt nor a sidecar caption: the set the L3 recovery job can change), `issue_counts.sd_missing_checkpoint` (readable rows a generator actually claimed that still record no model name), and `issue_counts.unattributed_sd_metadata` (readable rows that record generation data against no generator at all, which today's parser cannot produce, so the attribution is stale and a re-parse derives one). Do not render a `statistics` key as an issue or attach a fix to one.
+| Key | Feeds `actionable_count` | Costs `quality_score` | Notes |
+|-----|--------------------------|-----------------------|-------|
+| `unreadable` | yes | yes | Priced for the whole `reparse_or_reconnect` union. |
+| `missing_text` | yes | yes | |
+| `sd_missing_checkpoint` | yes | yes | |
+| `unattributed_sd_metadata` | yes | yes | |
+| `missing_dimensions` | yes | yes | Priced for the whole `incomplete_scan_record` union. |
+| `untagged` | yes | yes | |
+| `missing_file_size` | no | via `missing_dimensions` | Second facet of one incomplete scan record. |
+| `metadata_error` | no | via `unreadable` | Every unreadable row is also one of these. |
+| `metadata_pending` | no | no | A running import, not a defect. |
+| `missing_embedding` | no | no | Optional coverage; complement is `summary.embedding_percent`. |
+| `missing_aesthetic` | no | no | Optional coverage; complement is `summary.aesthetic_percent`. |
 
-Each entry in `recommendations` carries `{kind, severity, count}`, and `count` is the number of **distinct rows** the action visits, never the sum of the issue counters it covers: `reparse_or_reconnect` spans `unreadable` and `metadata_error` (the same rows, since marking a row unreadable also sets `metadata_status = 'error'`), and `incomplete_scan_record` spans `missing_dimensions` and `missing_file_size`.
+`summary.actionable_count` counts **images**, not issues: rows matching any actionable key or sharing a filename with another row, each counted once. It can never exceed `summary.total_images`. `summary.quality_score` deducts per remedy over the distinct rows that remedy visits, so every deduction is a number a `recommendations` entry also carries, and a row broken in two ways one action fixes costs once.
+
+`statistics` holds counts that are true but are not defects: `missing_prompt`, `missing_negative_prompt`, `missing_checkpoint` and `unknown_generator` say how much of the library carries real SD generation provenance, which stays at or near 100% forever for images Stable Diffusion never made. Three have a narrower actionable counterpart covering only the rows something can still be done for — `issue_counts.missing_text` (neither a prompt nor a sidecar caption: the set the L3 recovery job can change), `issue_counts.sd_missing_checkpoint` (readable rows a generator actually claimed that still record no model name), and `issue_counts.unattributed_sd_metadata` (readable rows that record generation data against no generator at all, which today's parser cannot produce, so the attribution is stale and a re-parse derives one). `unknown_generator` counts every readable row with no generator recorded — `''`, NULL or `'unknown'`, whitespace trimmed — which is the same predicate `unattributed_sd_metadata` is built from, so that key really is a subset of it. `'others'` is excluded from both: it is the parser's complete verdict that text was found and no detector claimed it. Do not render a `statistics` key as an issue or attach a fix to one.
+
+Each entry in `recommendations` carries `{kind, severity, count}`, and `count` is the number of **distinct rows** the action visits, never the sum of the issue counters it covers: `reparse_or_reconnect` spans `unreadable` and `metadata_error` (largely the same rows, since marking a row unreadable also sets `metadata_status = 'error'`; a readable image whose metadata parse failed is in `metadata_error` alone), and `incomplete_scan_record` spans `missing_dimensions` and `missing_file_size`.
 
 Clients should present this as guidance, not as an automatic cleanup operation. Use it to decide whether to re-import, re-parse, tag, or avoid flattening archives with duplicate filenames.
 
