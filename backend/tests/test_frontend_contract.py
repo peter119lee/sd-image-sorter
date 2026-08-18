@@ -3805,3 +3805,86 @@ def test_every_health_recommendation_the_payload_can_send_is_written_in_both_loc
                 f"{pack_name} is missing {key}, so the bar is labelled with its "
                 "own snake_case key"
             )
+
+
+def _js_string_list(source: str, variable_name: str) -> list[str]:
+    """Like :func:`_js_string_array`, but a member may legitimately be ``''``."""
+    match = re.search(
+        rf"\bvar {re.escape(variable_name)} = \[(?P<body>[^\]]*)\]", source, re.DOTALL
+    )
+    assert match is not None, f"library-health.js no longer declares {variable_name}"
+    values = re.findall(r"'([^']*)'", match.group("body"))
+    assert values, f"{variable_name} is empty, so this guard would check nothing"
+    return values
+
+
+def test_the_attention_list_only_names_defects_the_audit_itself_counts():
+    """The reason column may not accuse a row of something issue_counts excludes.
+
+    It did, both ways. "Files Needing Attention" called any promptless row
+    *Missing prompt*, though ``missing_text`` deliberately spares a row whose
+    text lives in ``sidecar_caption``; and any row without a checkpoint *Missing
+    checkpoint*, though ``sd_missing_checkpoint`` only counts rows a generator
+    actually claimed. So a row listed for being untagged was shown a defect the
+    audit refuses to count — the same "this number has no honest source" failure
+    the issue-bar allowlist had, pointing the other way.
+    """
+    repo_root = Path(__file__).resolve().parents[2]
+    source = _library_health_source(repo_root)
+
+    from db_facets import SAMPLE_REASON_LADDER
+    from db_helpers import NO_GENERATOR_RECORDED_SQL, UNATTRIBUTED_GENERATORS
+
+    # Order is the contract, not just membership: the backend shows the *first*
+    # matching rank, so a panel walking the same keys in a different order names
+    # a real defect that is not the one the row was listed for.
+    walked = _js_string_array(source, "SAMPLE_REASON_LADDER")
+    assert walked == list(SAMPLE_REASON_LADDER), (
+        "library-health.js walks the attention-list reasons in a different order "
+        f"than db_facets ranks them: panel={walked} payload={list(SAMPLE_REASON_LADDER)}"
+    )
+
+    tested = _js_object_keys(source, "REASON_TESTS")
+    assert sorted(tested) == sorted(SAMPLE_REASON_LADDER), (
+        "every ranked reason needs a predicate over the sampled columns: "
+        f"extra={sorted(set(tested) - set(SAMPLE_REASON_LADDER))}, "
+        f"missing={sorted(set(SAMPLE_REASON_LADDER) - set(tested))}"
+    )
+
+    # Rank 0 is the exception by design: an unreadable row is described by its
+    # own read_error, so it is the one rank with no static label.
+    labelled = _js_object_keys(source, "REASON_LABELS")
+    expected_labels = [key for key in SAMPLE_REASON_LADDER if key != "unreadable"]
+    assert sorted(labelled) == sorted(expected_labels), (
+        "the labelled reasons are no longer the ranked ones: "
+        f"extra={sorted(set(labelled) - set(expected_labels))}, "
+        f"missing={sorted(set(expected_labels) - set(labelled))}"
+    )
+
+    # The two generator vocabularies decide which of those ranks a row lands on,
+    # and both are backend constants. A second spelling is how "a checkpoint is
+    # missing" and "nothing generated this" stopped being the same question.
+    assert _js_string_list(source, "UNATTRIBUTED_GENERATORS") == list(
+        UNATTRIBUTED_GENERATORS
+    ), "library-health.js disagrees with db_helpers.UNATTRIBUTED_GENERATORS"
+
+    recorded_values = re.search(r"IN \((?P<body>[^)]*)\)", NO_GENERATOR_RECORDED_SQL)
+    assert recorded_values is not None, (
+        "NO_GENERATOR_RECORDED_SQL no longer spells its values as an IN list, so "
+        "this guard can no longer read them"
+    )
+    assert _js_string_list(source, "NO_GENERATOR_RECORDED") == re.findall(
+        r"'([^']*)'", recorded_values.group("body")
+    ), "library-health.js disagrees with db_helpers.NO_GENERATOR_RECORDED_SQL"
+
+    # A reason with no wording renders its own dotted key into the column.
+    reason_keys = set(re.findall(r"'(health\.reason\.[A-Za-z]+)'", source))
+    assert len(reason_keys) >= len(expected_labels), (
+        f"only {sorted(reason_keys)} reason strings found; the ladder needs one "
+        "per labelled rank plus the fallback"
+    )
+    for pack_name, pack in _locale_pack_sources(repo_root).items():
+        for key in sorted(reason_keys):
+            assert re.search(
+                rf"^\s*'{re.escape(key)}'\s*:", pack, re.MULTILINE
+            ), f"{pack_name} is missing {key}"

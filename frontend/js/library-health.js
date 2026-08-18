@@ -130,17 +130,110 @@
         return t('health.issue.' + key, fallbackMap[key] || key);
     }
 
+    // Mirrors db_helpers.UNATTRIBUTED_GENERATORS: the ids metadata_parser records
+    // when no SD tool claimed the image. A checkpoint is only expected of a row
+    // some generator did claim, so this list is what decides whether an empty
+    // checkpoint column is a gap or simply the truth about a downloaded picture.
+    var UNATTRIBUTED_GENERATORS = ['unknown', 'others'];
+
+    // Mirrors db_helpers.NO_GENERATOR_RECORDED_SQL's value set, which is narrower
+    // than the negation of the list above: 'others' is a finished verdict
+    // ("metadata was found, nothing recognised it"), while '' — NULL and blank
+    // legacy rows, reached through TRIM(COALESCE(...)) — and 'unknown' mean no
+    // attribution was ever recorded.
+    var NO_GENERATOR_RECORDED = ['', 'unknown'];
+
+    // Mirrors db_facets.SAMPLE_REASON_LADDER: the order the backend ranks a
+    // listed row's defects in. Walking the same order is what makes the reason
+    // column say why the row is on the list, instead of naming the first thing
+    // that happens to look empty. Both directions were wrong here: a caption-only
+    // row was reported as "Missing prompt" though issue_counts.missing_text
+    // excludes it, and any row without a checkpoint was reported as "Missing
+    // checkpoint" though sd_missing_checkpoint only counts rows a generator
+    // claimed. Pinned by
+    // test_the_attention_list_only_names_defects_the_audit_itself_counts.
+    var SAMPLE_REASON_LADDER = [
+        'unreadable',
+        'metadata_error',
+        'metadata_pending',
+        'missing_text',
+        'sd_missing_checkpoint',
+        'unattributed_sd_metadata',
+        'missing_dimensions',
+        'untagged'
+    ];
+
+    // Rank 0 is absent on purpose: an unreadable row carries its own read_error,
+    // which says more than any label could.
+    var REASON_LABELS = {
+        metadata_error: ['health.reason.metadataError', 'Metadata error'],
+        metadata_pending: ['health.reason.metadataPending', 'Metadata pending'],
+        missing_text: ['health.reason.missingText', 'No prompt and no caption'],
+        sd_missing_checkpoint: ['health.reason.missingCheckpoint', 'Missing checkpoint'],
+        unattributed_sd_metadata: [
+            'health.reason.unattributedSdMetadata',
+            'Generation data with no generator'
+        ],
+        missing_dimensions: ['health.reason.missingDimensions', 'Missing dimensions'],
+        untagged: ['health.reason.untagged', 'Not tagged']
+    };
+
+    function isBlank(value) {
+        return value == null || !String(value).trim();
+    }
+
+    function generatorId(sample) {
+        return String(sample.generator == null ? '' : sample.generator).trim().toLowerCase();
+    }
+
+    // One predicate per rank, over the columns issue_samples actually ships.
+    var REASON_TESTS = {
+        // read_error stands in for is_readable = 0, which the payload does not
+        // carry; mark_image_unreadable writes both together.
+        unreadable: function (sample) {
+            return !isBlank(sample.read_error);
+        },
+        metadata_error: function (sample) {
+            return String(sample.metadata_status || '').trim().toLowerCase() === 'error';
+        },
+        metadata_pending: function (sample) {
+            return String(sample.metadata_status || '').trim().toLowerCase() === 'pending';
+        },
+        missing_text: function (sample) {
+            return isBlank(sample.prompt) && isBlank(sample.sidecar_caption);
+        },
+        sd_missing_checkpoint: function (sample) {
+            return isBlank(sample.checkpoint_normalized)
+                && !isBlank(sample.generator)
+                && UNATTRIBUTED_GENERATORS.indexOf(generatorId(sample)) === -1;
+        },
+        // The payload ships two of the four columns HAS_SD_METADATA_SQL reads, so
+        // a row whose only generation data is a negative prompt or a LoRA list
+        // falls through to the honest fallback rather than being renamed.
+        unattributed_sd_metadata: function (sample) {
+            return NO_GENERATOR_RECORDED.indexOf(generatorId(sample)) !== -1
+                && (!isBlank(sample.prompt) || !isBlank(sample.checkpoint_normalized));
+        },
+        missing_dimensions: function (sample) {
+            return !sample.width || !sample.height;
+        },
+        untagged: function (sample) {
+            return !sample.tagged_at;
+        }
+    };
+
     function sampleReason(sample) {
         if (!sample) return '';
-        if (sample.read_error) return sample.read_error;
-        var status = String(sample.metadata_status || '').toLowerCase();
-        if (status === 'error') return t('health.reason.metadataError', 'Metadata error');
-        if (status === 'pending') return t('health.reason.metadataPending', 'Metadata pending');
-        if (!sample.prompt || !String(sample.prompt).trim()) return t('health.reason.missingPrompt', 'Missing prompt');
-        if (!sample.checkpoint_normalized || !String(sample.checkpoint_normalized).trim()) return t('health.reason.missingCheckpoint', 'Missing checkpoint');
-        if (!sample.width || !sample.height) return t('health.reason.missingDimensions', 'Missing dimensions');
-        if (!sample.tagged_at) return t('health.reason.untagged', 'Not tagged');
-        return t('health.reason.review', 'Review');
+        for (var index = 0; index < SAMPLE_REASON_LADDER.length; index++) {
+            var key = SAMPLE_REASON_LADDER[index];
+            if (!REASON_TESTS[key](sample)) continue;
+            if (key === 'unreadable') return String(sample.read_error);
+            return t(REASON_LABELS[key][0], REASON_LABELS[key][1]);
+        }
+        // The backend lists a row only when one of these ranks matches it, so
+        // reaching here means the evidence is in a column issue_samples withholds.
+        // Naming a defect anyway is the bug this ladder exists to stop.
+        return t('health.reason.unnamed', 'Reason not available');
     }
 
     function renderStatus(data) {

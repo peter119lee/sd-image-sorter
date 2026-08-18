@@ -299,6 +299,41 @@ ISSUE_REMEDIES: Tuple[IssueRemedy, ...] = (
 )
 
 
+# Which defects put a row in ``issue_samples``, and the order the one reason
+# shown against it is picked in. Issue-vocabulary keys, so both the sample
+# query's WHERE and its rank come from the vocabulary's own predicates: a row
+# can only be listed for something the audit counts, and can only be described
+# as something it is. Spelling the predicates out here again is what let the
+# list and the counts disagree once already.
+#
+# ``missing_embedding`` and ``missing_aesthetic`` are absent because they are
+# reported-only coverage rather than defects — an attention list is an
+# invitation to act. ``missing_file_size`` is absent because it shares the
+# ``incomplete_scan_record`` remedy with ``missing_dimensions`` and, in every
+# library measured so far, the same rows; a row missing only its file size is
+# therefore not listed at all, which is behaviour this tuple preserves rather
+# than a rule it endorses.
+SAMPLE_REASON_LADDER: Tuple[str, ...] = (
+    "unreadable",
+    "metadata_error",
+    "metadata_pending",
+    "missing_text",
+    "sd_missing_checkpoint",
+    "unattributed_sd_metadata",
+    "missing_dimensions",
+    "untagged",
+)
+
+
+def _sample_reason_specs(
+    ladder: Tuple[str, ...] = SAMPLE_REASON_LADDER,
+    vocabulary: Tuple[IssueSpec, ...] = ISSUE_VOCABULARY,
+) -> Tuple[IssueSpec, ...]:
+    """The ladder resolved to the vocabulary entries it names, in ladder order."""
+    by_key = {spec.key: spec for spec in vocabulary}
+    return tuple(by_key[key] for key in ladder)
+
+
 def _validate_issue_vocabulary(
     vocabulary: Tuple[IssueSpec, ...] = ISSUE_VOCABULARY,
     remedies: Tuple[IssueRemedy, ...] = ISSUE_REMEDIES,
@@ -383,6 +418,30 @@ def _validate_issue_vocabulary(
                 "remedy does not resolve it, so its advertised count would "
                 "describe different rows"
             )
+
+    if not SAMPLE_REASON_LADDER:
+        raise ValueError("the attention list ranks no reason, so it would list nothing")
+    duplicate_ranks = {
+        key for key in SAMPLE_REASON_LADDER if SAMPLE_REASON_LADDER.count(key) > 1
+    }
+    if duplicate_ranks:
+        raise ValueError(
+            f"the attention list ranks these keys twice: {sorted(duplicate_ranks)}"
+        )
+    unranked = [key for key in SAMPLE_REASON_LADDER if key not in by_key]
+    if unranked:
+        raise ValueError(
+            f"the attention list ranks undeclared issue keys: {unranked}; a listed "
+            "row would be described as a defect nothing counts"
+        )
+    reported_only_ranks = [
+        key for key in SAMPLE_REASON_LADDER if by_key[key].remedy is None
+    ]
+    if reported_only_ranks:
+        raise ValueError(
+            f"the attention list ranks reported-only coverage: {reported_only_ranks}; "
+            "it would invite action on a key that declares none"
+        )
 
 
 _validate_issue_vocabulary()
@@ -584,35 +643,35 @@ def get_library_health_report(*, sample_limit: int = 8) -> Dict[str, Any]:
 
         # A sample list is an invitation to act, so it follows the same rule as
         # the counts: a row whose only text is a sidecar caption is not a text
-        # problem, and a row nothing generated is not a checkpoint problem.
+        # problem, and a row nothing generated is not a checkpoint problem. Both
+        # the membership test and the rank are the vocabulary's own predicates,
+        # walked in SAMPLE_REASON_LADDER order, so neither can drift from what
+        # issue_counts publishes.
+        #
         # ``sidecar_caption`` and ``generator`` ride along because rows listed
         # for some other reason still have to be describable — without them a
         # consumer can only report "missing prompt" or "missing checkpoint" for
         # a row where neither is a defect.
+        ranked_reasons = _sample_reason_specs()
+        sample_membership_sql = "\n               OR ".join(
+            f"({spec.sql})" for spec in ranked_reasons
+        )
+        # ELSE is unreachable: membership is the disjunction of the same
+        # predicates the ranks are, so every listed row matches one of them.
+        sample_rank_sql = "\n                    ".join(
+            f"WHEN {spec.sql} THEN {rank}" for rank, spec in enumerate(ranked_reasons)
+        )
         issue_sample_rows = cursor.execute(
             f"""
             SELECT id, filename, path, generator, metadata_status, read_error,
                    prompt, sidecar_caption, checkpoint_normalized, width, height,
                    file_size, tagged_at
             FROM images
-            WHERE COALESCE(is_readable, 1) = 0
-               OR LOWER(COALESCE(metadata_status, 'complete')) IN ('pending', 'error')
-               OR (COALESCE(is_readable, 1) = 1 AND ({MISSING_TEXT_SQL}))
-               OR (COALESCE(is_readable, 1) = 1 AND (checkpoint_normalized IS NULL OR TRIM(checkpoint_normalized) = '') AND {SD_ATTRIBUTED_GENERATOR_SQL})
-               OR (COALESCE(is_readable, 1) = 1 AND ({UNATTRIBUTED_SD_METADATA_SQL}))
-               OR (COALESCE(is_readable, 1) = 1 AND (width IS NULL OR height IS NULL OR width <= 0 OR height <= 0))
-               OR (COALESCE(is_readable, 1) = 1 AND tagged_at IS NULL)
+            WHERE {sample_membership_sql}
             ORDER BY
                 CASE
-                    WHEN COALESCE(is_readable, 1) = 0 THEN 0
-                    WHEN LOWER(COALESCE(metadata_status, 'complete')) = 'error' THEN 1
-                    WHEN LOWER(COALESCE(metadata_status, 'complete')) = 'pending' THEN 2
-                    WHEN {MISSING_TEXT_SQL} THEN 3
-                    WHEN (checkpoint_normalized IS NULL OR TRIM(checkpoint_normalized) = '') AND {SD_ATTRIBUTED_GENERATOR_SQL} THEN 4
-                    WHEN {UNATTRIBUTED_SD_METADATA_SQL} THEN 5
-                    WHEN width IS NULL OR height IS NULL OR width <= 0 OR height <= 0 THEN 6
-                    WHEN tagged_at IS NULL THEN 7
-                    ELSE 8
+                    {sample_rank_sql}
+                    ELSE {len(ranked_reasons)}
                 END,
                 id ASC
             LIMIT ?
