@@ -403,7 +403,16 @@ class TestReadabilityAndDerivedState:
         assert row["content_fingerprint"] == "fp-1"
         assert _tag_count(image_id) == 1
 
-    def test_mark_image_unreadable_clears_derived_and_flags_error(self, test_db):
+    def test_mark_image_unreadable_clears_pixel_caches_but_keeps_the_tags(self, test_db):
+        """An unreachable file is not a changed file, so the tags still hold.
+
+        This assertion used to require ``_tag_count == 0``, which pinned a
+        data-loss bug: the same call runs from an ordinary gallery listing, so an
+        unplugged drive plus one page load deleted every tag on it. It also made
+        the "derived state is deliberately KEPT" behaviour of
+        ``reconnect_image_source_path`` above unreachable — there was never
+        anything left to keep by the time a reconnect ran.
+        """
         _add("/w/bad.png")
         image_id = db.get_image_by_path("/w/bad.png")["id"]
         self._seed_derived(image_id)
@@ -414,11 +423,13 @@ class TestReadabilityAndDerivedState:
         assert row["is_readable"] == 0
         assert row["read_error"] == "Truncated File Read"
         assert row["metadata_status"] == "error"
-        assert row["tagged_at"] is None  # derived cleared
+        # Recomputed from pixels we can no longer read, so these must go.
+        assert row["tagged_at"] is None
         assert row["content_fingerprint"] is None
-        assert _tag_count(image_id) == 0
+        # Entered against this image, and unrecoverable if dropped.
+        assert _tag_count(image_id) == 1
 
-    def test_mark_image_unreadable_by_path_clears_every_equivalent_row(self, test_db):
+    def test_mark_image_unreadable_by_path_marks_every_equivalent_row(self, test_db):
         stored_paths = (
             r"C:\Library\Bad.png",
             "/mnt/c/Library/Bad.png",
@@ -455,7 +466,8 @@ class TestReadabilityAndDerivedState:
             assert row["metadata_status"] == "error"
             assert row["tagged_at"] is None
             assert row["content_fingerprint"] is None
-            assert _tag_count(image_id) == 0
+            # Same rule as mark_image_unreadable: pixel caches go, tags stay.
+            assert _tag_count(image_id) == 1
 
         unrelated_id = image_ids_by_path[unrelated_path]
         unrelated_row = _row(unrelated_id)

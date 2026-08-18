@@ -11,10 +11,14 @@ module directly from feature code — ``db_images_write`` itself imports this
 module at the end of its body, so a direct import that wins the race would
 trip the managed import cycle and fail loudly.
 
-The derived-state clear helper stays in ``db_images_write``
-(tests/test_derived_state_contract.py pins its writer statement to that
-filename); the from-import below binds the SAME function object, so the
-unreadable transitions keep clearing stale derived rows exactly as before.
+The derived-state clear helpers stay in ``db_images_write``
+(tests/test_derived_state_contract.py pins their writer statements to that
+filename); the from-import below binds the SAME function object.
+
+The unreadable transitions call ``_clear_image_pixel_caches``, NOT
+``_clear_image_derived_state``: an unreachable file is not a changed file, so the
+pixel-derived caches go and the tags stay. Deleting them here is unrecoverable
+once a reconnect hands the row back.
 
 Imports only from db_core / db_helpers / utils.source_paths /
 utils.reported_cause / db_images_write / stdlib; it must not import from
@@ -35,7 +39,7 @@ from db_helpers import (
     _normalize_indexed_image_path,
     _path_query_match_clause,
 )
-from db_images_write import _clear_image_derived_state, _sync_image_path_identity
+from db_images_write import _clear_image_pixel_caches, _sync_image_path_identity
 
 
 def reconnect_image_source_path(
@@ -228,11 +232,19 @@ def _stored_unreadable_cause(read_error: Optional[str]) -> Optional[str]:
     return normalize_reported_cause(read_error)
 
 def mark_image_unreadable(image_id: int, read_error: Optional[str]) -> None:
-    """Mark an indexed image as unreadable so normal workflows exclude it."""
+    """Mark an indexed image as unreadable so normal workflows exclude it.
+
+    Clears the pixel caches only. This runs on the "file not found" path — and
+    ``ImageService._filter_and_mark_missing_images`` reaches it from an ordinary
+    gallery listing — so an unplugged drive plus one page load used to delete
+    every tag on that drive with no prompt and no notice. Nothing about the
+    image changed; we just cannot see it, and ``reconnect_image_source_path``
+    can hand the row back at any time.
+    """
     stored_cause = _stored_unreadable_cause(read_error)
     with get_db() as conn:
         cursor = conn.cursor()
-        _clear_image_derived_state(cursor, image_id)
+        _clear_image_pixel_caches(cursor, image_id)
         cursor.execute(
             """
             UPDATE images
@@ -247,7 +259,11 @@ def mark_image_unreadable(image_id: int, read_error: Optional[str]) -> None:
     _invalidate_tags_cache()
 
 def mark_image_unreadable_by_path(path: str, read_error: Optional[str]) -> None:
-    """Mark an existing image row as unreadable based on its file path."""
+    """Mark an existing image row as unreadable based on its file path.
+
+    Same rule as ``mark_image_unreadable``: pixel caches only, because being
+    unreachable is not the same fact as having changed.
+    """
     candidates = build_indexed_image_lookup_candidates(path)
     if not candidates:
         return
@@ -271,7 +287,7 @@ def mark_image_unreadable_by_path(path: str, read_error: Optional[str]) -> None:
             if not rows:
                 break
             for row in rows:
-                _clear_image_derived_state(cursor, row["id"])
+                _clear_image_pixel_caches(cursor, row["id"])
             last_image_id = int(rows[-1]["id"])
         cursor.execute(
             f"""
