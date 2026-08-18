@@ -56,6 +56,7 @@ from utils.path_validation import (
     validate_file_path,
     validate_image_output_path,
 )
+from utils.reported_cause import describe_readability_failure
 
 # NOTE(decomposition): keep the historical logger channel so log routing and
 # output stay byte-identical after the package split.
@@ -349,7 +350,10 @@ class ServingMixin:
             if not readable:
                 raise HTTPException(
                     status_code=422,
-                    detail=f"Invalid or unreadable image file: {read_error or 'image decode failed'}",
+                    detail=(
+                        "Invalid or unreadable image file: "
+                        f"{describe_readability_failure(read_error) if read_error else 'image decode failed'}"
+                    ),
                 )
 
             result = await run_in_threadpool(parse_image, str(tmp_path))

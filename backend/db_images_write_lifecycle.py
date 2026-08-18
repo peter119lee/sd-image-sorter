@@ -17,12 +17,14 @@ filename); the from-import below binds the SAME function object, so the
 unreadable transitions keep clearing stale derived rows exactly as before.
 
 Imports only from db_core / db_helpers / utils.source_paths /
-db_images_write / stdlib; it must not import from ``database``.
+utils.reported_cause / db_images_write / stdlib; it must not import from
+``database``.
 """
 import os
 from datetime import datetime
 from typing import Optional, List
 
+from utils.reported_cause import normalize_reported_cause
 from utils.source_paths import build_indexed_image_lookup_candidates
 from db_core import (
     get_db,
@@ -214,8 +216,20 @@ def update_image_path(image_id: int, new_path: str):
         if cursor.rowcount:
             _sync_image_path_identity(cursor, image_id, normalized_path)
 
+def _stored_unreadable_cause(read_error: Optional[str]) -> Optional[str]:
+    """Keep SQL NULL as NULL; otherwise the same user-facing cause scan/move store.
+
+    ``describe_readability_failure`` would turn empty/None into
+    ``"Unreadable image"``. Callers that pass None or ``""`` must keep today's
+    column shape, so this is ``normalize_reported_cause`` with None preserved.
+    """
+    if read_error is None:
+        return None
+    return normalize_reported_cause(read_error)
+
 def mark_image_unreadable(image_id: int, read_error: Optional[str]) -> None:
     """Mark an indexed image as unreadable so normal workflows exclude it."""
+    stored_cause = _stored_unreadable_cause(read_error)
     with get_db() as conn:
         cursor = conn.cursor()
         _clear_image_derived_state(cursor, image_id)
@@ -228,7 +242,7 @@ def mark_image_unreadable(image_id: int, read_error: Optional[str]) -> None:
                 indexed_at = CURRENT_TIMESTAMP
             WHERE id = ?
             """,
-            (read_error, image_id),
+            (stored_cause, image_id),
         )
     _invalidate_tags_cache()
 
@@ -268,7 +282,7 @@ def mark_image_unreadable_by_path(path: str, read_error: Optional[str]) -> None:
                 indexed_at = CURRENT_TIMESTAMP
             WHERE {clause}
             """,
-            [read_error, *params],
+            [_stored_unreadable_cause(read_error), *params],
         )
     _invalidate_tags_cache()
 

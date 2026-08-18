@@ -23,6 +23,7 @@ them, that must be a conscious decision, not an accident.
 
 from __future__ import annotations
 
+import re
 import sys
 from pathlib import Path
 
@@ -203,6 +204,34 @@ def test_worker_unreadable_image_records_reader_reason(
             "SELECT read_error FROM images WHERE id = ?", (image_id,)
         ).fetchone()
     assert row["read_error"] == "truncated file"
+
+
+def test_worker_unreadable_progress_does_not_show_a_drive_path(
+    fake_tagger_env, monkeypatch, tmp_path: Path
+) -> None:
+    """The ETA toast interpolates the same cause the row stores; neither may name a folder."""
+    image_id = _add_image(tmp_path, "broken.png")
+    pillow = r"cannot identify image file 'L:\OwnersLibrary\broken.png'"
+    monkeypatch.setattr(
+        tsvc, "verify_image_readable", lambda path: (False, pillow)
+    )
+
+    messages = _run_worker(_payload([image_id]))
+
+    with db.get_db() as conn:
+        row = conn.execute(
+            "SELECT read_error FROM images WHERE id = ?", (image_id,)
+        ).fetchone()
+    stored = row["read_error"] or ""
+    assert "broken.png" in stored
+    assert re.search(r"[A-Za-z]:\\", stored) is None, stored
+
+    skipped = [m["message"] for m in messages if "Skipped unreadable image" in (m.get("message") or "")]
+    assert skipped, "the worker did not emit the unreadable progress toast"
+    for message in skipped:
+        assert "broken.png" in message
+        assert re.search(r"[A-Za-z]:\\", message) is None, message
+        assert "OwnersLibrary" not in message
 
 
 def test_worker_filters_nonexistent_image_ids_from_total(

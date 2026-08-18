@@ -41,6 +41,7 @@ from model_download_sources import (
     log_model_artifact_status,
 )
 from model_health_paths import CLIP_TEXT_REQUIRED_FILES, CLIP_VISION_REQUIRED_FILES
+from utils.reported_cause import describe_readability_failure
 from utils.source_paths import resolve_existing_indexed_image_path
 from ai_runtime_guard import (
     PRIORITY_BATCH,
@@ -521,9 +522,10 @@ class SimilarityIndex(_IndexCoreMixin, _VectorCacheMixin, _TopKMixin):
                         self._progress["processed"] += 1
                         self._progress["errors"] += 1
                         self._progress["unreadable"] += 1
-                        self._record_issue("unreadable", img_id, img_path, read_error or "Unreadable image")
+                        cause = describe_readability_failure(read_error)
+                        self._record_issue("unreadable", img_id, img_path, cause)
                         if hasattr(self.db, "mark_image_unreadable"):
-                            self.db.mark_image_unreadable(img_id, read_error or "Unreadable image")
+                            self.db.mark_image_unreadable(img_id, cause)
                         continue
 
                     before_fingerprint = _compute_embedding_content_fingerprint(resolved_path)

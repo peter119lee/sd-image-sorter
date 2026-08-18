@@ -19,6 +19,7 @@ from config import DEFAULT_TAGGER_MODEL, TAGGER_MODELS
 from image_fingerprint import compute_image_content_fingerprint
 from metadata_parser import verify_image_readable
 from services import entry_stats_service
+from utils.reported_cause import describe_readability_failure
 from services.tagging.filters import (
     _apply_pre_tag_filters,
     _build_last_run_stats,
@@ -526,16 +527,15 @@ def _tagging_worker_main(
                 if not readable:
                     total_errors += 1
                     total_processed += 1
-                    worker_db.mark_image_unreadable(
-                        img["id"], read_error or "Unreadable image"
-                    )
+                    cause = describe_readability_failure(read_error)
+                    worker_db.mark_image_unreadable(img["id"], cause)
                     logger.warning(
                         "Skipping unreadable image during tagging: %s (%s)",
                         image_path,
                         read_error,
                     )
                     send_with_eta(
-                        f"Skipped unreadable image: {image_name} ({read_error or 'Unreadable image'})",
+                        f"Skipped unreadable image: {image_name} ({cause})",
                     )
                     continue
 

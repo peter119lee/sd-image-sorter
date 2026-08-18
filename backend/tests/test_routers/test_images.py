@@ -10,6 +10,7 @@ Tests:
 Priority: HIGH
 """
 import os
+import re
 import sys
 import json
 import base64
@@ -1866,6 +1867,7 @@ class TestUtilityImageEndpoints:
         data = response.json()
         detail = data.get("detail") or data.get("error") or data.get("message") or ""
         assert "parse" in detail.lower() or "image" in detail.lower()
+        assert re.search(r"[A-Za-z]:\\", detail) is None, detail
 
     def test_parse_uploaded_image_rejects_oversized_upload(self, test_client, monkeypatch):
         from routers import images as images_router

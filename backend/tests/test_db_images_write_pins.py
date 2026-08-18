@@ -40,6 +40,7 @@ target the export surface and the write-path edge contracts a split must keep.
 """
 
 import ast
+import re
 import sys
 from pathlib import Path
 
@@ -474,6 +475,78 @@ class TestReadabilityAndDerivedState:
         assert row["is_readable"] == 1
         assert row["read_error"] is None
         assert row["metadata_status"] == "complete"
+
+    def test_mark_image_unreadable_does_not_store_a_drive_path(self, test_db):
+        """The unreadable write is the funnel: callers must not be able to persist a folder.
+
+        Tagging, similarity, Manual Sort, and the workbench all pass
+        ``verify_image_readable(...).read_error`` through unchanged. Pillow
+        answers ``cannot identify image file '<absolute path>'``. That string
+        used to land in ``images.read_error`` as-is.
+        """
+        image_id = _add("/w/kept.png")
+        db.mark_image_unreadable(
+            image_id,
+            r"cannot identify image file 'L:\OwnersLibrary\kept.png'",
+        )
+
+        stored = _row(image_id)["read_error"] or ""
+        assert stored
+        assert "kept.png" in stored
+        assert "cannot identify" in stored
+        assert re.search(r"[A-Za-z]:\\", stored) is None, stored
+        assert "OwnersLibrary" not in stored
+
+    def test_mark_image_unreadable_by_path_does_not_store_a_drive_path(self, test_db):
+        image_id = _add("/w/by_path.png")
+        db.mark_image_unreadable_by_path(
+            "/w/by_path.png",
+            r"cannot identify image file 'L:\OwnersLibrary\by_path.png'",
+        )
+
+        stored = _row(image_id)["read_error"] or ""
+        assert "by_path.png" in stored
+        assert re.search(r"[A-Za-z]:\\", stored) is None, stored
+        assert "OwnersLibrary" not in stored
+
+    def test_already_normalised_cause_is_byte_stable_on_a_second_pass(self, test_db, tmp_path):
+        """Scan/move already run the cause through the normaliser; a second pass must not change it."""
+        from metadata_parser import verify_image_readable
+        from utils.reported_cause import describe_readability_failure, normalize_reported_cause
+
+        broken = tmp_path / "00042.png"
+        broken.write_bytes(b"truncated image data")
+        readable, raw = verify_image_readable(str(broken))
+        assert readable is False and raw
+
+        already = describe_readability_failure(raw)
+        assert already == normalize_reported_cause(already)
+
+        image_id = _add(str(broken).replace("\\", "/"), filename="00042.png")
+        db.mark_image_unreadable(image_id, already)
+        assert _row(image_id)["read_error"] == already
+
+        db.mark_image_unreadable(image_id, already)
+        assert _row(image_id)["read_error"] == already
+
+    @pytest.mark.parametrize(
+        "literal",
+        ("File not found", "Unreadable image", "Truncated File Read", "boom"),
+    )
+    def test_hardcoded_english_literals_stay_themselves(self, test_db, literal):
+        image_id = _add(f"/w/{literal.replace(' ', '_')}.png")
+        db.mark_image_unreadable(image_id, literal)
+        assert _row(image_id)["read_error"] == literal
+
+    def test_none_and_empty_read_error_keep_current_db_shape(self, test_db):
+        none_id = _add("/w/none-cause.png")
+        empty_id = _add("/w/empty-cause.png")
+
+        db.mark_image_unreadable(none_id, None)
+        db.mark_image_unreadable(empty_id, "")
+
+        assert _row(none_id)["read_error"] is None
+        assert _row(empty_id)["read_error"] == ""
 
 
 # ===========================================================================

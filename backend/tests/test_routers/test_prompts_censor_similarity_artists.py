@@ -2274,6 +2274,36 @@ class TestSimilarityRouterValidation:
             "missing.png",
         }
 
+    def test_embed_unreadable_reason_does_not_name_a_drive(self, test_db, tmp_path, monkeypatch):
+        import re
+        import similarity as similarity_module
+
+        image_path = tmp_path / "broken.png"
+        image_path.write_bytes(b"not an image")
+        image_id = test_db.add_image(
+            path=str(image_path),
+            filename=image_path.name,
+            metadata_json="{}",
+        )
+        pillow = r"cannot identify image file 'L:\OwnersLibrary\broken.png'"
+        monkeypatch.setattr(similarity_module, "_get_embed_model", lambda: object())
+        monkeypatch.setattr(
+            similarity_module, "verify_image_readable", lambda _path: (False, pillow)
+        )
+
+        result = similarity_module.SimilarityIndex(test_db).embed_batch([image_id])
+        reason = result["recent_issues"][0]["reason"]
+        assert "broken.png" in reason
+        assert re.search(r"[A-Za-z]:\\", reason) is None, reason
+        assert "OwnersLibrary" not in reason
+
+        with test_db.get_db() as conn:
+            stored = conn.execute(
+                "SELECT read_error FROM images WHERE id = ?", (image_id,)
+            ).fetchone()["read_error"]
+        assert stored == reason
+        assert re.search(r"[A-Za-z]:\\", stored or "") is None
+
     def test_embed_batch_resolves_windows_indexed_path_before_embedding(self, test_db, tmp_path, monkeypatch):
         import similarity as similarity_module
         from PIL import Image
