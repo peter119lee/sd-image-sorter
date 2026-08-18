@@ -2505,7 +2505,11 @@ test('Keep/Reject cull should switch modes, keep/reject/skip, and route kept ima
   // Keep (→) the first image → advances; tally increments.
   await page.keyboard.press('ArrowRight')
   await expect(page.locator('#cull-progress-text')).toHaveText('2 / 3')
-  await expect(page.locator('#cull-tally-keep')).toHaveText('♥ 1')
+  await expect(page.locator('#cull-tally-keep-count')).toHaveText('1')
+  // The sprite glyph and the screen-reader word are the non-colour keep/reject
+  // distinction, so a tally update must write the count span without erasing them.
+  await expect(page.locator('#cull-tally-keep svg.icon')).toHaveCount(1)
+  await expect(page.locator('#cull-tally-keep .sr-only')).toHaveCount(1)
   const secondCullImageId = await page.evaluate(() => Number((window as any).ManualSortState?.currentImage?.id))
   expect(secondCullImageId).toBeGreaterThan(0)
   expect(secondCullImageId).not.toBe(firstCullImageId)
@@ -2513,7 +2517,9 @@ test('Keep/Reject cull should switch modes, keep/reject/skip, and route kept ima
   // Reject (←) the second → advances; reject tally increments.
   await page.keyboard.press('ArrowLeft')
   await expect(page.locator('#cull-progress-text')).toHaveText('3 / 3')
-  await expect(page.locator('#cull-tally-reject')).toHaveText('✕ 1')
+  await expect(page.locator('#cull-tally-reject-count')).toHaveText('1')
+  await expect(page.locator('#cull-tally-reject svg.icon')).toHaveCount(1)
+  await expect(page.locator('#cull-tally-reject .sr-only')).toHaveCount(1)
   const thirdCullImageId = await page.evaluate(() => Number((window as any).ManualSortState?.currentImage?.id))
   expect(thirdCullImageId).toBeGreaterThan(0)
   expect(thirdCullImageId).not.toBe(firstCullImageId)

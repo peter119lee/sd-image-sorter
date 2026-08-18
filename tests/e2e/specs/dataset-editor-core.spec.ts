@@ -3475,7 +3475,9 @@ test('local items: queue decoration + local _setActive branch (no flush, no diff
     }
   }, LOCAL_ID)
   expect(item.className).toContain('source-local')
-  expect(item.idLabel).toBe('📁 img_001.png')
+  // A local item relabels the id line with its filename instead of the gallery
+  // default `#<id>`; the source is carried by the class above, not by a glyph.
+  expect(item.idLabel).toBe('img_001.png')
 
   // Make the caption diff visible from the edited gallery image first.
   await page.evaluate(() => (window as any).DatasetMaker._setActive(703))
@@ -3502,7 +3504,7 @@ test('local items: queue decoration + local _setActive branch (no flush, no diff
   expect(res.activeId).toBe(LOCAL_ID)
   expect(res.captionEditNow).toBe('1girl, frown, hat')
   expect(res.taValue).toBe('local caption, tree')
-  expect(res.filename).toBe('📁 img_001.png')
+  expect(res.filename).toBe('img_001.png')
   // Gallery-only hook: the diff indicator is untouched by a local switch.
   expect(res.diffHidden).toBe(false)
 })

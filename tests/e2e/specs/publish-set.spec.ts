@@ -188,10 +188,15 @@ test('workbench renders pairs, drag reorders, and exports through the UI', async
   await expect(rows).toHaveCount(3)
 
   // Master toggle defaults on: the paired row pre-selects its censored variant.
+  // The pair line names the censored file it resolved, and carries the paired
+  // state as a class rather than as a glyph in the text, so this survives icon
+  // and locale sweeps while still failing if the affordance disappears.
   const pairedRow = page.locator(`.pub-item[data-image-id="${fixtureIds[1]}"]`)
-  await expect(pairedRow.locator('.pub-item-pair')).toHaveText('✓ v350-pub-2_censored.png')
+  await expect(pairedRow.locator('.pub-item-pair')).toHaveText('v350-pub-2_censored.png')
+  await expect(pairedRow.locator('.pub-item-pair')).toHaveClass(/is-paired/)
   await expect(pairedRow.locator('.pub-variant-btn.active')).toHaveText('Censored')
   const unpairedRow = page.locator(`.pub-item[data-image-id="${fixtureIds[0]}"]`)
+  await expect(unpairedRow.locator('.pub-item-pair')).toHaveClass(/is-unpaired/)
   await expect(unpairedRow.locator('.pub-variant-btn.active')).toHaveText('Original')
 
   // Drag the first row below the last one → order becomes [2, 3, 1].
