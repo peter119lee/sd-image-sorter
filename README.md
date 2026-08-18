@@ -95,7 +95,7 @@
 - **真能干活**：不是只看图，是完整的筛选、打标、排序、查重、打码工作流。
 - **真适合大图库**：几千张图不是展示案例，是默认使用场景。
 - **真有速度感**：WASD 手动分拣、批量动作、后台进度、快捷键都不是摆设。
-- **真有界面**：不是冷冰冰的调试页，而是带玻璃拟态和霓虹氛围的本地工具。
+- **真有界面**：不是冷冰冰的调试页。中性石墨底、单一强调色、发丝线分隔，长时间看图不累。
 
 ## 截图
 
@@ -739,7 +739,7 @@ If an old install already pulled full AI Python packages, use **Setup Now → Di
 - **Backend**: FastAPI, SQLite, Pillow, ONNX Runtime
 - **Frontend**: Vanilla HTML, CSS, JavaScript
 - **AI models**: WD14 taggers, YOLOv8-based censor detection, CLIP similarity, Kaloscope artist ID
-- **Design language**: glassmorphism, neon UI, keyboard-first workflows
+- **Design language**: flat graphite surfaces, one accent color, hairline panels, keyboard-first workflows
 
 ### Notes
 

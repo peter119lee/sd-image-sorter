@@ -39,11 +39,13 @@ run-portable.bat
 data/
 update/
 
-# Internal dev files (not for public repo)
-AGENTS.md
+# Internal dev files (not for public repo).
+# SECURITY.md, THIRD_PARTY_MODELS.md and docs/architecture.md are NOT listed
+# here on purpose: GitHub reads SECURITY.md to enable private vulnerability
+# reporting, THIRD_PARTY_MODELS.md is the model licensing/attribution
+# statement, and README links to docs/architecture.md. They are still excluded
+# from release archives by scripts/build_release_packages.py.
 CLAUDE.md
-THIRD_PARTY_MODELS.md
-SECURITY.md
 backend/lora_debug.txt
 example/
 models/nudenet/
@@ -197,10 +199,9 @@ backend/verify_sorting.py
 
 # Internal docs (generated, not for public repo)
 # docs/API.md is versioned because API contract tests validate it.
+# docs/architecture.md is versioned because README links to it.
 docs/DELETION_LOG.md
 docs/IMPROVEMENT_PLAN.md
-docs/SECURITY_ARCHITECTURE.md
-docs/architecture.md
 
 # Internal scratch / audit prompts (not for public repo)
 v3_audit_prompt.md
