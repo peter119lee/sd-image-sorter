@@ -87,6 +87,7 @@
             items: [
                 { icon: '🛡️', nameKey: 'tools.obfuscation', name: 'Privacy Tools', descKey: 'catalog.obfuscation', desc: 'Obfuscate images for upload sites and restore them back (inside Reader)', run: () => openReaderTool('obfuscation') },
                 { icon: '🧹', nameKey: 'dup.navTitle', name: 'Duplicate Cleanup', descKey: 'catalog.dup', desc: 'Scan the whole library for duplicates and clean them in one pass', run: () => { goView('gallery'); window.requestAnimationFrame(() => clickWhenReady('nav-tools-dup-cleaner', 10)); } },
+                { icon: '#i-wand', nameKey: 'nav.reverse', name: 'Reverse Prompt', descKey: 'catalog.reverse', desc: 'Drop one image to recover its prompt: the record inside the file first, AI inference only when there is none', run: () => goView('reverse') },
                 { icon: '🧪', nameKey: 'nav.promptlab', name: 'Prompt Helper', descKey: 'catalog.promptlab', desc: 'Build prompts from your library: weights, templates, negatives', run: () => goView('promptlab') },
                 { icon: '🖌️', nameKey: 'nav.artist', name: 'Style Finder', descKey: 'catalog.artist', desc: 'Identify artists with a similar style (experimental)', run: () => goView('artist') },
                 { icon: '📦', nameKey: 'entry.tileModels', name: 'Model Center', descKey: 'catalog.models', desc: 'Download and manage the AI models every feature runs on', run: () => openSettingsTab('models') },
@@ -103,7 +104,19 @@
         const icon = document.createElement('span');
         icon.className = 'catalog-icon';
         icon.setAttribute('aria-hidden', 'true');
-        icon.textContent = item.icon;
+        if (String(item.icon || '').startsWith('#i-')) {
+            // Graphite entries name a sprite symbol. The legacy emoji rows below
+            // still take the textContent path and are retired separately.
+            const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            svg.setAttribute('class', 'icon');
+            svg.setAttribute('aria-hidden', 'true');
+            const use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+            use.setAttribute('href', item.icon);
+            svg.appendChild(use);
+            icon.appendChild(svg);
+        } else {
+            icon.textContent = item.icon;
+        }
 
         const copy = document.createElement('span');
         copy.className = 'catalog-copy';

@@ -19,6 +19,7 @@ function updateNavigationOverflowState() {
         'nav-tabs-compact-labels',
         'nav-tabs-compact-secondary',
         'nav-tabs-compact-brand',
+        'nav-priority-tools-overflow',
         'nav-priority-overflow'
     );
     if (forceMobileLayout) {
@@ -73,6 +74,18 @@ function updateNavigationOverflowState() {
         return false;
     }
 
+    // The newest tool goes first. Measured at 1920: compact-labels alone left
+    // the bar fitting with eight tabs, and a ninth pushed it over — which would
+    // have demoted Prompt Helper and Style Finder from direct tabs at an
+    // ordinary desktop width, the exact thing the note above says must not
+    // happen. One extra rung keeps that promise and still leaves the newcomer
+    // reachable through its More-menu mirror.
+    navBar.classList.add('nav-priority-tools-overflow');
+    if (!needsOverflow()) {
+        closeMobileMenu();
+        return false;
+    }
+
     // Only when compacting is not enough: move the low-priority tools into More.
     navBar.classList.add('nav-priority-overflow');
     if (!needsOverflow()) {
@@ -110,6 +123,7 @@ function updateNavigationOverflowState() {
         'nav-tabs-compact-labels',
         'nav-tabs-compact-secondary',
         'nav-tabs-compact-brand',
+        'nav-priority-tools-overflow',
         'nav-priority-overflow'
     );
     navBar.classList.add('nav-tabs-overflow');
@@ -169,10 +183,18 @@ function setupNavToolsMenu() {
 // highlight would otherwise be invisible.
 function updateNavToolsActive(viewName) {
     const toggle = document.getElementById('nav-tools-toggle');
-    const TOOL_VIEWS = ['promptlab', 'artist'];
+    // Reverse Prompt belongs here for the same reason the two older tools do,
+    // and more strongly: the ladder's `nav-priority-tools-overflow` rung hides
+    // its direct tab a step EARLIER than theirs, so at ordinary desktop widths
+    // the toggle is the only thing left that can say where the user is.
+    const TOOL_VIEWS = ['promptlab', 'artist', 'reverse'];
     if (toggle) toggle.classList.toggle('active', TOOL_VIEWS.includes(viewName));
-    document.querySelectorAll('.nav-tools-mirror').forEach((item) => {
-        const isActive = item.dataset.view === viewName;
+    // Two kinds of menu row mirror a view: the grandfathered ones carry
+    // data-view, the newer ones data-mirror-view (a second [data-view] for the
+    // same view would break Playwright strict mode). Both need the highlight,
+    // or the open view's own row is the one row in the menu that looks unvisited.
+    document.querySelectorAll('.nav-tools-mirror, [data-mirror-view]').forEach((item) => {
+        const isActive = (item.dataset.view || item.dataset.mirrorView) === viewName;
         item.classList.toggle('active', isActive);
         item.setAttribute('aria-selected', String(isActive));
     });

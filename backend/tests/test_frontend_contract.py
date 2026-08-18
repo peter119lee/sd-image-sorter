@@ -3088,3 +3088,579 @@ def test_the_busy_badge_loads_before_the_helper_that_asks_it_for_wording():
         "ai-busy.js must be loaded before app/api.js, which calls explain()"
     )
     assert 'id="nav-ai-busy"' in index_html, "the badge element is gone"
+
+
+# ---------------------------------------------------------------------------
+# Reverse Prompt — drop one image, read the recorded prompt, guess only when
+# there is nothing to read.
+# ---------------------------------------------------------------------------
+
+
+def _reverse_prompt_family(repo_root: Path) -> dict[str, str]:
+    directory = repo_root / "frontend" / "js" / "reverse-prompt"
+    sources = {
+        path.name: path.read_text(encoding="utf-8")
+        for path in sorted(directory.glob("*.js"))
+    }
+    assert sources, "frontend/js/reverse-prompt/*.js family is missing"
+    return sources
+
+
+def _reverse_prompt_source(repo_root: Path) -> str:
+    return "\n".join(_reverse_prompt_family(repo_root).values())
+
+
+def _whole_view_markup(html: str, view_id: str) -> str:
+    """The complete ``<section id=...>`` element, nested ``<section>`` included.
+
+    ``<section id="x".*?</section>`` with re.DOTALL stops at the FIRST closer,
+    which for a view that nests cards inside ``<section>`` is not the view's own
+    closer - it silently returns a prefix. Match the tags and track depth so the
+    window is the element.
+    """
+    opener = f'<section id="{view_id}"'
+    start = html.find(opener)
+    assert start != -1, f"the {view_id} section is missing"
+    depth = 0
+    for token in re.finditer(r"<section\b|</section\s*>", html[start:]):
+        depth += -1 if token.group(0).startswith("</") else 1
+        if depth == 0:
+            return html[start:start + token.end()]
+    raise AssertionError(f"{view_id} is opened but never closed")
+
+
+def test_the_reverse_prompt_page_is_a_view_a_user_can_actually_reach():
+    """A page nobody can navigate to is the defect this slice exists to fix.
+
+    TIPO shipped working and stayed invisible for one reason: its only entrance
+    was buried. So pin all three entrances of the new view together - the tab in
+    the nav bar, the per-view init hook ``switchView`` needs to boot it, and the
+    entry-page function catalog, which is how a user who does not read the tab
+    strip finds anything.
+    """
+    repo_root = Path(__file__).resolve().parents[2]
+    html = (repo_root / "frontend" / "index.html").read_text(encoding="utf-8")
+    view_switch = (repo_root / "frontend" / "js" / "app" / "view-switch.js").read_text(
+        encoding="utf-8"
+    )
+    catalog = (repo_root / "frontend" / "js" / "modules" / "entry-catalog.js").read_text(
+        encoding="utf-8"
+    )
+
+    assert 'id="view-reverse"' in html, "the Reverse Prompt view section is missing"
+    tab = re.search(
+        r'<button[^>]*id="nav-tab-reverse"[^>]*>', html, re.DOTALL
+    )
+    assert tab is not None, "no nav tab addresses the Reverse Prompt view"
+    assert 'data-view="reverse"' in tab.group(0), (
+        "the tab must carry data-view so switchView and the click binding find it"
+    )
+    assert 'aria-controls="view-reverse"' in tab.group(0), (
+        "the tab must name the panel it controls"
+    )
+    assert "viewName === 'reverse'" in view_switch, (
+        "switchView has no branch that initialises the Reverse Prompt view"
+    )
+    assert "goView('reverse')" in catalog, (
+        "the entry-page function catalog cannot reach the Reverse Prompt view"
+    )
+
+
+def test_the_reverse_prompt_modes_map_onto_the_switches_the_backend_actually_has():
+    """Three user-facing modes, two existing booleans, no fourth code path.
+
+    The owner asked for VLM-only, tagger-only, and tagger-then-tags-plus-image.
+    Smart Tag already expresses all three through ``enable_wd14`` /
+    ``enable_vlm`` / ``vlm_grounding``, so the frontend must send those fields by
+    their real names - a typo here is a silently different mode, because
+    ``SmartTagStartRequest`` ignores unknown keys (``extra="ignore"``).
+    """
+    repo_root = Path(__file__).resolve().parents[2]
+    adapter = (
+        repo_root / "frontend" / "js" / "reverse-prompt" / "adapter.js"
+    ).read_text(encoding="utf-8")
+
+    from services.smart_tag.request import SmartTagRequest
+
+    backend_fields = set(SmartTagRequest.__dataclass_fields__)
+    for field in ("enable_wd14", "enable_vlm", "vlm_grounding", "image_paths"):
+        assert field in backend_fields, (
+            f"{field} is no longer a Smart Tag request field; the adapter's mode "
+            "table is describing an API that changed"
+        )
+
+    blocks = dict(
+        re.findall(
+            r"^\s{8}(?P<mode>\w+):\s*\{(?P<body>[^}]*)\}", adapter, re.MULTILINE
+        )
+    )
+    assert set(blocks) == {"grounded", "tagger", "vlm"}, (
+        f"the adapter declares modes {sorted(blocks)}; the owner asked for "
+        "exactly three"
+    )
+
+    def flags(body: str) -> dict[str, bool]:
+        return {
+            name: value == "true"
+            for name, value in re.findall(r"(\w+):\s*(true|false)", body)
+        }
+
+    tagger = flags(blocks["tagger"])
+    vlm = flags(blocks["vlm"])
+    grounded = flags(blocks["grounded"])
+
+    assert tagger["enable_wd14"] is True and tagger["enable_vlm"] is False, (
+        "tagger-only must run the booru tagger and nothing else"
+    )
+    assert vlm["enable_wd14"] is False and vlm["enable_vlm"] is True, (
+        "VLM-only must not also run the tagger"
+    )
+    assert grounded["enable_wd14"] is True and grounded["enable_vlm"] is True, (
+        "the third mode runs both"
+    )
+    assert grounded["vlm_grounding"] is True, (
+        "vlm_grounding is what hands the tags to the VLM alongside the image; "
+        "without it the third mode is just mode one followed by mode two"
+    )
+
+
+def test_the_reverse_prompt_adapter_hides_the_sync_versus_polled_difference():
+    """One ``await`` for the caller, whichever transport the mode needs.
+
+    Tagger-only is a single synchronous request; the two VLM modes are a job
+    (start, poll, read results). Those response shapes cannot be unified on the
+    backend without inventing a shim nobody else needs, so the seam is here: one
+    ``runMode`` that resolves the same record either way.
+    """
+    repo_root = Path(__file__).resolve().parents[2]
+    adapter = (
+        repo_root / "frontend" / "js" / "reverse-prompt" / "adapter.js"
+    ).read_text(encoding="utf-8")
+    family = _reverse_prompt_family(repo_root)
+
+    assert len(re.findall(r"\basync runMode\s*\(", adapter)) == 1, (
+        "runMode must be the single entrance both transports resolve through"
+    )
+    for endpoint in (
+        "/api/tag/single",
+        "/api/smart-tag/start",
+        "/api/smart-tag/progress",
+        "/api/smart-tag/results",
+    ):
+        assert endpoint in adapter, f"the adapter never calls {endpoint}"
+
+    # Nothing outside the adapter may reach either transport: the moment a view
+    # module polls a job itself, the abstraction is gone and the two paths start
+    # drifting.
+    for name, source in family.items():
+        if name == "adapter.js":
+            continue
+        for endpoint in ("/api/smart-tag/", "/api/tag/single"):
+            assert endpoint not in source, (
+                f"{name} calls {endpoint} directly instead of going through "
+                "runMode, which defeats the adapter"
+            )
+
+
+def test_the_adapter_treats_every_terminal_job_status_as_terminal():
+    """A queued job is not a finished one, and a new status must not be missed.
+
+    ``vlm_grounding`` work is queued behind whatever holds the AI runtime, so
+    ``queued`` and ``running`` are the two states the poll loop must keep
+    waiting through - and every other status the job record can hold has to end
+    it, or a failed run spins forever. The vocabulary is read from the backend's
+    own declaration so adding a status fails here instead of hanging the page.
+    """
+    repo_root = Path(__file__).resolve().parents[2]
+    adapter = (
+        repo_root / "frontend" / "js" / "reverse-prompt" / "adapter.js"
+    ).read_text(encoding="utf-8")
+    jobs = (repo_root / "backend" / "services" / "smart_tag" / "jobs.py").read_text(
+        encoding="utf-8"
+    )
+
+    declared = re.search(
+        r'status:\s*str\s*=\s*"queued"\s*#\s*(?P<vocabulary>[\w |]+)', jobs
+    )
+    assert declared is not None, (
+        "SmartTagJobState no longer declares its status vocabulary inline; "
+        "point this guard at wherever it moved"
+    )
+    vocabulary = {
+        word.strip() for word in declared.group("vocabulary").split("|") if word.strip()
+    }
+    assert len(vocabulary) >= 4, f"parsed an implausible status vocabulary: {vocabulary}"
+
+    expected_terminal = vocabulary - {"queued", "running"}
+    terminal = set(
+        re.findall(
+            r"^\s*TERMINAL_JOB_STATUSES:[^\[]*\[(?P<items>[^\]]*)\]",
+            adapter,
+            re.MULTILINE | re.DOTALL,
+        )
+    )
+    assert terminal, "the adapter declares no TERMINAL_JOB_STATUSES set"
+    declared_terminal = set(re.findall(r"'([\w]+)'", next(iter(terminal))))
+
+    # ``idle`` is the answer /progress gives for a job it no longer knows, which
+    # is terminal for the caller even though it is not a job status.
+    assert expected_terminal <= declared_terminal, (
+        "the adapter would keep polling after the job finished in "
+        f"{sorted(expected_terminal - declared_terminal)}"
+    )
+    assert "queued" not in declared_terminal and "running" not in declared_terminal, (
+        "treating queued or running as terminal reports a waiting job as a "
+        "finished one"
+    )
+
+
+def test_no_reverse_prompt_mode_can_write_a_library_row(monkeypatch, tmp_path):
+    """The page promises a dropped file is never added to the library.
+
+    Three engines, and the guarantee has a different shape in each:
+
+    * ``POST /api/tag/single`` answers ``stored: false``, and
+      ``test_single_image_tag_endpoint.py`` counts every table the batch tag
+      writer touches before and after — including for a file that arrived
+      through the Reader upload path.
+    * The two vision-model modes reach the SAME writer as a gallery run. What
+      stops them is the source id: a path-sourced item is yielded with
+      ``image_id = 0`` and the caption phase persists only for ``image_id > 0``.
+      Both halves are exercised here, because either one alone is not the
+      guarantee — an id that stopped being zero, or a gate that stopped
+      checking, would each silently start writing rows.
+    """
+    from services.smart_tag.caption_phase import _handle_caption_result
+    from services.smart_tag.jobs import SmartTagJobState
+    from services.smart_tag.request import SmartTagRequest
+    from services.smart_tag.sources import _iter_request_source_chunks
+
+    dropped = tmp_path / "never-indexed.png"
+    dropped.write_bytes(b"not read by the source iterator")
+    request = SmartTagRequest(image_paths=[str(dropped)], enable_wd14=True, enable_vlm=True)
+
+    chunks = list(_iter_request_source_chunks(request))
+    assert chunks == [[(str(dropped), 0, str(dropped))]], (
+        "a path-sourced item no longer carries image_id = 0, so the write gate "
+        f"below would let it through: {chunks}"
+    )
+
+    import services.smart_tag.results as results_module
+
+    def _refuse_to_persist(*args, **kwargs):
+        raise AssertionError(
+            "a path-sourced caption reached the database writer"
+        )
+
+    monkeypatch.setattr("services.smart_tag.caption_phase._persist_result", _refuse_to_persist)
+    monkeypatch.setattr(results_module, "_get_caption_results_dir", lambda: tmp_path)
+
+    job = SmartTagJobState(job_id="reverse-prompt-no-write", total=1)
+    partial = {
+        "general_names": ["1girl"],
+        "copyright_names": [],
+        "character_names": [],
+        "general_rows": [{"tag": "1girl", "confidence": 0.9, "category": "general"}],
+        "copyright_rows": [],
+        "character_rows": [],
+        "rating": "general",
+        "noise_stripped": 0,
+        "tag_score_sets": [],
+    }
+    try:
+        _handle_caption_result(
+            job,
+            request,
+            str(dropped),
+            0,
+            str(dropped),
+            partial,
+            "A sentence about the picture.",
+            nl_active=True,
+        )
+    finally:
+        results_module._close_caption_results(job)
+
+    # The failure branch swallows exceptions into job.errors, so a persist that
+    # DID happen would show up as a recorded error rather than a raised one.
+    assert job.errors == [], f"the caption phase reported {job.errors}"
+    assert job.succeeded == 1
+    assert job.caption_result_count == 1, (
+        "the caption went nowhere: it must land in the job results file, which "
+        "is what the page reads back"
+    )
+
+
+def test_the_page_keeps_a_recorded_prompt_and_a_guess_in_separate_labelled_boxes():
+    """Conflating the two is the dishonesty this whole effort has been removing.
+
+    "The file recorded this prompt" and "we guessed this from the pixels" are
+    different claims about different evidence, and the user is about to paste the
+    result into a generator. Every provenance the renderer knows must therefore
+    own a distinct badge AND a distinct explanation, in both packs.
+    """
+    repo_root = Path(__file__).resolve().parents[2]
+    render = (
+        repo_root / "frontend" / "js" / "reverse-prompt" / "render.js"
+    ).read_text(encoding="utf-8")
+
+    table = re.search(
+        r"PROVENANCE\s*[:=]\s*Object\.freeze\(\{(?P<body>.*?)^\s*\}\)", render,
+        re.MULTILINE | re.DOTALL,
+    )
+    assert table is not None, "render.js declares no PROVENANCE table"
+    kinds = set(
+        re.findall(r"^\s*(\w+):\s*\{", table.group("body"), re.MULTILINE)
+    )
+    assert kinds == {"recorded", "inferred"}, (
+        f"the renderer knows provenances {sorted(kinds)}; it must distinguish "
+        "exactly a record from a guess"
+    )
+    badges = re.findall(r"badgeKey:\s*'([\w.]+)'", table.group("body"))
+    notes = re.findall(r"noteKey:\s*'([\w.]+)'", table.group("body"))
+    assert len(set(badges)) == 2, f"both provenances share a badge: {badges}"
+    assert len(set(notes)) == 2, f"both provenances share an explanation: {notes}"
+    assert not set(badges) & set(notes)
+
+    packs = _locale_pack_sources(repo_root)
+    for key in badges + notes:
+        for pack_name, source in packs.items():
+            assert re.search(rf"^\s*'{re.escape(key)}'\s*:", source, re.MULTILINE), (
+                f"{pack_name} is missing {key}, so the badge would render as its key"
+            )
+
+    english = packs["en.js"]
+
+    def value(key: str) -> str:
+        found = re.search(rf"^\s*'{re.escape(key)}'\s*:\s*'(?P<v>[^']*)'", english, re.MULTILINE)
+        assert found is not None, f"en.js does not declare {key} as a plain string"
+        return found.group("v").lower()
+
+    recorded_badge, inferred_badge = (
+        value(badges[0]) if "record" in value(badges[0]) else value(badges[1]),
+        value(badges[1]) if "record" in value(badges[0]) else value(badges[0]),
+    )
+    assert "record" in recorded_badge, (
+        f"the recorded badge does not say it is a record: {recorded_badge!r}"
+    )
+    assert "guess" in inferred_badge, (
+        f"the inferred badge does not say it is a guess: {inferred_badge!r}"
+    )
+    assert "record" not in inferred_badge, (
+        f"the inferred badge claims to be a record: {inferred_badge!r}"
+    )
+
+
+def test_the_page_offers_a_comparison_instead_of_overwriting_the_record():
+    """Inference over a file that already recorded its prompt is allowed.
+
+    Comparing the two is genuinely useful, so the affordance stays - but the
+    result is an addition beside the record with its own framing, never a
+    replacement. ``tests/e2e/specs/reverse-prompt.spec.ts`` asserts both boxes
+    are on screen at once; this pins the wording that tells them apart.
+    """
+    repo_root = Path(__file__).resolve().parents[2]
+    render = (
+        repo_root / "frontend" / "js" / "reverse-prompt" / "render.js"
+    ).read_text(encoding="utf-8")
+
+    assert "reverse.compareNote" in render, (
+        "nothing explains which of the two boxes is the record"
+    )
+    for pack_name, source in _locale_pack_sources(repo_root).items():
+        assert re.search(r"^\s*'reverse\.compareNote'\s*:", source, re.MULTILINE), (
+            f"{pack_name} is missing reverse.compareNote"
+        )
+
+
+def test_the_page_explains_a_busy_runtime_with_the_shipped_explanation():
+    """A second explanation of the same 409 would be a second thing to keep true.
+
+    ``AiBusy.explain`` already answers a refusal from its structured blocker, and
+    ``formatUserError`` defers to it before the model-name patterns can rewrite
+    "busy" into "not ready". This page must go through that, not write its own
+    sentence about a runtime it cannot see.
+    """
+    repo_root = Path(__file__).resolve().parents[2]
+    family = _reverse_prompt_family(repo_root)
+    source = "\n".join(family.values())
+
+    assert "formatUserError" in source, (
+        "the page does not route failures through the shared formatter, so a "
+        "409 would surface as a raw error"
+    )
+    assert "AiRuntimeBusyError" not in source, (
+        "the page is inspecting the refusal payload itself; AiBusy.isBusyError "
+        "already owns that check"
+    )
+    for phrase in ("AI runtime", "is busy", "Model setup"):
+        assert phrase not in source, (
+            f"the page writes its own busy-runtime wording ({phrase!r}); reuse "
+            "the explanation that shipped with the badge"
+        )
+
+
+def test_the_tipo_control_is_gated_on_the_pinned_dialect_map_not_a_second_copy():
+    """TIPO expands a Booru tag list; a natural-language target wants prose.
+
+    ``caption_dialect.py`` is the only place a target's documented dialect is
+    decided, and ``target-model.js`` is already pinned to it. Restating the map
+    here would make a third copy that can disagree with both.
+    """
+    repo_root = Path(__file__).resolve().parents[2]
+    tipo = (repo_root / "frontend" / "js" / "reverse-prompt" / "tipo.js").read_text(
+        encoding="utf-8"
+    )
+    profiles = (repo_root / "frontend" / "js" / "modules" / "target-model.js").read_text(
+        encoding="utf-8"
+    )
+
+    assert re.search(r"\bdialectFor\s*\(", profiles), (
+        "target-model.js exposes no way to ask about a target other than the "
+        "Dataset Maker project's own"
+    )
+    assert "TargetModel" in tipo and "dialectFor" in tipo, (
+        "tipo.js does not ask the pinned map for the target's dialect"
+    )
+
+    from services.caption_dialect import CAPTION_DIALECT_TARGET_MODELS
+
+    for model in CAPTION_DIALECT_TARGET_MODELS:
+        assert f"'{model}'" not in tipo, (
+            f"tipo.js hardcodes the target {model!r}; that is a second dialect "
+            "map, and it will drift"
+        )
+
+
+def test_tipo_warns_about_the_download_before_it_happens_and_offers_no_prepare():
+    """First press pulls 100-250 MB with no confirmation today.
+
+    The Model Center card is deliberately manual-only - there is no
+    ``prepare_model("tipo")`` branch - so a Prepare button here would be a
+    control that cannot run. The honest alternative is to say what the first
+    press costs before it costs it, with the size read from the card that owns it.
+    """
+    repo_root = Path(__file__).resolve().parents[2]
+    tipo = (repo_root / "frontend" / "js" / "reverse-prompt" / "tipo.js").read_text(
+        encoding="utf-8"
+    )
+    inventory = (
+        repo_root / "backend" / "services" / "model_service_inventory.py"
+    ).read_text(encoding="utf-8")
+
+    assert "/api/models/prepare" not in tipo, (
+        "TIPO has no prepare branch; a Prepare button would do nothing"
+    )
+    assert "reverse.tipoDownloadWarn" in tipo, (
+        "nothing warns about the first-run download"
+    )
+
+    card_size = re.search(r"Weights \(~(?P<low>\d+)-(?P<high>\d+) MB", inventory)
+    assert card_size is not None, (
+        "the TIPO card no longer states its download size; the warning's numbers "
+        "have to come from somewhere real"
+    )
+    packs = _locale_pack_sources(repo_root)
+    for pack_name, source in packs.items():
+        warning = re.search(
+            r"^\s*'reverse\.tipoDownloadWarn'\s*:\s*'(?P<v>[^']*)'", source, re.MULTILINE
+        )
+        assert warning is not None, f"{pack_name} is missing reverse.tipoDownloadWarn"
+        for bound in (card_size.group("low"), card_size.group("high")):
+            assert bound in warning.group("v"), (
+                f"{pack_name}'s download warning does not carry the size the "
+                f"Model Center card states ({bound} MB)"
+            )
+
+
+def test_every_reverse_prompt_locale_key_the_page_uses_exists_in_both_packs():
+    """A missing key renders as the key itself, in English, for a Chinese user."""
+    repo_root = Path(__file__).resolve().parents[2]
+    html = (repo_root / "frontend" / "index.html").read_text(encoding="utf-8")
+    source = _reverse_prompt_source(repo_root)
+
+    referenced = set(re.findall(r"'(reverse\.[A-Za-z0-9]+)'", source))
+    referenced |= set(re.findall(r'data-i18n(?:-aria|-title)?="(reverse\.[A-Za-z0-9]+)"', html))
+    assert len(referenced) >= 20, (
+        f"only found {len(referenced)} reverse.* keys; the scan is not seeing "
+        "the page's strings"
+    )
+
+    for pack_name, pack in _locale_pack_sources(repo_root).items():
+        declared = set(_language_pack_keys(pack))
+        missing = sorted(referenced - declared)
+        assert not missing, f"{pack_name} is missing {missing}"
+
+
+def test_every_reverse_prompt_aria_label_is_translated_through_the_real_attribute():
+    """A literal ``aria-label`` alone is an English-only accessible name.
+
+    The i18n engine implements ``data-i18n-aria``; ``data-i18n-aria-label`` looks
+    right and does nothing. Both halves are needed - the literal covers the frame
+    before translations are applied, the key covers every frame after.
+    """
+    repo_root = Path(__file__).resolve().parents[2]
+    html = (repo_root / "frontend" / "index.html").read_text(encoding="utf-8")
+
+    markup = _whole_view_markup(html, "view-reverse")
+    # The window has to span what it claims. A guard that silently stops two
+    # thirds of the way through looks like coverage while checking nothing, so
+    # pin the last card in the view: if the slice ever shortens again, this
+    # fails instead of quietly passing.
+    assert 'id="reverse-tipo"' in markup, (
+        "the captured markup stops before the last card in the view, so every "
+        "assertion below only covers part of what it names"
+    )
+
+    labelled = [tag for tag in re.findall(r"<[a-z]+[^>]*>", markup) if "aria-label=" in tag]
+    assert labelled, (
+        "no element in this view declares an accessible name, so this guard is "
+        "checking nothing - the drop zone and the draft box both need one"
+    )
+    for tag in labelled:
+        assert "data-i18n-aria=" in tag, (
+            "this accessible name is English-only; add data-i18n-aria: " + tag
+        )
+    assert "data-i18n-aria-label=" not in markup, (
+        "data-i18n-aria-label is not implemented by the i18n engine"
+    )
+
+
+def test_intake_borrows_the_readers_drop_zone_instead_of_wiring_a_second_one():
+    """``_setupDropZone`` is shareable only because it reaches one method.
+
+    It takes its elements as arguments and dispatches to ``this._handleFile``,
+    which is what lets a second view supply itself as the receiver. If it grows a
+    dependency on any other Reader member, that call silently breaks this page -
+    so pin the property rather than trusting the comment.
+    """
+    repo_root = Path(__file__).resolve().parents[2]
+    intake = (
+        repo_root / "frontend" / "js" / "reverse-prompt" / "intake.js"
+    ).read_text(encoding="utf-8")
+    reader = (
+        repo_root / "frontend" / "js" / "image-reader" / "ingest.js"
+    ).read_text(encoding="utf-8")
+
+    assert "_setupDropZone.call(this" in intake, (
+        "this page wires its own drag-and-drop instead of reusing the Reader's"
+    )
+    assert "/api/parse-image" in intake, (
+        "intake must go through the endpoint that already caps the upload, "
+        "verifies decodability, retains the temp file and returns the metadata"
+    )
+
+    body = re.search(
+        r"_setupDropZone\(dropZone, fileInput\) \{(?P<body>.*?)\n        \},",
+        reader,
+        re.DOTALL,
+    )
+    assert body is not None, (
+        "_setupDropZone moved or changed signature; re-check that the Reverse "
+        "Prompt page can still supply itself as its receiver"
+    )
+    reached = set(re.findall(r"this\.(_?\w+)", body.group("body")))
+    assert reached == {"_handleFile"}, (
+        f"_setupDropZone now reaches {sorted(reached)} on its receiver; the "
+        "Reverse Prompt page only implements _handleFile"
+    )

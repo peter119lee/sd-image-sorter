@@ -1,0 +1,497 @@
+/* ==========================================================================
+   Reverse Prompt — Graphite.
+
+   Tokens only: neutral graphite surfaces, ONE amber accent reserved for the
+   primary action and the active state, flat panels separated by 1px hairlines,
+   3-6px radii, motion only on a state the user caused. No gradients, no glows,
+   no backdrop-filter.
+
+   The one piece of colour that is not the accent is deliberate: the record and
+   the guess are DATA, and per the design rules a status colour is always paired
+   with a word. Both badges therefore carry their own text, and the colour only
+   reinforces what the label already says.
+   ========================================================================== */
+
+/* The nav ladder's newest rung. `.nav-priority-advanced` (Prompt Helper, Style
+   Finder) drops into the More menu only when compacting the labels is not
+   enough; measured at 1920, a ninth direct tab is exactly what tips the bar
+   over, so this one drops ONE RUNG EARLIER rather than costing the two older
+   tools their place. Hidden tabs still respond to a programmatic click, so the
+   More-menu mirror keeps navigating. `!important` beats the ladder's own display
+   rules, matching how `.nav-tab-tucked` is written. */
+.nav-bar.nav-priority-tools-overflow .nav-priority-tool {
+    display: none !important;
+}
+
+/* ...and the mirror is only an ENTRANCE, so it appears only while the rung above
+   has taken the direct tab away. Without this the bar offered Reverse Prompt
+   twice at 1920 and 2560 (direct tab plus menu row); the same rule already
+   exists for the Prompt Helper / Style Finder mirrors two rows below in the same
+   menu (`.nav-bar:not(.nav-priority-overflow) .nav-tools-mirror`), so this
+   follows the convention rather than inventing one. `nav-missions.js` owns the
+   `hidden` attribute on every `[data-mirror-view]`, so this must win on
+   specificity, not only on `!important`. */
+.nav-bar:not(.nav-priority-tools-overflow) #nav-tools-reverse {
+    display: none !important;
+}
+
+.reverse-container {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    padding: 18px 20px 28px;
+    max-width: 1600px;
+    margin-inline: auto;
+    width: 100%;
+    min-width: 0;
+}
+
+.reverse-header {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.reverse-header .view-title {
+    margin: 0;
+}
+
+.reverse-lead {
+    margin: 0;
+    max-width: 88ch;
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
+    color: var(--text-2);
+}
+
+.reverse-columns {
+    display: grid;
+    grid-template-columns: minmax(320px, 400px) minmax(0, 1fr);
+    gap: 16px;
+    align-items: start;
+    min-width: 0;
+}
+
+.reverse-pane {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--r-card);
+    padding: 14px;
+    min-width: 0;
+}
+
+.reverse-intake-pane {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.reverse-results-pane {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+/* --- Intake ------------------------------------------------------------- */
+
+.reverse-drop-zone {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 26px 16px;
+    text-align: center;
+    border: 1px dashed var(--border-strong);
+    border-radius: var(--r-card);
+    background: rgba(255, 255, 255, 0.02);
+    color: var(--text-2);
+    cursor: pointer;
+    transition:
+        border-color var(--duration-fast) var(--ease-out),
+        background var(--duration-fast) var(--ease-out);
+}
+
+.reverse-drop-zone:hover,
+.reverse-drop-zone:focus-visible {
+    border-color: var(--border-strong);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text);
+}
+
+.reverse-drop-zone.drag-over {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+    color: var(--text);
+}
+
+.reverse-drop-zone.has-image {
+    padding: 12px 16px;
+}
+
+.reverse-drop-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 0;
+    color: var(--muted);
+}
+
+.reverse-drop-title {
+    font-size: var(--fs-section);
+    font-weight: 600;
+    color: var(--text);
+}
+
+.reverse-drop-hint {
+    font-size: var(--fs-footnote);
+    line-height: var(--lh-body);
+    color: var(--muted);
+    max-width: 42ch;
+}
+
+.reverse-preview {
+    display: block;
+    width: 100%;
+    max-height: 240px;
+    object-fit: contain;
+    background: var(--stage);
+    border: 1px solid var(--border);
+    border-radius: var(--r-tile);
+}
+
+.reverse-preview[hidden] {
+    display: none;
+}
+
+.reverse-file-name {
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: var(--fs-footnote);
+    color: var(--muted);
+    overflow-wrap: anywhere;
+}
+
+.reverse-file-name:empty {
+    display: none;
+}
+
+/* --- Mode picker -------------------------------------------------------- */
+
+.reverse-modes {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 0;
+    padding: 10px;
+    border: 1px solid var(--hairline-2);
+    border-radius: var(--r-card);
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.reverse-modes legend {
+    padding: 0 4px;
+    font-size: var(--fs-section);
+    font-weight: 600;
+    color: var(--text-2);
+}
+
+.reverse-mode-option {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 8px;
+    align-items: start;
+    padding: 6px;
+    border-radius: var(--r-ctl);
+    cursor: pointer;
+    transition: background var(--duration-fast) var(--ease-out);
+}
+
+.reverse-mode-option:hover {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.reverse-mode-option:has(input:checked) {
+    background: var(--accent-soft);
+}
+
+.reverse-mode-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.reverse-mode-name {
+    font-size: var(--fs-label);
+    font-weight: 600;
+    color: var(--text);
+}
+
+.reverse-mode-help {
+    font-size: var(--fs-footnote);
+    line-height: var(--lh-body);
+    color: var(--muted);
+}
+
+/* --- Target + actions --------------------------------------------------- */
+
+.reverse-field {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    font-size: var(--fs-label);
+    font-weight: 500;
+    color: var(--text-2);
+}
+
+.reverse-field .form-help {
+    font-size: var(--fs-footnote);
+    line-height: var(--lh-body);
+    color: var(--muted);
+    font-weight: 400;
+}
+
+.reverse-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+}
+
+.reverse-no-record,
+.reverse-stored-note {
+    margin: 0;
+    font-size: var(--fs-footnote);
+    line-height: var(--lh-body);
+    color: var(--muted);
+}
+
+.reverse-no-record[hidden],
+.reverse-status[hidden] {
+    display: none;
+}
+
+.reverse-status {
+    margin: 0;
+    font-size: var(--fs-footnote);
+    line-height: var(--lh-body);
+    color: var(--text-2);
+    overflow-wrap: anywhere;
+}
+
+.reverse-status.is-error {
+    color: var(--danger);
+}
+
+/* --- Results: the record and the guess, never the same box --------------- */
+
+.reverse-results[hidden] {
+    display: none;
+}
+
+.reverse-result {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--r-card);
+    background: rgba(255, 255, 255, 0.02);
+    min-width: 0;
+}
+
+.reverse-result[data-provenance="recorded"] {
+    border-left: 3px solid var(--success);
+}
+
+.reverse-result[data-provenance="inferred"] {
+    border-left: 3px solid var(--warning);
+}
+
+.reverse-result-head {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+}
+
+.reverse-result-head .btn {
+    margin-left: auto;
+}
+
+.reverse-result-head .btn ~ .btn {
+    margin-left: 0;
+}
+
+/* Rule 5: the status colour is data and is always paired with a word — each
+   badge states its own claim in text, so colour is never the sole carrier. */
+.reverse-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border: 1px solid currentColor;
+    border-radius: var(--r-tile);
+    font-size: var(--fs-footnote);
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+}
+
+.reverse-badge-recorded {
+    color: var(--success);
+}
+
+.reverse-badge-inferred {
+    color: var(--warning);
+}
+
+.reverse-result-meta {
+    font-family: var(--font-mono);
+    font-size: var(--fs-footnote);
+    color: var(--muted);
+    overflow-wrap: anywhere;
+}
+
+.reverse-result-note,
+.reverse-result-compare,
+.reverse-result-sublabel {
+    margin: 0;
+    font-size: var(--fs-footnote);
+    line-height: var(--lh-body);
+    color: var(--text-2);
+}
+
+.reverse-result-compare {
+    padding: 7px 9px;
+    border: 1px solid rgba(var(--warning-rgb), 0.32);
+    border-radius: var(--r-ctl);
+    background: rgba(var(--warning-rgb), 0.07);
+}
+
+.reverse-result-sublabel {
+    font-weight: 600;
+    color: var(--muted);
+}
+
+.reverse-result-text {
+    margin: 0;
+    padding: 9px 10px;
+    max-height: 260px;
+    overflow: auto;
+    background: var(--control-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--r-ctl);
+    font-family: var(--font-mono);
+    font-size: var(--fs-data);
+    line-height: var(--lh-body);
+    color: var(--text);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.reverse-result-text.is-negative {
+    color: var(--text-2);
+}
+
+/* --- Draft + TIPO ------------------------------------------------------- */
+
+.reverse-draft-card,
+.reverse-tipo-card {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px;
+    border: 1px solid var(--hairline-2);
+    border-radius: var(--r-card);
+    background: rgba(255, 255, 255, 0.02);
+    min-width: 0;
+}
+
+.reverse-card-title {
+    margin: 0;
+    font-size: var(--fs-section);
+    font-weight: 600;
+    color: var(--text);
+}
+
+.reverse-card-help {
+    margin: 0;
+    font-size: var(--fs-footnote);
+    line-height: var(--lh-body);
+    color: var(--muted);
+}
+
+.reverse-card-help:empty {
+    display: none;
+}
+
+.reverse-draft {
+    width: 100%;
+    min-height: 96px;
+    resize: vertical;
+    padding: 9px 10px;
+    font-family: var(--font-mono);
+    font-size: var(--fs-data);
+    line-height: var(--lh-body);
+}
+
+.reverse-tipo-card .btn {
+    align-self: flex-start;
+}
+
+.reverse-tipo-results[hidden] {
+    display: none;
+}
+
+.reverse-tipo-results {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.reverse-tipo-line {
+    margin: 0;
+    font-size: var(--fs-footnote);
+    line-height: var(--lh-body);
+    color: var(--text-2);
+    overflow-wrap: anywhere;
+}
+
+.reverse-tipo-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px 10px;
+    max-height: 220px;
+    overflow-y: auto;
+}
+
+.reverse-tipo-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 7px;
+    border: 1px solid var(--hairline-2);
+    border-radius: var(--r-ctl);
+    font-size: var(--fs-label);
+    color: var(--text-2);
+    cursor: pointer;
+    transition: border-color var(--duration-fast) var(--ease-out);
+}
+
+.reverse-tipo-item:hover {
+    border-color: var(--border-strong);
+    color: var(--text);
+}
+
+/* Small laptops (1280-1439) keep both columns but give the results the room:
+   the intake column is a fixed-content form and the results hold long prompts. */
+@media (min-width: 1280px) and (max-width: 1439px) {
+    .reverse-columns {
+        grid-template-columns: minmax(300px, 340px) minmax(0, 1fr);
+    }
+
+    .reverse-container {
+        padding: 14px 16px 24px;
+    }
+}

@@ -28,6 +28,7 @@
     <link rel="stylesheet" href="/static/css/publish-set.css">
     <link rel="stylesheet" href="/static/css/entry.css">
     <link rel="stylesheet" href="/static/css/ai-busy.css">
+    <link rel="stylesheet" href="/static/css/reverse-prompt.css">
     <!-- tokens.css must stay the LAST stylesheet: it owns the Aurora palette
          and remaps every legacy token defined by the sheets above. -->
     <link rel="stylesheet" href="/static/css/tokens.css">
@@ -492,6 +493,19 @@
                         <span class="tab-text" data-i18n="nav.dataset">Dataset</span>
                     </button>
                     <span class="nav-divider nav-advanced-divider" aria-hidden="true"></span>
+                    <!-- Reverse Prompt: one image in, its recorded prompt out, and
+                         AI inference only when the file recorded nothing. Sits with
+                         the power tools on its OWN width-degradation rung
+                         (nav-priority-tool, dropped one step before
+                         nav-priority-advanced): measured at 1920, a ninth direct tab
+                         is what tips the bar over, and demoting the two older tools
+                         to pay for the newest one is not a trade the design makes.
+                         #nav-tools-reverse below is its More-menu entrance. -->
+                    <button class="nav-tab nav-priority-tool" id="nav-tab-reverse" data-view="reverse" role="tab" aria-selected="false" aria-controls="view-reverse"
+                            data-i18n-title="nav.reverse" title="Reverse Prompt">
+                        <span class="tab-icon" aria-hidden="true"><svg class="icon" aria-hidden="true"><use href="#i-wand"/></svg></span>
+                        <span class="tab-text" data-i18n="nav.reverse">Reverse Prompt</span>
+                    </button>
                     <button class="nav-tab nav-priority-advanced" id="nav-tab-promptlab" data-view="promptlab" role="tab" aria-selected="false" aria-controls="view-promptlab"
                             data-i18n-title="nav.promptlab" title="Prompt Helper">
                         <span class="tab-icon" aria-hidden="true"><svg class="icon" aria-hidden="true"><use href="#i-flask"/></svg></span>
@@ -515,6 +529,14 @@
                             <span class="nav-tools-caret" aria-hidden="true">▾</span>
                         </button>
                         <div class="nav-tools-menu" id="nav-tools-menu" aria-label="More tools" hidden>
+                            <!-- data-mirror-view, NOT data-view: page objects click plain
+                                 [data-view=...] locators and a duplicate would trip
+                                 Playwright strict mode. -->
+                            <button class="nav-tab nav-tools-item nav-custom-mirror" id="nav-tools-reverse" data-mirror-view="reverse" type="button"
+                                    data-i18n-title="nav.reverse" title="Reverse Prompt">
+                                <span class="tab-icon" aria-hidden="true"><svg class="icon" aria-hidden="true"><use href="#i-wand"/></svg></span>
+                                <span class="tab-text" data-i18n="nav.reverse">Reverse Prompt</span>
+                            </button>
                             <button class="nav-tab nav-tools-item nav-tools-mirror" id="nav-tools-promptlab" data-view="promptlab" role="tab" aria-selected="false" aria-controls="view-promptlab"
                                     data-i18n-title="nav.promptlab" title="Prompt Helper">
                                 <span class="tab-icon" aria-hidden="true"><svg class="icon" aria-hidden="true"><use href="#i-flask"/></svg></span>
@@ -3103,6 +3125,106 @@
                             <div class="promptlab-load-more-row">
                                 <button class="btn btn-ghost btn-small" id="btn-similar-duplicates-more" type="button" data-i18n="common.loadMore">Load More</button>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ========== Reverse Prompt View ==========
+                 One image in, its prompt out. The order matters and is the point:
+                 intake reads the file's own metadata first (ComfyUI / NovelAI /
+                 WebUI / Forge / WebP EXIF+XMP are all already parsed), so when the
+                 file recorded a prompt the page shows the RECORD. AI inference is
+                 offered only as a fallback — or, over a file that does have a
+                 record, as an explicit comparison that never replaces it.
+                 The two result boxes are separate containers on purpose: rendering
+                 a guess cannot structurally overwrite a record. -->
+            <section id="view-reverse" class="view" role="tabpanel" aria-labelledby="nav-tab-reverse">
+                <div class="reverse-container">
+                    <header class="reverse-header">
+                        <h2 class="view-title" data-i18n="reverse.title">Reverse Prompt</h2>
+                        <p class="reverse-lead" data-i18n="reverse.lead">Drop one image. If the file recorded its own prompt you get that record; if it did not, the AI guesses — and this page always tells you which one you are looking at.</p>
+                    </header>
+
+                    <div class="reverse-columns">
+                        <div class="reverse-pane reverse-intake-pane">
+                            <div class="reverse-drop-zone" id="reverse-drop-zone" tabindex="0" role="button"
+                                 aria-label="Drop one image here, or activate to browse" data-i18n-aria="reverse.dropAria">
+                                <span class="reverse-drop-icon" aria-hidden="true"><svg class="icon icon-20" aria-hidden="true"><use href="#i-image"/></svg></span>
+                                <span class="reverse-drop-title" data-i18n="reverse.dropTitle">Drop one image here</span>
+                                <span class="reverse-drop-hint" data-i18n="reverse.dropHint">Or click to browse. The file is read in place and never added to your library.</span>
+                            </div>
+                            <input type="file" id="reverse-file-input" accept="image/*" hidden>
+                            <img id="reverse-preview" class="reverse-preview" alt="" hidden>
+                            <p class="reverse-file-name" id="reverse-file-name"></p>
+
+                            <fieldset class="reverse-modes">
+                                <legend data-i18n="reverse.modeLegend">How should it guess, if it has to?</legend>
+                                <label class="reverse-mode-option">
+                                    <input type="radio" name="reverse-mode" value="grounded" checked>
+                                    <span class="reverse-mode-copy">
+                                        <span class="reverse-mode-name" data-i18n="reverse.modeGrounded">Tagger, then the vision model</span>
+                                        <span class="reverse-mode-help" data-i18n="reverse.modeGroundedHelp">Tags the image first, then hands those tags and the image to the vision model together. Usually the best result.</span>
+                                    </span>
+                                </label>
+                                <label class="reverse-mode-option">
+                                    <input type="radio" name="reverse-mode" value="tagger">
+                                    <span class="reverse-mode-copy">
+                                        <span class="reverse-mode-name" data-i18n="reverse.modeTagger">Tagger only</span>
+                                        <span class="reverse-mode-help" data-i18n="reverse.modeTaggerHelp">Local WD14 tags, no vision model. Fastest, and works offline.</span>
+                                    </span>
+                                </label>
+                                <label class="reverse-mode-option">
+                                    <input type="radio" name="reverse-mode" value="vlm">
+                                    <span class="reverse-mode-copy">
+                                        <span class="reverse-mode-name" data-i18n="reverse.modeVlm">Vision model only</span>
+                                        <span class="reverse-mode-help" data-i18n="reverse.modeVlmHelp">Describes the picture in prose without tagging it first.</span>
+                                    </span>
+                                </label>
+                            </fieldset>
+
+                            <label class="reverse-field">
+                                <span data-i18n="reverse.targetLabel">Writing this prompt for</span>
+                                <select id="reverse-target-model" class="form-input">
+                                    <option value="" data-i18n="reverse.targetNone">Not saying</option>
+                                    <option value="sdxl">SDXL</option>
+                                    <option value="flux">FLUX.1</option>
+                                    <option value="krea2">Krea 2</option>
+                                    <option value="anima">Anima</option>
+                                </select>
+                                <span class="form-help" data-i18n="reverse.targetHelp">Only used to decide which prompt-shaping tools apply. Tag tools are switched off for a target documented to want natural language.</span>
+                            </label>
+
+                            <div class="reverse-actions">
+                                <button class="btn btn-primary" id="btn-reverse-run" type="button" disabled>
+                                    <span class="reverse-run-label" data-i18n="reverse.run">Infer the prompt</span>
+                                </button>
+                                <button class="btn btn-ghost btn-small" id="btn-reverse-cancel" type="button" hidden data-i18n="reverse.cancel">Cancel</button>
+                            </div>
+                            <p class="reverse-no-record helper-text" id="reverse-no-record" hidden></p>
+                            <p class="reverse-status" id="reverse-status" role="status" aria-live="polite" hidden></p>
+                            <p class="reverse-stored-note" data-i18n="reverse.storedNote">Nothing on this page is written to your library.</p>
+                        </div>
+
+                        <div class="reverse-pane reverse-results-pane">
+                            <div class="reverse-results" id="reverse-recorded" hidden></div>
+                            <div class="reverse-results" id="reverse-inferred" hidden></div>
+
+                            <section class="reverse-draft-card">
+                                <h3 class="reverse-card-title" data-i18n="reverse.draftTitle">Your draft</h3>
+                                <p class="reverse-card-help" data-i18n="reverse.draftHelp">Yours to edit. Use as draft on a result above copies it here, and the prompt tools below work on this box only.</p>
+                                <textarea id="reverse-draft" class="reverse-draft" rows="5" spellcheck="false"
+                                          aria-label="Prompt draft" data-i18n-aria="reverse.draftAria"></textarea>
+                            </section>
+
+                            <section class="reverse-tipo-card" id="reverse-tipo">
+                                <h3 class="reverse-card-title" data-i18n="reverse.tipoTitle">Expand the tags (TIPO)</h3>
+                                <p class="reverse-card-help" id="reverse-tipo-note"></p>
+                                <button class="btn btn-secondary btn-small" id="btn-reverse-tipo" type="button" disabled>
+                                    <span data-i18n="reverse.tipoRun">Suggest missed tags</span>
+                                </button>
+                                <div class="reverse-tipo-results" id="reverse-tipo-results" hidden></div>
+                            </section>
                         </div>
                     </div>
                 </div>
@@ -8071,6 +8193,17 @@
     <script src="/static/js/modules/mask-editor.js"></script>
     <script src="/static/js/modules/target-model.js"></script>
     <script src="/static/js/modules/dataset-estimator.js"></script>
+    <!-- reverse-prompt family: core.js declares window.ReversePrompt and MUST
+         load first; the middle files are Object.assign mixins; boot.js wires the
+         listeners and MUST load last. intake.js borrows the Reader's
+         _setupDropZone, so it loads after the image-reader family. target-model.js
+         above owns the dialect map tipo.js asks. -->
+    <script src="/static/js/reverse-prompt/core.js"></script>
+    <script src="/static/js/reverse-prompt/adapter.js"></script>
+    <script src="/static/js/reverse-prompt/render.js"></script>
+    <script src="/static/js/reverse-prompt/tipo.js"></script>
+    <script src="/static/js/reverse-prompt/intake.js"></script>
+    <script src="/static/js/reverse-prompt/boot.js"></script>
     <script>
     /* Sorting sub-tab toggle (Auto-Separate / Manual Sort) */
     window._switchSortingSub = function(sub) {

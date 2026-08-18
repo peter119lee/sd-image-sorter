@@ -113,6 +113,8 @@ function switchView(viewName) {
         if (typeof window.initSimilar === 'function') window.initSimilar();
     } else if (viewName === 'promptlab') {
         if (typeof window.initPromptLab === 'function') window.initPromptLab();
+    } else if (viewName === 'reverse') {
+        if (typeof window.initReversePrompt === 'function') window.initReversePrompt();
     } else if (viewName === 'artist') {
         if (window.ArtistIdent && typeof window.ArtistIdent.init === 'function') {
             window.ArtistIdent.init();

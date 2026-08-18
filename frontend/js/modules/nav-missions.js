@@ -139,7 +139,16 @@
         });
 
         document.querySelectorAll('[data-mirror-view]').forEach((mirror) => {
-            mirror.hidden = visible.includes(mirror.dataset.mirrorView);
+            const view = mirror.dataset.mirrorView;
+            // Only mirrors for tabs THIS module tucks. A view outside ALL_VIEWS
+            // (Reverse Prompt) has its direct tab hidden by the width ladder
+            // instead, so `visible` says nothing about whether its tab is on
+            // screen — and because the active view is pushed into `visible`,
+            // hiding on that basis removed the open view's only remaining entry
+            // from the menu the user had just used to get there. That mirror's
+            // own ladder rule owns its visibility.
+            if (!ALL_VIEWS.includes(view)) return;
+            mirror.hidden = visible.includes(view);
         });
 
         renderStepBadges(missionKey ? MISSIONS[missionKey].tabs : null);

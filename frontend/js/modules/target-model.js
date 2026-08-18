@@ -133,6 +133,21 @@
             return profile?.captionProfile || null;
         },
 
+        /**
+         * The same two answers for an ARBITRARY target id, so a surface that is
+         * not the Dataset Maker project (the Reverse Prompt page picks its own
+         * target) can ask without reading `#dataset-target-model`. Applying the
+         * project's setting to text it does not govern would be a claim about
+         * text the setting never reaches, which a contract test forbids.
+         */
+        dialectFor(model) {
+            return PROFILES[String(model || '')]?.dialect || null;
+        },
+
+        captionProfileFor(model) {
+            return PROFILES[String(model || '')]?.captionProfile || null;
+        },
+
         init() {
             const select = document.getElementById('dataset-target-model');
             if (!select) return;
