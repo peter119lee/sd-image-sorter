@@ -144,6 +144,17 @@ def _clear_library() -> None:
         conn.execute("DELETE FROM images")
 
 
+# Membership of a duplicate-filename group, spelled out here rather than
+# imported so the expectation states the contract independently of the query it
+# is checking.
+_DUPLICATE_MEMBER_SQL = (
+    "(filename IS NOT NULL AND TRIM(filename) != '' AND LOWER(filename) IN ("
+    "SELECT LOWER(filename) FROM images "
+    "WHERE filename IS NOT NULL AND TRIM(filename) != '' "
+    "GROUP BY LOWER(filename) HAVING COUNT(*) > 1))"
+)
+
+
 @pytest.fixture
 def library_with_every_issue(test_db, tmp_path: Path) -> Dict[str, Any]:
     """One library that trips every remediable key, with distinct counts.
@@ -433,17 +444,80 @@ class TestOneBrokenRowCostsTheScoreOnce:
             )
 
 
+class TestTheAttentionCountDescribesImages:
+    """``actionable_count`` renders at ``#health-actionable``, in the KPI row
+    beside "Metadata Ready" and "Tag Coverage" — both percentages of images. It
+    summed the issue counters, so a row wanting three repairs read as three, and
+    the total could exceed the library it describes. On the owner's library it
+    published 6,324 attention items for the 6,020 images that need attention.
+    """
+
+    def test_a_row_broken_three_ways_is_one_image_to_attend_to(
+        self, test_db, tmp_path: Path
+    ):
+        folder = tmp_path / "triple"
+        folder.mkdir()
+        rows = [_seed(folder, f"triple-{index}.png", dimensions=False) for index in range(3)]
+
+        report = _report()
+
+        assert report["issue_counts"]["missing_text"] == len(rows)
+        assert report["issue_counts"]["missing_dimensions"] == len(rows)
+        assert report["issue_counts"]["untagged"] == len(rows)
+        assert report["summary"]["actionable_count"] == len(rows), (
+            "three problems on one image are one image to attend to"
+        )
+
+    def test_the_attention_count_never_outgrows_the_library(self, test_db, tmp_path: Path):
+        """The same property ``recommendations`` already holds, for the number
+        the panel leads with."""
+        folder = tmp_path / "triple"
+        folder.mkdir()
+        for index in range(3):
+            _seed(folder, f"triple-{index}.png", dimensions=False)
+
+        summary = _report()["summary"]
+
+        assert summary["actionable_count"] <= summary["total_images"], summary
+
+    def test_a_duplicate_named_row_that_is_also_broken_counts_once(
+        self, test_db, tmp_path: Path
+    ):
+        """Duplicate filenames are advertised as their own card, so a row that
+        is untagged *and* shares a name is still one image needing work."""
+        first = tmp_path / "a"
+        second = tmp_path / "b"
+        first.mkdir()
+        second.mkdir()
+        _seed(first, "same.png", caption=DANBOORU_CAPTION)
+        _seed(second, "same.png", caption=DANBOORU_CAPTION)
+
+        report = _report()
+
+        assert report["duplicate_filenames"]["images"] == 2
+        assert report["issue_counts"]["untagged"] == 2
+        assert report["summary"]["actionable_count"] == 2, (
+            "two images, each needing tagging and a rename, are two images"
+        )
+
+
 class TestNothingChargesTheUserWithoutOfferingAnAction:
     def test_the_summary_totals_come_only_from_declared_contributors(
         self, library_with_every_issue
     ):
-        report = _report()
-        issue_counts = report["issue_counts"]
-        duplicates = report["duplicate_filenames"]["images"]
+        """Recomputed from the declarations, as distinct rows.
 
-        expected = sum(
-            issue_counts[spec.key] for spec in ISSUE_VOCABULARY if spec.feeds_actionable
-        ) + duplicates
+        ``actionable_count`` is rendered as a KPI beside per-image percentages,
+        so it answers "how many of my images need attention" — one row wanting
+        three repairs is one image. Summing the counters answered a different
+        question and could exceed the library total.
+        """
+        report = _report()
+        union = " OR ".join(
+            f"({spec.sql})" for spec in ISSUE_VOCABULARY if spec.feeds_actionable
+        )
+
+        expected = _count_where(f"({union}) OR {_DUPLICATE_MEMBER_SQL}")
 
         assert report["summary"]["actionable_count"] == expected
 

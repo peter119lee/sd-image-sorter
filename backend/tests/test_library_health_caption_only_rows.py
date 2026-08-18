@@ -209,11 +209,23 @@ class TestCaptionOnlyRowsAreNotProblems:
     def test_losing_the_caption_text_is_what_makes_those_rows_problems(
         self, owner_shaped_library
     ):
-        """Same rows, same library: only the caption column differs."""
-        before = _report()
-        caption_only = owner_shaped_library["caption_only"]
+        """Same rows, same library: only the caption column differs.
 
+        The two rows are tagged first. Nothing in this fixture is AI-tagged —
+        ``TestIssueSamples`` depends on that — so without this step they already
+        need attention for a second reason, and ``actionable_count`` counts
+        images: it would not move, and the claim below would be untrue of the
+        library it is asserted against.
+        """
+        caption_only = owner_shaped_library["caption_only"]
         placeholders = ",".join("?" for _ in caption_only)
+        with db.get_db() as conn:
+            conn.execute(
+                f"UPDATE images SET tagged_at = CURRENT_TIMESTAMP WHERE id IN ({placeholders})",
+                caption_only,
+            )
+        before = _report()
+
         with db.get_db() as conn:
             conn.execute(
                 f"UPDATE images SET sidecar_caption = NULL WHERE id IN ({placeholders})",

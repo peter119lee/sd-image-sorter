@@ -70,6 +70,15 @@ _NO_CHECKPOINT_SQL = "(checkpoint_normalized IS NULL OR TRIM(checkpoint_normaliz
 _NO_DIMENSIONS_SQL = "(width IS NULL OR height IS NULL OR width <= 0 OR height <= 0)"
 _NO_FILE_SIZE_SQL = "(file_size IS NULL OR file_size <= 0)"
 _METADATA_STATUS_SQL = "LOWER(COALESCE(metadata_status, 'complete'))"
+_NAMED_SQL = "(filename IS NOT NULL AND TRIM(filename) != '')"
+# One row of a filename that more than one row carries. The same grouping
+# ``duplicate_filenames`` reports, expressed per row so a shared name can join
+# the other reasons an image needs attention without being counted twice.
+_DUPLICATE_FILENAME_MEMBER_SQL = (
+    f"({_NAMED_SQL} AND LOWER(filename) IN ("
+    f"SELECT LOWER(filename) FROM images WHERE {_NAMED_SQL} "
+    "GROUP BY LOWER(filename) HAVING COUNT(*) > 1))"
+)
 
 
 class IssueSpec(NamedTuple):
@@ -396,6 +405,13 @@ def get_library_health_report(*, sample_limit: int = 8) -> Dict[str, Any]:
     keys describing one repair therefore cost one row once, and at most one of a
     remedy's keys may declare the weight.
 
+    ``summary.actionable_count`` is a count of **images**, not of issues: the
+    number of rows matching any ``feeds_actionable`` key or sharing a filename
+    with another row, each counted once. It renders in the KPI row beside
+    ``metadata_ready_percent`` and ``tagged_percent``, both of which are per-image
+    figures, so summing the counters answered a question nobody asked and could
+    report more attention items than the library has images.
+
     ``statistics`` holds counts that are true but are not defects:
     ``missing_prompt``, ``missing_checkpoint``, ``missing_negative_prompt`` and
     ``unknown_generator``, which together say how much of the library carries
@@ -428,6 +444,12 @@ def get_library_health_report(*, sample_limit: int = 8) -> Dict[str, Any]:
         f"SUM(CASE WHEN {_issue_union_sql(remedy, by_key)} THEN 1 ELSE 0 END) AS remedy_{remedy.kind}"
         for remedy in ISSUE_REMEDIES
     )
+    # Every reason an image needs attention, ORed so one row counts once. Rides
+    # the same scan as the counters rather than adding a pass over the table.
+    actionable_union_sql = " OR ".join(
+        [f"({spec.sql})" for spec in ISSUE_VOCABULARY if spec.feeds_actionable]
+        + [_DUPLICATE_FILENAME_MEMBER_SQL]
+    )
 
     with get_db() as conn:
         cursor = conn.cursor()
@@ -438,6 +460,7 @@ def get_library_health_report(*, sample_limit: int = 8) -> Dict[str, Any]:
                 SUM(CASE WHEN {_READABLE_SQL} THEN 1 ELSE 0 END) AS readable,
                 {issue_columns},
                 {remedy_columns},
+                SUM(CASE WHEN {actionable_union_sql} THEN 1 ELSE 0 END) AS actionable_rows,
                 SUM(CASE WHEN {_READABLE_SQL} AND {NO_PROMPT_SQL} THEN 1 ELSE 0 END) AS stat_missing_prompt,
                 SUM(CASE WHEN {_READABLE_SQL} AND (negative_prompt IS NULL OR TRIM(negative_prompt) = '') THEN 1 ELSE 0 END) AS stat_missing_negative_prompt,
                 SUM(CASE WHEN {_READABLE_SQL} AND {_NO_CHECKPOINT_SQL} THEN 1 ELSE 0 END) AS stat_missing_checkpoint,
@@ -579,12 +602,12 @@ def get_library_health_report(*, sample_limit: int = 8) -> Dict[str, Any]:
     # made it: a row carrying sidecar caption text is described, so only genuine
     # textlessness counts against it.
     metadata_ready = max(readable - issue_counts["missing_text"] - issue_counts["missing_dimensions"], 0)
-    # Both totals are summed straight off the vocabulary's own declarations, so a
-    # key cannot cost the user anything it did not declare — and cannot declare
-    # anything without naming the remedy that moves it.
-    actionable_count = sum(
-        issue_counts[spec.key] for spec in ISSUE_VOCABULARY if spec.feeds_actionable
-    ) + duplicate_filename_images
+    # Both totals come straight off the vocabulary's own declarations, so a key
+    # cannot cost the user anything it did not declare — and cannot declare
+    # anything without naming the remedy that moves it. Both count rows: an image
+    # wanting three repairs is one image to attend to, and one broken row costs
+    # the score once per repair it needs.
+    actionable_count = _count("actionable_rows")
     quality_score = 100.0
     if total > 0:
         # Charged per remedy over the distinct rows it visits, so the score
