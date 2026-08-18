@@ -105,16 +105,28 @@ def _clear_image_derived_state(cursor: sqlite3.Cursor, image_id: int) -> None:
     """Remove derived data that becomes stale when the source image CHANGED.
 
     Only for a genuine content change (a new fingerprint at the same path): the
-    old tags and predictions describe pixels that no longer exist, so keeping
-    them would be worse than losing them.
+    machine's guesses describe pixels that no longer exist, so keeping them
+    would be worse than losing them.
+
+    Rows the user wrote themselves (``source='manual'``) survive, using the same
+    ``PIPELINE_TAG_SOURCES`` boundary that stops a re-tag overwriting them. The
+    tagger already refuses to clobber those labels, so a rescan silently
+    deleting them contradicted the rule — and it is reachable in normal use,
+    because censoring an image in place changes its pixels.
 
     Do NOT call this when a file is merely unreachable — see
     ``mark_image_unreadable``. Nothing about the image changed there, and
     deleting tags for an unplugged drive is unrecoverable: a later reconnect
     restores the row but cannot restore the tags.
     """
+    from db_tags import PIPELINE_TAG_SOURCES
+
     _clear_image_pixel_caches(cursor, image_id)
-    cursor.execute("DELETE FROM tags WHERE image_id = ?", (image_id,))
+    placeholders = ",".join("?" * len(PIPELINE_TAG_SOURCES))
+    cursor.execute(
+        f"DELETE FROM tags WHERE image_id = ? AND (source IN ({placeholders}) OR source IS NULL)",
+        (image_id, *PIPELINE_TAG_SOURCES),
+    )
     cursor.execute("DELETE FROM tag_scores WHERE image_id = ?", (image_id,))
     cursor.execute("DELETE FROM tag_writer_provenance WHERE image_id = ?", (image_id,))
     cursor.execute("DELETE FROM artist_predictions WHERE image_id = ?", (image_id,))
@@ -271,7 +283,14 @@ def _upsert_image_record(
             source_changed=source_changed,
             mark_unreadable=mark_unreadable,
         ):
-            _clear_image_derived_state(cursor, image_id)
+            # A scan that could not read the file has learned nothing about its
+            # pixels, so it may only drop the pixel caches. Deleting the tags
+            # here is the same data loss as mark_image_unreadable used to cause,
+            # reached by re-scanning with a drive disconnected.
+            if mark_unreadable:
+                _clear_image_pixel_caches(cursor, image_id)
+            else:
+                _clear_image_derived_state(cursor, image_id)
 
         # sidecar_fingerprint is COALESCEd rather than assigned: a NULL in the
         # record means the caller could not question the filesystem about
@@ -557,7 +576,12 @@ def update_image_metadata(
             )
             and not can_preserve_derived_state
         ):
-            _clear_image_derived_state(cursor, image_id)
+            # Same rule as the upsert above: unreadable means we could not look,
+            # not that the image changed.
+            if mark_unreadable:
+                _clear_image_pixel_caches(cursor, image_id)
+            else:
+                _clear_image_derived_state(cursor, image_id)
         cursor.execute(
             """
             UPDATE images

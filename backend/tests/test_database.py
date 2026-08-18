@@ -1040,6 +1040,8 @@ class TestImageCRUD:
         row = db.get_image_by_id(image_id)
         assert row["is_readable"] == 0
         assert row["metadata_status"] == "error"
+        # Recomputed from pixels we can no longer read, so these must go even
+        # though the caller asked to preserve derived state.
         assert row["ai_caption"] is None
         assert row["aesthetic_score"] is None
         with db.get_db() as conn:
@@ -1048,13 +1050,18 @@ class TestImageCRUD:
                 (image_id,),
             ).fetchone()["embedding"]
         assert embedding_value is None
-        assert db.get_image_tags(image_id) == []
+        # ...but the labels stay. This used to assert they were deleted, which
+        # pinned a data-loss bug: an unreadable mark means we could not look at
+        # the file, not that the file changed, and the same write happens when a
+        # scan meets a disconnected drive. Tags and predictions still describe
+        # these pixels and are restored to usefulness the moment it reconnects.
+        assert [tag["tag"] for tag in db.get_image_tags(image_id)] == ["stale_tag"]
         with db.get_db() as conn:
             remaining_artist_rows = conn.execute(
                 "SELECT COUNT(*) FROM artist_predictions WHERE image_id = ?",
                 (image_id,),
             ).fetchone()[0]
-        assert remaining_artist_rows == 0
+        assert remaining_artist_rows == 1
 
 
 class TestTagOperations:

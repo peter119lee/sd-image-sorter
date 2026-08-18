@@ -109,6 +109,80 @@ class TestMarkingAnImageUnreadableKeepsWhatTheUserMade:
         assert row["ai_caption"] is None
 
 
+class TestScanningDoesNotDestroyTags:
+    """The second route to the same loss, through the scan/upsert path.
+
+    ``add_image`` sets ``mark_unreadable`` from ``is_readable=False``, and
+    ``_should_clear_derived_state`` short-circuits to True on that flag alone —
+    so re-scanning a folder while a drive is disconnected wiped the tags of
+    every row it could not read, exactly like listing the gallery did.
+    """
+
+    def test_rescanning_an_unreadable_file_keeps_its_tags(self, test_db):
+        image_id = db.add_image(path=r"L:\lib\scanned.png", filename="scanned.png")
+        db.add_tags(image_id, [{"tag": "1girl", "confidence": 0.9}])
+        db.set_user_rating(image_id, 3)
+
+        # What a scan does when it cannot read the file it already indexed.
+        db.add_image(
+            path=r"L:\lib\scanned.png",
+            filename="scanned.png",
+            is_readable=False,
+            read_error="File not found",
+        )
+
+        assert _tag_names(image_id) == ["1girl"]
+        row = db.get_image_by_id(image_id)
+        assert row["is_readable"] == 0
+        assert row["user_rating"] == 3
+
+    def test_rescanning_a_file_whose_pixels_changed_still_drops_its_ai_tags(self, test_db):
+        """The content-change path must keep clearing: those tags describe old pixels."""
+        image_id = db.add_image(
+            path=r"L:\lib\edited.png",
+            filename="edited.png",
+            content_fingerprint="fingerprint-before",
+        )
+        db.add_tags(image_id, [{"tag": "1girl", "confidence": 0.9, "source": "tagger"}])
+
+        db.add_image(
+            path=r"L:\lib\edited.png",
+            filename="edited.png",
+            content_fingerprint="fingerprint-after",
+        )
+
+        assert _tag_names(image_id) == []
+
+    def test_a_hand_typed_tag_survives_even_when_the_pixels_changed(self, test_db):
+        """Only the machine's guesses go stale; the user's own words do not.
+
+        ``add_tags`` already refuses to let re-tagging overwrite ``source='manual'``
+        rows, so a content-change rescan silently deleting them contradicted the
+        rule the tagger obeys. It is reachable in normal use: censoring an image
+        in place changes its pixels, and the next scan took the labels with it.
+        """
+        image_id = db.add_image(
+            path=r"L:\lib\censored.png",
+            filename="censored.png",
+            content_fingerprint="fingerprint-before",
+        )
+        db.add_tags(
+            image_id,
+            [
+                {"tag": "1girl", "confidence": 0.9, "source": "tagger"},
+                {"tag": "my_oc_name", "confidence": 1.0, "source": "manual"},
+            ],
+        )
+
+        db.add_image(
+            path=r"L:\lib\censored.png",
+            filename="censored.png",
+            content_fingerprint="fingerprint-after",
+        )
+
+        assert _tag_names(image_id) == ["my_oc_name"]
+
+
 class TestBrowsingTheGalleryDoesNotDestroyTags:
     def test_listing_a_gallery_with_a_missing_file_keeps_its_tags(self, test_db):
         """This is the path that made the loss reachable without any user action.
