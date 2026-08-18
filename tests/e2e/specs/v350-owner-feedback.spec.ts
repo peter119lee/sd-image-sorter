@@ -649,6 +649,11 @@ test('Gallery folder relocalization preserves the active tree state', async ({ p
   await page.evaluate(() => (window as any).I18n.setLang('en'))
   await expect(page.locator('#folder-tree-browsing')).toContainText(`Folder: ${targetPath}`)
   await expect(target).toHaveAttribute('aria-pressed', 'true')
+  // The re-render re-reveals the active row on a rAF pair, same as the initial
+  // browse above, so settle those frames before measuring.
+  await page.evaluate(() => new Promise<void>((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+  }))
   const after = await page.evaluate(() => {
     const tree = document.getElementById('folder-tree')
     const sidebar = tree?.closest('.filter-sidebar-scroll')

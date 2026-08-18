@@ -172,6 +172,10 @@
             this._renderTree();
             container.scrollTop = treeScrollTop;
             if (sidebarScroll) sidebarScroll.scrollTop = sidebarScrollTop;
+            // Re-rendering in another language reflows the rows, so the restored
+            // offset alone can leave the browsed folder out of view. Reveal it
+            // again, like every other path that re-renders the tree.
+            this._scheduleActiveVisibility();
         },
 
         _scheduleActiveVisibility() {
