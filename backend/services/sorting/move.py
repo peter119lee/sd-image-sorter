@@ -71,6 +71,32 @@ def _is_same_existing_file(left: str, right: str) -> bool:
         return False
 
 
+def normalize_reported_cause(text: str) -> str:
+    """Render an already-worded cause as one line a user can be shown.
+
+    Anything the app reports as the reason a specific file failed has to pass
+    through here first. ``frontend/js/modules/utils/errors.js`` replaces any
+    message carrying a drive-qualified path, or running past its length
+    ceiling, with a canned "please try again" sentence — so an un-normalized
+    cause does not merely look untidy, it is deleted before the user sees it.
+    """
+    cause = " ".join(_shorten_paths(str(text or "")).split())
+    if len(cause) > _MAX_REPORTED_CAUSE_LENGTH:
+        cause = cause[:_MAX_REPORTED_CAUSE_LENGTH].rstrip() + "..."
+    return cause
+
+
+def describe_readability_failure(read_error: Optional[str]) -> str:
+    """Name why an image could not be decoded, in words a user can be shown.
+
+    Pillow answers with ``cannot identify image file '<absolute path>'``. Every
+    readability check reported that verbatim, which is the one shape errors.js
+    throws away: the user was told to try again on a file that cannot be
+    decoded and never will be, and the sentence saying so was the casualty.
+    """
+    return normalize_reported_cause(read_error) or "Unreadable image"
+
+
 def _describe_file_operation_cause(exc: Exception) -> str:
     """Render an exception as a single-line, path-free, user-readable cause."""
     text = str(exc)
@@ -83,10 +109,7 @@ def _describe_file_operation_cause(exc: Exception) -> str:
     elif path:
         text = text.removeprefix(f"File operation failed for '{path}': ")
 
-    cause = " ".join(_shorten_paths(text).split())
-    if len(cause) > _MAX_REPORTED_CAUSE_LENGTH:
-        cause = cause[:_MAX_REPORTED_CAUSE_LENGTH].rstrip() + "..."
-    return cause
+    return normalize_reported_cause(text)
 
 
 def _svc():
@@ -313,8 +336,9 @@ class MoveMixin:
 
             readable, read_error = verify_image_readable(source_path)
             if not readable:
-                skipped.append({"image_id": image_id, "filename": filename, "error": read_error or "Unreadable image"})
-                db.mark_image_unreadable(image_id, read_error or "Unreadable image")
+                cause = describe_readability_failure(read_error)
+                skipped.append({"image_id": image_id, "filename": filename, "error": cause})
+                db.mark_image_unreadable(image_id, cause)
                 continue
 
             filtered.append(image_id)
@@ -341,7 +365,7 @@ class MoveMixin:
 
         readable, read_error = verify_image_readable(source_path)
         if not readable:
-            error_message = read_error or "Unreadable image"
+            error_message = describe_readability_failure(read_error)
             db.mark_image_unreadable(image_id, error_message)
             return {"id": image_id, "error": error_message, "operation": operation, "success": False}
 

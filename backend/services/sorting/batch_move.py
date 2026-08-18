@@ -18,6 +18,7 @@ from fastapi import BackgroundTasks, HTTPException
 
 import database as db
 from services import entry_stats_service
+from services.sorting.move import describe_readability_failure, normalize_reported_cause
 from services.sorting_models import BatchMoveRequest
 from utils.path_validation import normalize_user_path, validate_folder_path
 
@@ -253,6 +254,23 @@ class BatchMoveMixin:
                 processed = 0
                 errors: List[Dict[str, Any]] = []
 
+                def _report_error(image_id: int, filename: str, cause: str) -> None:
+                    """The only way an entry gets into the panel's list.
+
+                    Three branches can fail an image here, and each used to
+                    write its own cause. One of them (the readability check)
+                    reported Pillow's raw string, absolute path and all, which
+                    is exactly the shape errors.js discards — so the panel
+                    printed "An unexpected error occurred. Please try again."
+                    for a file that will never decode. Normalizing at the one
+                    place the list is written keeps the next branch honest too.
+                    """
+                    errors.append({
+                        "image_id": image_id,
+                        "filename": filename,
+                        "error": normalize_reported_cause(cause),
+                    })
+
                 def _write_cancelled_state() -> None:
                     """Publish the cancelled summary for this batch-move run."""
                     completed_verb_local = "Copied" if operation == "copy" else "Moved"
@@ -335,7 +353,7 @@ class BatchMoveMixin:
                             image = image_map.get(image_id)
                             if not image:
                                 processed += 1
-                                errors.append({"image_id": image_id, "filename": f"id-{image_id}", "error": "Image row not found"})
+                                _report_error(image_id, f"id-{image_id}", "Image row not found")
                                 continue
 
                             filename = image.get("filename", "image")
@@ -347,7 +365,7 @@ class BatchMoveMixin:
                             else:
                                 readable, read_error = verify_image_readable(source_path)
                                 if not readable:
-                                    error_message = read_error or "Unreadable image"
+                                    error_message = describe_readability_failure(read_error)
                                     db.mark_image_unreadable(image["id"], error_message)
                                 else:
                                     try:
@@ -375,7 +393,7 @@ class BatchMoveMixin:
                                         error_message = self._describe_operation_failure(operation, e)
 
                             if error_message:
-                                errors.append({"image_id": image_id, "filename": filename, "error": error_message})
+                                _report_error(image_id, filename, error_message)
 
                             processed += 1
                             if not self._update_batch_move_progress_if_current(

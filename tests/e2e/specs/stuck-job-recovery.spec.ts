@@ -1,3 +1,7 @@
+import path from 'node:path'
+import fsSync from 'node:fs'
+import { execFileSync } from 'node:child_process'
+
 import { expect, test, type Page } from '../fixtures/click-ledger'
 
 /**
@@ -24,6 +28,21 @@ import { expect, test, type Page } from '../fixtures/click-ledger'
  * shared `formatUserError` mapping like every other error surface, and a real
  * normalized backend cause still arrives intact through that filter rather than
  * being replaced by its canned fallback sentence.
+ *
+ * That last claim used to be checked against causes written by hand in this
+ * file, which is why it kept passing while the product shipped
+ * "manual-autosep-copy-fail.png: An unexpected error occurred. Please try
+ * again." for a file that cannot be decoded. Hand-written causes only ever
+ * prove that the strings someone thought of survive. The causes below are
+ * produced by the backend normalizer itself, so the guard fails when either
+ * side drifts: if the backend stops normalizing, the cause arrives carrying an
+ * absolute path and the panel drops it; if the panel stops formatting, the
+ * mapped cause arrives raw.
+ *
+ * The last test is the other half of the same boundary. `formatUserError`
+ * discards drive-qualified paths on purpose, across every error surface in the
+ * app, so "the cause was swallowed" must never be answered by loosening that
+ * filter. A cause that still carries an absolute path has to stay swallowed.
  */
 
 test.describe.configure({ mode: 'serial' })
@@ -71,6 +90,90 @@ async function openAutoSeparate(page: Page): Promise<void> {
     w._switchSortingSub('autosep')
   })
   await expect(page.locator('#view-autosep')).toBeVisible()
+}
+
+const repoRoot = path.resolve(__dirname, '..', '..', '..')
+
+function resolveBackendPython(): string {
+  const candidates = process.platform === 'win32'
+    ? [
+        path.join(repoRoot, 'backend', 'venv', 'Scripts', 'python.exe'),
+        path.join(repoRoot, 'backend', 'venv', 'bin', 'python'),
+      ]
+    : [
+        path.join(repoRoot, 'backend', 'venv', 'bin', 'python'),
+        path.join(repoRoot, 'backend', 'venv', 'Scripts', 'python.exe'),
+      ]
+  return process.env.PW_BACKEND_PYTHON
+    || candidates.find((candidate) => fsSync.existsSync(candidate))
+    || (process.platform === 'win32' ? 'python' : 'python3')
+}
+
+/**
+ * The exact causes the backend reports for real per-file failures, taken from
+ * the backend rather than invented here — including the corrupt file it decodes
+ * for real, which is the failure this panel was losing.
+ */
+function backendReportedCauses(): string[] {
+  const backendDir = path.join(repoRoot, 'backend')
+  const script = `
+import json
+import sys
+import tempfile
+from pathlib import Path
+
+sys.path.insert(0, ${JSON.stringify(backendDir)})
+
+from PIL import Image
+
+from exceptions import FileOperationError
+from metadata_parser._runtime import verify_image_readable
+from services.sorting.move import _describe_file_operation_cause, describe_readability_failure
+
+causes = []
+
+with tempfile.TemporaryDirectory() as workspace:
+    broken = Path(workspace) / "IMG_0042.png"
+    Image.new("RGB", (16, 16), color="green").save(broken)
+    broken.write_bytes(b"truncated image data")
+    readable, decoder_answer = verify_image_readable(str(broken))
+    if readable:
+        raise SystemExit("the decoder accepted a truncated file; this fixture proves nothing")
+    causes.append(describe_readability_failure(decoder_answer))
+
+denied = FileOperationError(
+    "Permission denied: [WinError 5] Access is denied:\\n"
+    r"'L:\\library\\IMG_0043.png' -> 'L:\\keepers\\IMG_0043.png'",
+    path=r"L:\\library\\IMG_0043.png",
+    operation="move",
+)
+causes.append(_describe_file_operation_cause(denied))
+
+locked = FileOperationError(
+    "Failed to move file: [WinError 32] The process cannot access the file "
+    "because it is being used by another process",
+    path=r"L:\\library\\IMG_0044.png",
+    operation="move",
+)
+causes.append(_describe_file_operation_cause(locked))
+
+print(json.dumps(causes))
+`
+  const output = execFileSync(resolveBackendPython(), ['-X', 'utf8', '-c', script], {
+    cwd: repoRoot,
+    stdio: 'pipe',
+  }).toString('utf8').trim()
+
+  const causes: unknown = JSON.parse(output)
+  if (!Array.isArray(causes) || causes.length === 0) {
+    throw new TypeError(`Backend reported no causes to check: ${output}`)
+  }
+  for (const cause of causes) {
+    if (typeof cause !== 'string' || cause.trim().length === 0) {
+      throw new TypeError(`Backend reported an unusable cause: ${JSON.stringify(cause)}`)
+    }
+  }
+  return causes as string[]
 }
 
 async function advanceClock(page: Page, ms: number): Promise<void> {
@@ -310,41 +413,79 @@ test('a refused undo shows the backend reason instead of a bare "Failed to undo"
 // ---------------------------------------------------------------------------
 
 test('Auto-Separate per-file errors go through the shared formatter and keep a real normalized cause', async ({ page }) => {
+  const backendCauses = backendReportedCauses()
+  await gotoWithControllableClock(page)
+  await openAutoSeparate(page)
+  await page.evaluate((causes) => {
+    const w = window as RecoveryWin
+    const recentErrors = [
+      ...causes.map((error, index) => ({ filename: `IMG_01${index}.png`, error })),
+      // A cause the shared map owns, so a raw render is distinguishable from a
+      // formatted one.
+      { filename: 'IMG_0199.png', error: 'Failed to move image: ENOSPC no space left on device' },
+    ]
+    w.showAutosepMoveProgress(recentErrors.length)
+    ;(w as any).updateAutosepMoveProgress({
+      status: 'running',
+      current: recentErrors.length,
+      total: recentErrors.length,
+      moved: 0,
+      errors: recentErrors.length,
+      operation: 'move',
+      recent_errors: recentErrors,
+    }, recentErrors.length)
+  }, backendCauses)
+
+  const panel = page.locator('#autosep-move-errors')
+  await expect(panel).toBeVisible()
+  const text = (await panel.textContent()) || ''
+
+  // Every cause the backend reports arrives whole: not shortened, not replaced.
+  for (const cause of backendCauses) {
+    expect(text).toContain(cause)
+  }
+  expect(text).not.toContain('An unexpected error occurred')
+  expect(text).not.toContain('发生了未预期的错误')
+
+  // ENOSPC proves the panel really is going through formatUserError now: raw
+  // rendering would have printed the errno string instead of this sentence.
+  expect(text).toContain('Not enough disk space')
+
+  await page.evaluate(() => (window as RecoveryWin).hideAutosepMoveProgress())
+})
+
+test('a cause that still carries an absolute path stays swallowed', async ({ page }) => {
   await gotoWithControllableClock(page)
   await openAutoSeparate(page)
   await page.evaluate(() => {
     const w = window as RecoveryWin
-    w.showAutosepMoveProgress(2)
+    w.showAutosepMoveProgress(1)
     ;(w as any).updateAutosepMoveProgress({
       status: 'running',
-      current: 2,
-      total: 2,
+      current: 1,
+      total: 1,
       moved: 0,
-      errors: 2,
+      errors: 1,
       operation: 'move',
-      recent_errors: [
-        // Exactly the shape services/sorting/batch_move.py now emits: single
-        // line, basename only, length-capped.
-        { filename: 'IMG_0042.png', error: "Failed to move image: [Errno 13] Permission denied: 'IMG_0042.png'" },
-        // A cause the shared map owns, so a raw render is distinguishable from
-        // a formatted one.
-        { filename: 'IMG_0043.png', error: 'Failed to move image: ENOSPC no space left on device' },
-      ],
-    }, 2)
+      recent_errors: [{
+        filename: 'IMG_0200.png',
+        error: "cannot identify image file 'L:\\private-library\\subject\\IMG_0200.png'",
+      }],
+    }, 1)
   })
 
   const panel = page.locator('#autosep-move-errors')
   await expect(panel).toBeVisible()
   const text = (await panel.textContent()) || ''
 
-  // The normalized cause survives the formatter's jargon/length filter intact.
-  expect(text).toContain('IMG_0042.png')
-  expect(text).toContain('Permission denied')
-  expect(text).not.toContain('An unexpected error occurred')
-
-  // ENOSPC proves the panel really is going through formatUserError now: raw
-  // rendering would have printed the errno string instead of this sentence.
-  expect(text).toContain('Not enough disk space')
+  // The filter that discards drive-qualified paths guards every error surface
+  // in the app, so it has to keep firing here. Making a swallowed cause visible
+  // is the backend's job — normalize it before reporting it — never this
+  // filter's job to stop looking.
+  expect(text).not.toContain('L:\\private-library')
+  expect(text).not.toContain('private-library')
+  // The panel still names the file it is talking about.
+  expect(text).toContain('IMG_0200.png')
 
   await page.evaluate(() => (window as RecoveryWin).hideAutosepMoveProgress())
 })
