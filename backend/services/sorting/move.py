@@ -9,7 +9,6 @@ at call time so existing monkeypatches keep landing.
 
 import logging
 import os
-import re
 import shutil
 import threading
 import time
@@ -22,45 +21,12 @@ from exceptions import FileOperationError
 from services import entry_stats_service
 from services.sorting_models import MoveRequest, VALID_FILE_OPERATIONS
 from utils.path_validation import normalize_user_path, validate_folder_path
+from utils.reported_cause import describe_readability_failure, normalize_reported_cause
 
 # NOTE(decomposition): keep the historical logger channel — tests attach
 # handlers / caplog filters to "services.sorting_service" (heartbeat pins),
 # and log routing/output must stay byte-identical after the package split.
 logger = logging.getLogger("services.sorting_service")
-
-# Keep a reported cause short enough that the shared frontend formatter
-# (frontend/js/modules/utils/errors.js) forwards it instead of collapsing it
-# to a generic sentence at its 180-character ceiling.
-_MAX_REPORTED_CAUSE_LENGTH = 140
-
-_QUOTED_PATH_PATTERN = re.compile(r"(['\"])(?P<path>[^'\"]*[\\/][^'\"]*)\1")
-_DRIVE_OR_UNC_PATH_PATTERN = re.compile(r"(?:[A-Za-z]:[\\/]|\\\\)[^\s'\"]*")
-_POSIX_PATH_PATTERN = re.compile(r"(?<![\w~])/(?:[^\s'\"/]+/)+[^\s'\"]*")
-
-
-def _path_leaf(value: str) -> str:
-    """Return the final component of a path written with either separator."""
-    parts = [part for part in re.split(r"[\\/]+", value) if part]
-    return parts[-1] if parts else value
-
-
-def _shorten_paths(text: str) -> str:
-    """Replace filesystem paths in an error message with their filename.
-
-    The cause of a failed move is worth showing the user; the absolute path it
-    happened at is not. ``frontend/js/modules/utils/errors.js`` treats any
-    message carrying a drive-qualified path as technical jargon and replaces
-    the whole thing with a generic sentence, so leaving the path in would throw
-    the diagnosis away again.
-    """
-    shortened = _QUOTED_PATH_PATTERN.sub(
-        lambda match: f"{match.group(1)}{_path_leaf(match.group('path'))}{match.group(1)}",
-        text,
-    )
-    shortened = _DRIVE_OR_UNC_PATH_PATTERN.sub(
-        lambda match: _path_leaf(match.group(0)), shortened
-    )
-    return _POSIX_PATH_PATTERN.sub(lambda match: _path_leaf(match.group(0)), shortened)
 
 
 def _is_same_existing_file(left: str, right: str) -> bool:
@@ -69,32 +35,6 @@ def _is_same_existing_file(left: str, right: str) -> bool:
         return os.path.samefile(left, right)
     except OSError:
         return False
-
-
-def normalize_reported_cause(text: str) -> str:
-    """Render an already-worded cause as one line a user can be shown.
-
-    Anything the app reports as the reason a specific file failed has to pass
-    through here first. ``frontend/js/modules/utils/errors.js`` replaces any
-    message carrying a drive-qualified path, or running past its length
-    ceiling, with a canned "please try again" sentence — so an un-normalized
-    cause does not merely look untidy, it is deleted before the user sees it.
-    """
-    cause = " ".join(_shorten_paths(str(text or "")).split())
-    if len(cause) > _MAX_REPORTED_CAUSE_LENGTH:
-        cause = cause[:_MAX_REPORTED_CAUSE_LENGTH].rstrip() + "..."
-    return cause
-
-
-def describe_readability_failure(read_error: Optional[str]) -> str:
-    """Name why an image could not be decoded, in words a user can be shown.
-
-    Pillow answers with ``cannot identify image file '<absolute path>'``. Every
-    readability check reported that verbatim, which is the one shape errors.js
-    throws away: the user was told to try again on a file that cannot be
-    decoded and never will be, and the sentence saying so was the casualty.
-    """
-    return normalize_reported_cause(read_error) or "Unreadable image"
 
 
 def _describe_file_operation_cause(exc: Exception) -> str:
