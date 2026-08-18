@@ -571,6 +571,68 @@ Resolve one pending ambiguous-match review (v3.5.0, Roadmap-C). Body: `{ "review
 
 Returns `404` for an unknown review and `409` when a reconnect run is active, the review is already resolved, the found file no longer exists, or the found path is already indexed as a different row (the review is then marked `conflict` — a row is never silently duplicated).
 
+#### GET /api/images/missing-summary
+Group every unreadable row by the folder it claims to live in, and report whether that place is reachable right now. This completes the missing-file flow: reconnect handles files that **moved**, and this handles files that are **gone**.
+
+`reason` per group:
+
+| Reason | Meaning | `clearable` |
+|--------|---------|-------------|
+| `file_deleted` | The folder is readable, still holds other entries, and the file is not among them | `true` |
+| `folder_deleted` | The folder is gone, but a readable ancestor still holds content — so the volume is mounted and the folder really was removed | `true` |
+| `location_unreachable` | We cannot confirm the place is really there | `false` |
+
+The bias is deliberate and asymmetric: refusing to clear something that is genuinely gone leaves a banner the user can resolve by reconnecting and re-scanning, while clearing something merely unreachable destroys tags and ratings for files that still exist. So `location_unreachable` also covers every ambiguous case:
+
+- nothing above the file is readable — a disconnected drive or an offline share;
+- the folder exists but is not readable (permission denied) — the files are probably fine and we simply cannot look;
+- the folder is readable but **completely empty**, which is indistinguishable from an unmounted mount point (on Linux a disconnected `/mnt/usb` is exactly a readable directory holding nothing);
+- the row has a blank path, which would otherwise resolve to the working directory.
+
+`user_work_total` counts images that would lose something a rescan cannot bring back: tags, a star rating, collection membership, or dataset-project membership. Prompts, checkpoints and dimensions are re-read from the file, so they are not counted.
+
+`clearable_user_work_total` is the same count restricted to groups that can actually be cleared, and it is the figure a confirmation prompt should quote. The two differ whenever a blocked location holds tagged images: those keep their tags precisely because they are never cleared, so quoting the library-wide total would warn about a loss that cannot happen.
+
+At most 12 groups are returned (`groups_truncated` says whether more exist); `total`, `clearable_total`, `blocked_total`, `user_work_total` and `location_total` always cover the whole library, and `unreachable_locations` names every blocked location even beyond the group cap.
+
+Example response:
+
+```json
+{
+  "total": 1614,
+  "clearable_total": 1614,
+  "blocked_total": 0,
+  "user_work_total": 0,
+  "clearable_user_work_total": 0,
+  "location_total": 6,
+  "groups_truncated": false,
+  "unreachable_locations": [],
+  "groups": [
+    {
+      "location": "L:/datasets/retired-lora",
+      "reason": "folder_deleted",
+      "clearable": true,
+      "count": 945,
+      "with_tags": 0,
+      "with_rating": 0,
+      "in_collection": 0,
+      "in_dataset": 0,
+      "user_work_total": 0,
+      "sample_filenames": ["00001.png", "00002.png", "00003.png"]
+    }
+  ]
+}
+```
+
+#### POST /api/images/missing/clear
+Clear gallery records for missing files. **No file is deleted or moved** — only database rows are removed, and re-scanning the folder adds them back if the files reappear.
+
+Body: `{ "location": "L:/datasets/retired-lora" }` clears one folder's records. Omit `location` to clear every reachable location at once.
+
+A `location_unreachable` group is never cleared. Naming one explicitly returns `status: "refused"` with `reason: "location_unreachable"` and removes nothing; a clear-everything call reports those rows under `skipped_unreachable`. The guard exists because an unplugged external drive marks its rows unreadable while the files are intact, so clearing them would drop tags and ratings for images that still exist.
+
+`status` is `cleared`, `refused`, or `nothing_to_clear`. Call `GET /api/images/missing-summary` first to learn what clearing would cost.
+
 #### POST /api/image-metadata/save-edited
 Save an image copy with edited metadata fields.
 

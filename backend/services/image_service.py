@@ -148,6 +148,7 @@ from services.image._filters import (
 from services.image.gallery import GalleryMixin
 from services.image.jobs_delete import DeleteJobsMixin
 from services.image.jobs_remove import RemoveJobsMixin
+from services.image.missing import MissingFilesMixin
 from services.image.reconnect import ReconnectMixin
 from services.image.repair import RepairReviewMixin
 from services.image.selection import SelectionMixin
@@ -223,6 +224,7 @@ def move_file_to_trash(path: str) -> None:
 class ImageService(
     ReconnectMixin,
     RepairReviewMixin,
+    MissingFilesMixin,
     GalleryMixin,
     DeleteJobsMixin,
     RemoveJobsMixin,

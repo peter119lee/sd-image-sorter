@@ -835,3 +835,39 @@ def count_checkpoints(*, search_query: Optional[str]) -> int:
             where_params,
         ).fetchone()
     return int(row[0] or 0) if row else 0
+
+
+def get_unreadable_images_with_user_work() -> List[Dict[str, Any]]:
+    """Every unreadable row, with whether clearing it would destroy user work.
+
+    "User work" is only what a rescan cannot bring back. Prompts, checkpoints,
+    dimensions and generated metadata all come from the file, so re-indexing
+    restores them and they do not count. Tags, a star rating, collection
+    membership and dataset-project membership were entered by the user against
+    this row, and removing the row loses them.
+
+    Ordered by path so the caller's grouping is stable between calls.
+    """
+    with get_db() as conn:
+        rows = conn.execute(
+            """
+            SELECT i.id,
+                   i.path,
+                   i.filename,
+                   CASE WHEN EXISTS (
+                       SELECT 1 FROM tags t WHERE t.image_id = i.id
+                   ) THEN 1 ELSE 0 END AS has_tags,
+                   CASE WHEN COALESCE(i.user_rating, 0) > 0 THEN 1 ELSE 0 END AS has_rating,
+                   CASE WHEN EXISTS (
+                       SELECT 1 FROM collection_items ci WHERE ci.source_image_id = i.id
+                   ) THEN 1 ELSE 0 END AS in_collection,
+                   CASE WHEN EXISTS (
+                       SELECT 1 FROM dataset_project_items dpi
+                       WHERE dpi.source_image_id = i.id OR dpi.image_id = i.id
+                   ) THEN 1 ELSE 0 END AS in_dataset
+            FROM images i
+            WHERE COALESCE(i.is_readable, 1) = 0
+            ORDER BY i.path COLLATE NOCASE ASC, i.id ASC
+            """
+        ).fetchall()
+    return [dict(row) for row in rows]

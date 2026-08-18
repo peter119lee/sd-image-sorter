@@ -78,6 +78,7 @@ from routers.images_parts.models import (
     DeleteSelectedImagesRequest,
     DeleteSelectedImagesResponse,
     ExportSelectionImage,
+    ClearMissingImagesRequest,
     ExportSelectionRequest,
     ExportSelectionResponse,
     FilteredImageCountResponse,

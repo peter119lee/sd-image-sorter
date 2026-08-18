@@ -2649,6 +2649,81 @@ li > .icon {
    future — instead of naming each button. Guarded by
    tests/e2e/specs/desktop-layout-guards.spec.ts, which fails if any element
    carrying `hidden` computes to something other than display:none. */
+/* Missing-file breakdown under the gallery banner. Quiet by construction: the
+   banner already carries the warning, so this is a plain list of places. */
+.missing-panel {
+    margin: 0 0 10px;
+    padding: 8px 10px;
+    background: var(--wash-faint);
+    border: 1px solid var(--hairline-2);
+    border-radius: var(--r-card);
+}
+
+.missing-panel-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: 2px;
+}
+
+.missing-panel-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 5px 6px;
+    border-radius: var(--r-ctl);
+}
+
+.missing-panel-item:hover {
+    background: var(--wash);
+}
+
+.missing-panel-item.is-blocked {
+    /* A location we cannot read is not actionable here, so it reads as a note. */
+    color: var(--text-2);
+}
+
+.missing-panel-item.is-note {
+    color: var(--muted);
+    font-size: var(--fs-footnote);
+    justify-content: flex-start;
+}
+
+.missing-panel-item-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+}
+
+.missing-panel-item-location {
+    font-family: var(--font-mono);
+    font-size: var(--fs-data);
+    color: var(--text);
+    overflow-wrap: anywhere;
+}
+
+.missing-panel-item.is-blocked .missing-panel-item-location {
+    color: var(--text-2);
+}
+
+.missing-panel-item-meta {
+    color: var(--muted);
+    font-size: var(--fs-footnote);
+    line-height: 1.35;
+}
+
+.missing-panel-note {
+    margin: 8px 0 0;
+    padding-top: 8px;
+    border-top: 1px solid var(--hairline-1);
+    color: var(--muted);
+    font-size: var(--fs-footnote);
+    line-height: 1.45;
+}
+
 .theme-menu {
     position: fixed;
     z-index: 2700;
@@ -2719,6 +2794,7 @@ li > .icon {
 
 .btn[hidden],
 .theme-menu[hidden],
+.missing-panel[hidden],
 .helper-text[hidden],
 .sepcon-health-results[hidden],
 .dup-summary[hidden],

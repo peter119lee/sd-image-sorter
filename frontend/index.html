@@ -1031,14 +1031,27 @@
                             <span class="gallery-banner-detail" id="gallery-unreadable-banner-detail" data-i18n="reconnect.banner.detail">This usually means the files were moved, renamed, or are on an unplugged drive. Use Find Moved Files to re-link them — it only updates gallery records.</span>
                         </div>
                         <div class="gallery-banner-actions">
+                            <button type="button" class="btn btn-ghost btn-small" id="gallery-missing-clear-all" hidden>
+                                <span aria-hidden="true"><svg class="icon" aria-hidden="true"><use href="#i-broom"/></svg></span>
+                                <span id="gallery-missing-clear-all-label" data-i18n="missing.clearAll">Clear these records</span>
+                            </button>
                             <button type="button" class="btn btn-primary btn-small" id="gallery-unreadable-banner-cta">
                                 <span aria-hidden="true"><svg class="icon" aria-hidden="true"><use href="#i-search"/></svg></span>
                                 <span data-i18n="reconnect.banner.cta">Find Moved Files</span>
+                            </button>
+                            <button type="button" class="btn btn-ghost btn-small" id="gallery-missing-toggle-details" aria-expanded="false" aria-controls="gallery-missing-panel" hidden>
+                                <span id="gallery-missing-toggle-details-label" data-i18n="missing.showDetails">Show folders</span>
                             </button>
                             <button type="button" class="btn btn-ghost btn-small" id="gallery-unreadable-banner-dismiss" aria-label="Hide banner" data-i18n-aria="reconnect.banner.dismiss">
                                 <span aria-hidden="true"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></span>
                             </button>
                         </div>
+                    </div>
+                    <!-- Folder breakdown for the banner above. Built at runtime, so
+                         every text node claims dataset.i18nLocked. -->
+                    <div class="missing-panel" id="gallery-missing-panel" hidden>
+                        <ul class="missing-panel-list" id="gallery-missing-panel-list"></ul>
+                        <p class="missing-panel-note" id="gallery-missing-panel-note" data-i18n="missing.filesAreKept">Clearing a record never deletes a file. If the files come back, re-scan the folder and the images return.</p>
                     </div>
                     <div class="gallery-header">
                         <div class="gallery-header-left">

@@ -10,6 +10,7 @@ register before ``GET /api/images/{image_id}`` or they 422-shadow).
 from fastapi import BackgroundTasks, Depends, Query
 
 from routers.images import (
+    ClearMissingImagesRequest,
     ReconnectMissingFilesRequest,
     RepairConfirmRequest,
     get_image_service,
@@ -152,3 +153,107 @@ async def confirm_repair(
         action=request.action,
         chosen_image_id=request.chosen_image_id,
     )
+
+
+@router.get(
+    "/images/missing-summary",
+    summary="Describe gallery records whose image files are gone",
+    description="""
+Group every unreadable row by the folder it claims to live in, and say for each
+group whether that place is reachable right now:
+
+- `file_deleted` — the folder is readable and the file is not in it.
+- `folder_deleted` — the folder is gone but an ancestor is readable, so the
+  volume is mounted and the folder really was removed.
+- `location_unreachable` — nothing above the file is readable. This is what a
+  disconnected external drive looks like, and those files may be perfectly fine,
+  so such groups report `clearable: false` and clearing them is refused.
+
+`user_work_total` counts images that would lose something a rescan cannot bring
+back — tags, a star rating, collection membership, or dataset-project
+membership. Prompts and metadata are re-read from the file, so they do not count.
+
+Declared above `GET /api/images/{image_id}` so the dynamic-id route does not
+shadow it.
+    """,
+    responses={
+        200: {
+            "description": "Grouped missing-file records with reachability and cost",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "total": 1614,
+                        "clearable_total": 1614,
+                        "blocked_total": 0,
+                        "user_work_total": 0,
+                        "location_total": 6,
+                        "groups_truncated": False,
+                        "unreachable_locations": [],
+                        "groups": [
+                            {
+                                "location": "L:/datasets/retired-lora",
+                                "reason": "folder_deleted",
+                                "clearable": True,
+                                "count": 945,
+                                "with_tags": 0,
+                                "with_rating": 0,
+                                "in_collection": 0,
+                                "in_dataset": 0,
+                                "user_work_total": 0,
+                                "sample_filenames": ["00001.png", "00002.png", "00003.png"],
+                            }
+                        ],
+                    }
+                }
+            },
+        }
+    },
+)
+async def get_missing_images_summary(
+    service: ImageService = Depends(get_image_service),
+):
+    """Group unreadable rows by location, with reachability and what clearing costs."""
+    return service.summarize_missing_images()
+
+
+@router.post(
+    "/images/missing/clear",
+    summary="Clear gallery records for missing files (files are not deleted)",
+    description="""
+Remove database rows for images whose files are gone. **No file is deleted or
+moved** — a rescan of the folder adds the rows back if the files reappear.
+
+Send `location` to clear one folder's records, or omit it to clear every
+reachable location. A `location_unreachable` group is never cleared: naming one
+explicitly returns `status: "refused"`, and a clear-everything call reports it
+under `skipped_unreachable`. That guard exists because an unplugged external
+drive marks its rows unreadable while the files are intact, and clearing them
+would drop tags and ratings for images that still exist.
+
+Call `GET /api/images/missing-summary` first — it reports how many affected
+images carry work a rescan cannot restore.
+    """,
+    responses={
+        200: {
+            "description": "Rows cleared, refused, or nothing matched",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "cleared",
+                        "removed": 945,
+                        "skipped_unreachable": 0,
+                        "location": "L:/datasets/retired-lora",
+                        "locations_cleared": ["L:/datasets/retired-lora"],
+                        "permanent_delete": False,
+                    }
+                }
+            },
+        }
+    },
+)
+async def clear_missing_images(
+    request: ClearMissingImagesRequest,
+    service: ImageService = Depends(get_image_service),
+):
+    """Clear gallery records for missing files, keeping every file on disk."""
+    return service.clear_missing_images(location=request.location)

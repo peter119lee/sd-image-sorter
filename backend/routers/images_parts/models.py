@@ -66,6 +66,17 @@ class RepairConfirmRequest(BaseModel):
     chosen_image_id: Optional[int] = Field(default=None, ge=1)
 
 
+class ClearMissingImagesRequest(BaseModel):
+    """Body for POST /api/images/missing/clear.
+
+    ``location`` echoes a ``location`` value from the missing-summary response and
+    clears just that folder's records. Omit it to clear every *reachable*
+    location at once; unreachable ones are reported as skipped rather than
+    cleared, because an offline volume's files may be perfectly fine.
+    """
+    location: Optional[str] = Field(default=None, max_length=4096)
+
+
 class ExportSelectionRequest(BaseModel):
     # Same rationale as RemoveSelectedImagesRequest: sequential per-image
     # work + chunked SQL means the ceiling only caps payload memory.
