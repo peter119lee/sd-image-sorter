@@ -11,6 +11,7 @@ from typing import Optional, List, Dict, Any, NamedTuple, Tuple
 from db_core import get_db
 from db_helpers import (
     MISSING_TEXT_SQL,
+    NO_GENERATOR_RECORDED_SQL,
     NO_PROMPT_SQL,
     SD_ATTRIBUTED_GENERATOR_SQL,
     UNATTRIBUTED_SD_METADATA_SQL,
@@ -446,6 +447,12 @@ def get_library_health_report(*, sample_limit: int = 8) -> Dict[str, Any]:
     today's parser to write, so a stale attribution a re-parse can derive. Same
     split Prompt Lab's ``no_checkpoint_metadata`` reason makes before offering a
     scan.
+
+    ``unknown_generator`` counts by :data:`db_helpers.NO_GENERATOR_RECORDED_SQL`,
+    the same constant ``unattributed_sd_metadata`` is built from, so the narrower
+    key really is a subset of it. Comparing ``generator = 'unknown'`` exactly
+    instead left NULL and blank legacy rows out of the statistic while the issue
+    key still reported them, and the two numbers could not be read together.
     """
     bounded_sample_limit = max(1, min(int(sample_limit or 8), 25))
     by_key = {spec.key: spec for spec in ISSUE_VOCABULARY}
@@ -480,7 +487,7 @@ def get_library_health_report(*, sample_limit: int = 8) -> Dict[str, Any]:
                 SUM(CASE WHEN {_READABLE_SQL} AND {NO_PROMPT_SQL} THEN 1 ELSE 0 END) AS stat_missing_prompt,
                 SUM(CASE WHEN {_READABLE_SQL} AND (negative_prompt IS NULL OR TRIM(negative_prompt) = '') THEN 1 ELSE 0 END) AS stat_missing_negative_prompt,
                 SUM(CASE WHEN {_READABLE_SQL} AND {_NO_CHECKPOINT_SQL} THEN 1 ELSE 0 END) AS stat_missing_checkpoint,
-                SUM(CASE WHEN {_READABLE_SQL} AND generator = 'unknown' THEN 1 ELSE 0 END) AS stat_unknown_generator
+                SUM(CASE WHEN {_READABLE_SQL} AND {NO_GENERATOR_RECORDED_SQL} THEN 1 ELSE 0 END) AS stat_unknown_generator
             FROM images
             """
         ).fetchone()

@@ -556,8 +556,12 @@ def _apply_user_rating_filter(conditions: List[str], params: List[Any],
 # non-empty positive prompt. metadata_status is NOT used — it tracks the parse
 # *pipeline* state (complete/pending/error), which is uniformly "complete" for
 # already-scanned libraries and so makes a useless gallery filter.
+#
+# The generator half is the negation of db_helpers.NO_GENERATOR_RECORDED_SQL and
+# has to stay spelled the same, TRIM included, or a whitespace-only generator
+# reads as a named tool here and as no generator there.
 _HAS_METADATA_CLAUSE = (
-    "((LOWER(COALESCE(i.generator, '')) NOT IN ('', 'unknown')) "
+    "((LOWER(TRIM(COALESCE(i.generator, ''))) NOT IN ('', 'unknown')) "
     "OR (COALESCE(TRIM(i.prompt), '') <> ''))"
 )
 

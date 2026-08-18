@@ -327,9 +327,12 @@ SD_ATTRIBUTED_GENERATOR_SQL = (
 # verdict ("metadata was found, no detector claimed it"), whereas 'unknown' — the
 # value every parse starts at — survives only when nothing named a tool and no SD
 # field turned up at all. NULL/blank are legacy rows that predate the column.
+# TRIM because SD_ATTRIBUTED_GENERATOR_SQL trims: without it a generator of ' '
+# satisfied neither predicate, so such a row was missing from the generator tabs
+# and from the unnamed-generator count at the same time — reported by nothing.
 # Same spelling the gallery's "has SD generation parameters" filter uses
 # (db_query_filters._HAS_METADATA_CLAUSE), minus the table alias.
-NO_GENERATOR_RECORDED_SQL = "(LOWER(COALESCE(generator, '')) IN ('', 'unknown'))"
+NO_GENERATOR_RECORDED_SQL = "(LOWER(TRIM(COALESCE(generator, ''))) IN ('', 'unknown'))"
 # "This row records Stable Diffusion generation data." Any one of these is enough
 # for metadata_parser/__init__.py to promote the generator off 'unknown' (the
 # explicit-metadata branch and the closing fallback both do it), so the current

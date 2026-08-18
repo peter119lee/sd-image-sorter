@@ -49,7 +49,13 @@ PROSE_CAPTION = "A woman with silver hair stands in a sunlit doorway."
 # Spelled out here rather than imported, so each test states the contract
 # independently of the production constants it is checking.
 _READABLE_SQL = "COALESCE(is_readable, 1) = 1"
-_NO_GENERATOR_SQL = "LOWER(COALESCE(generator, '')) IN ('', 'unknown')"
+# Trimmed on both sides of the split, so a whitespace-only generator lands in
+# exactly one of them instead of falling out of both.
+_NO_GENERATOR_SQL = "LOWER(TRIM(COALESCE(generator, ''))) IN ('', 'unknown')"
+_SD_ATTRIBUTED_SQL = (
+    "(generator IS NOT NULL AND TRIM(generator) != '' "
+    "AND LOWER(TRIM(generator)) NOT IN ('unknown', 'others'))"
+)
 _HAS_SD_DATA_SQL = (
     "((prompt IS NOT NULL AND TRIM(prompt) != '') "
     "OR (negative_prompt IS NOT NULL AND TRIM(negative_prompt) != '') "
@@ -316,6 +322,95 @@ class TestALibraryWhoseAttributionIsGenuinelyStale:
         assert set(mixed_library["stale"]) <= sample_ids
         assert sample_ids.isdisjoint(mixed_library["others_with_text"])
         assert sample_ids.isdisjoint(mixed_library["attributed"])
+
+
+class TestAGeneratorColumnNothingEverFilledIn:
+    """The legacy spellings of "no generator", and whether the two blocks agree.
+
+    ``unattributed_sd_metadata`` is published as the narrower counterpart of the
+    ``unknown_generator`` statistic — a subset of it, covering only the rows a
+    re-parse can still attribute. That is what ``get_library_health_report``'s
+    docstring says and what ``docs/API.md`` tells clients.
+
+    It was not a subset. The key's predicate is ``NO_GENERATOR_RECORDED_SQL``,
+    which covers NULL and blank as well as ``'unknown'``, while the statistic
+    compared ``generator = 'unknown'`` exactly. So a legacy row that predates the
+    column was reported as a stale attribution the composition figure had never
+    heard of, and the two numbers could not be read together.
+    """
+
+    @pytest.fixture
+    def legacy_library(self, test_db, tmp_path: Path) -> Dict[str, Any]:
+        folder = tmp_path / "legacy"
+        folder.mkdir()
+
+        blank = [
+            _seed(folder, "empty-generator.png", prompt="1girl, cinematic",
+                  generator="", checkpoint="ponyRealism.safetensors"),
+        ]
+        null = [
+            _seed(folder, "null-generator.png", prompt="1boy, rain",
+                  checkpoint="ponyRealism.safetensors"),
+        ]
+        _set_generator(null, None)
+        attributed = [
+            _seed(folder, "gen-ok.png", prompt="1girl", generator="webui",
+                  checkpoint="ponyRealism.safetensors"),
+        ]
+
+        return {
+            "folder": folder,
+            "blank": blank,
+            "null": null,
+            "unnamed": blank + null,
+            "attributed": attributed,
+        }
+
+    def test_the_statistic_counts_every_row_with_no_generator_recorded(
+        self, legacy_library
+    ):
+        """What the statistic claims to say: how much of the library carries SD
+        provenance. A blank or NULL generator carries none, same as ``'unknown'``.
+        """
+        report = _report()
+
+        assert report["statistics"]["unknown_generator"] == len(legacy_library["unnamed"])
+        assert report["statistics"]["unknown_generator"] == _count_where(
+            f"{_READABLE_SQL} AND ({_NO_GENERATOR_SQL})"
+        )
+
+    def test_the_narrower_key_stays_inside_the_statistic_it_narrows(
+        self, legacy_library
+    ):
+        report = _report()
+
+        assert report["issue_counts"]["unattributed_sd_metadata"] == len(
+            legacy_library["unnamed"]
+        ), "both legacy rows record SD data against no generator"
+        assert (
+            report["issue_counts"]["unattributed_sd_metadata"]
+            <= report["statistics"]["unknown_generator"]
+        ), (
+            "the issue key is published as a subset of the statistic; a row in "
+            "the key and not the statistic makes both numbers unreadable"
+        )
+
+    def test_a_whitespace_generator_is_no_generator(self, legacy_library):
+        """The row that used to fall out of both sides.
+
+        ``SD_ATTRIBUTED_GENERATOR_SQL`` trims before testing for blank, so ``' '``
+        never counted as attributed; ``NO_GENERATOR_RECORDED_SQL`` did not trim,
+        so it never counted as unattributed either. The row was missing from the
+        generator tabs, from the composition statistic and from the stale-
+        attribution key at the same time — reported by nothing at all.
+        """
+        _set_generator(legacy_library["attributed"], "   ")
+        report = _report()
+        unnamed = len(legacy_library["unnamed"]) + len(legacy_library["attributed"])
+
+        assert report["statistics"]["unknown_generator"] == unnamed
+        assert report["issue_counts"]["unattributed_sd_metadata"] == unnamed
+        assert _count_where(f"{_READABLE_SQL} AND {_SD_ATTRIBUTED_SQL}") == 0
 
 
 class TestAnAbsentNegativePrompt:
