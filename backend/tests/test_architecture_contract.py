@@ -109,3 +109,35 @@ def test_sorting_service_delegates_session_file_persistence():
     assert "def parse_persisted_session_version" in store_source
     assert "def read_persisted_session" in store_source
     assert "def write_persisted_session" in store_source
+
+
+def test_a_second_data_access_style_is_not_shipped_without_callers():
+    """`db_repos` shipped 1,544 lines no production module ever imported.
+
+    It was added in v2.0 and recommended in ``database.py``'s docstring for
+    "new code", but nothing adopted it, it was not in the release exclusion
+    list, and its only exercise was one test asserting behavior already covered
+    against the production function. A parallel data-access layer is fine —
+    an unadopted one is dead weight in every download. If this is reintroduced,
+    migrate real callers in the same change.
+    """
+    assert not (ROOT / "backend" / "db_repos").exists(), (
+        "db_repos is back; migrate production callers to it or remove it"
+    )
+
+    database_source = _read_repo_file("backend", "database.py")
+    assert "from db_repos import" not in database_source
+
+    backend_dir = ROOT / "backend"
+    importers: list[str] = []
+    for path in backend_dir.rglob("*.py"):
+        parts = set(path.parts)
+        if parts & {"venv", "tests", "__pycache__", ".venv"}:
+            continue
+        text = path.read_text(encoding="utf-8", errors="replace")
+        if re.search(r"^\s*(?:from\s+db_repos\b|import\s+db_repos\b)", text, re.MULTILINE):
+            importers.append(path.relative_to(ROOT).as_posix())
+
+    assert not importers, (
+        "these modules import db_repos, which no longer exists: " + ", ".join(importers)
+    )

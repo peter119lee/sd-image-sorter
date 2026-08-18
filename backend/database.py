@@ -1,22 +1,16 @@
 """
 SQLite database for storing image metadata and tags.
 
-This module provides direct function-based database access for backward compatibility.
-For new code, consider using the repository pattern from db_repos:
+This module is a facade: it re-exports the function-based data access that the
+rest of the backend actually calls, over db_core / db_schema / db_helpers and
+the specialised db_* modules. Raw SQL, no ORM.
 
-    from db_repos import ImageRepository, TagRepository, CollectionRepository
-    from db_repos import ImageFilters
-
-    # Example usage:
-    image_repo = ImageRepository()
-    images = image_repo.find_all(filters=ImageFilters(tags=["portrait"]), limit=50)
-    image = image_repo.find_by_id(123)
-
-    # Dependency injection with FastAPI:
-    def get_image_repo() -> ImageRepository:
-        return ImageRepository()
-
-See backend/db_repos/repositories/ for the repository implementations.
+A parallel `db_repos` repository layer used to sit next to this one and was
+recommended here for "new code". It landed in v2.0 (2026-04-02) and in the four
+and a half months after it, not one production module imported it — so it
+shipped 1,544 lines of unexercised indirection in every release and was
+removed. Adding a second data-access style is a real decision: migrate the
+callers in the same change, or do not introduce it.
 """
 import sqlite3
 import os

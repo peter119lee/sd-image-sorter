@@ -205,3 +205,40 @@ def test_migration_009_preserves_compact_rows_and_unreadable_legacy_json():
         assert rows[1] == "not-json"
     finally:
         conn.close()
+
+
+def test_migrations_are_unique_and_strictly_increasing():
+    """Migration versions should stay deterministic and monotonic.
+
+    Migrations are numbered and forward-only, so a duplicate or out-of-order
+    version means the upgrade path depends on dict ordering rather than on the
+    number written in the filename.
+    """
+    import migrations
+
+    migration_list = migrations.get_migrations()
+    versions = [migration.version for migration in migration_list]
+
+    assert versions
+    assert versions == sorted(versions)
+    assert len(versions) == len(set(versions))
+
+
+def test_new_database_schema_version_matches_latest_migration(test_db):
+    """A fresh database must land on the newest migration, not part-way up.
+
+    Stopping short leaves a new install claiming a schema version it does not
+    have, and the next upgrade then skips the migrations in between.
+    """
+    import migrations
+    import database as db
+
+    latest_version = migrations.get_migrations()[-1].version
+
+    with db.get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT version FROM schema_version WHERE id = 1")
+        row = cursor.fetchone()
+
+    assert row is not None
+    assert int(row["version"]) == latest_version
