@@ -3,7 +3,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { execFileSync } from 'node:child_process'
 
-import { expect, test, type APIRequestContext, type Page } from '../fixtures/click-ledger'
+import { expect, test, type APIRequestContext, type Locator, type Page } from '../fixtures/click-ledger'
 import { observeManualScanTerminal } from '../fixtures/scan-terminal-observer'
 
 test.describe.configure({ mode: 'serial' })
@@ -1668,6 +1668,38 @@ test('auto-separate should honor search and move the matching files', async ({ p
   }
 })
 
+/**
+ * Scroll a folder row back into view and report whether it is then reachable.
+ *
+ * Opening the selection panel, and resizing, both shorten the sidebar's scroll
+ * area, so a row that was in view a moment earlier is left below the fold. The
+ * property worth pinning is that the tree stays reachable — that scrolling to a
+ * row the way a user would puts it fully on screen, above the footer and
+ * hit-testable — not that a row happens to survive a layout change in place.
+ * folder-tree.js reveals through requestAnimationFrame, so the measurement
+ * waits for that frame instead of sampling around it.
+ */
+async function revealFolderRowAboveFooter(row: Locator) {
+  return row.evaluate(async (element: HTMLElement) => {
+    const footer = document.querySelector('.filter-sidebar-footer')
+    if (!(footer instanceof HTMLElement)) {
+      throw new Error('Gallery sidebar footer is unavailable')
+    }
+    element.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+    await new Promise((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(resolve))
+    })
+    const rowBox = element.getBoundingClientRect()
+    const footerBox = footer.getBoundingClientRect()
+    const hit = document.elementFromPoint(rowBox.left + rowBox.width / 2, rowBox.bottom - 2)
+    return {
+      noOverlap: rowBox.bottom <= footerBox.top,
+      insideViewport: rowBox.top >= 0 && rowBox.bottom <= window.innerHeight,
+      hitBelongsToRow: hit instanceof Node && element.contains(hit),
+    }
+  })
+}
+
 test('gallery folder tree stays usable above the selection footer on supported desktops', async ({ page }) => {
   const { finalFolder } = prepareSidebarLayoutFixture()
   const consoleErrors: string[] = []
@@ -1794,30 +1826,11 @@ test('gallery folder tree stays usable above the selection footer on supported d
     await expect(page.locator('#folder-tree-browsing')).toContainText(finalFolder)
     await page.locator('#btn-toggle-select').click()
     await expect(sidebar.locator('#selection-actions')).toBeVisible()
-    await expect.poll(async () => lastFolder.evaluate((row: HTMLElement) => {
-      const footer = document.querySelector('.filter-sidebar-footer')
-      if (!(footer instanceof HTMLElement)) {
-        throw new Error('Gallery sidebar footer is unavailable')
-      }
-      const rowBox = row.getBoundingClientRect()
-      const footerBox = footer.getBoundingClientRect()
-      const hit = document.elementFromPoint(rowBox.left + rowBox.width / 2, rowBox.bottom - 2)
-      return {
-        noOverlap: rowBox.bottom <= footerBox.top,
-        insideViewport: rowBox.top >= 0 && rowBox.bottom <= window.innerHeight,
-        hitBelongsToRow: hit instanceof Node && row.contains(hit),
-      }
-    })).toEqual({ noOverlap: true, insideViewport: true, hitBelongsToRow: true })
+    await expect.poll(async () => revealFolderRowAboveFooter(lastFolder))
+      .toEqual({ noOverlap: true, insideViewport: true, hitBelongsToRow: true })
     await page.setViewportSize({ width: 1366, height: 768 })
-    await expect.poll(async () => lastFolder.evaluate((row: HTMLElement) => {
-      const footer = document.querySelector('.filter-sidebar-footer')
-      if (!(footer instanceof HTMLElement)) {
-        throw new Error('Gallery sidebar footer is unavailable after resize')
-      }
-      const rowBox = row.getBoundingClientRect()
-      const footerBox = footer.getBoundingClientRect()
-      return rowBox.top >= 0 && rowBox.bottom <= footerBox.top
-    })).toBe(true)
+    await expect.poll(async () => revealFolderRowAboveFooter(lastFolder))
+      .toEqual({ noOverlap: true, insideViewport: true, hitBelongsToRow: true })
     await page.evaluate(() => new Promise((resolve) => {
       requestAnimationFrame(() => requestAnimationFrame(resolve))
     }))
