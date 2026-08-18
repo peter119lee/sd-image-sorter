@@ -36,6 +36,7 @@ from metadata_parser import PARSED_METADATA_VERSION, parse_image
 from exceptions import ScanError, ScanCancelledError, FileOperationError
 from utils.atomic_staging import create_staging_sibling, publish_staging_file
 from utils.path_validation import is_directory_symlink_or_junction, validate_folder_path
+from utils.reported_cause import describe_readability_failure, normalize_reported_cause
 from utils.source_paths import (
     IndexedPathAccessError,
     normalize_indexed_image_path,
@@ -101,6 +102,28 @@ from image_manager_records import (
 )
 
 
+def _metadata_failure_result(
+    image_path: str,
+    filename: str,
+    stat_result: Optional[os.stat_result],
+    error_message: str,
+    kind: str,
+) -> Dict[str, Any]:
+    """Build the scan-worker payload for a file that could not be read.
+
+    The DB record and the progress-panel error share one normalised cause so a
+    drive path cannot reach Library Health through one arm and the scan
+    heartbeat through the other.
+    """
+    record = _build_metadata_error_record(image_path, filename, stat_result, error_message)
+    return {
+        "filename": filename,
+        "generator": None,
+        "record": record,
+        "error": {"filename": filename, "error": record["read_error"], "kind": kind},
+    }
+
+
 def parse_metadata_job(job: Dict[str, Any]) -> Dict[str, Any]:
     """Public wrapper for the metadata-parsing worker.
 
@@ -122,21 +145,18 @@ def _parse_metadata_job(job: Dict[str, Any]) -> Dict[str, Any]:
         metadata = parse_image(image_path, validate_image_data=bool(job.get("validate_image_data", True)))
         parse_error = metadata.get("parse_error")
         if parse_error:
-            return {
-                "filename": filename,
-                "generator": None,
-                "record": _build_metadata_error_record(image_path, filename, stat_result, parse_error),
-                "error": {"filename": filename, "error": parse_error, "kind": "unreadable"},
-            }
+            return _metadata_failure_result(
+                image_path, filename, stat_result, parse_error, "unreadable"
+            )
 
         if metadata["width"] <= 0 or metadata["height"] <= 0:
-            error_message = "Metadata parse returned no dimensions"
-            return {
-                "filename": filename,
-                "generator": None,
-                "record": _build_metadata_error_record(image_path, filename, stat_result, error_message),
-                "error": {"filename": filename, "error": error_message, "kind": "unreadable"},
-            }
+            return _metadata_failure_result(
+                image_path,
+                filename,
+                stat_result,
+                "Metadata parse returned no dimensions",
+                "unreadable",
+            )
 
         content_fingerprint = None
         if compute_content_fingerprint:
@@ -161,27 +181,12 @@ def _parse_metadata_job(job: Dict[str, Any]) -> Dict[str, Any]:
             "error": None,
         }
     except PermissionError as exc:
-        return {
-            "filename": filename,
-            "generator": None,
-            "record": _build_metadata_error_record(image_path, filename, None, str(exc)),
-            "error": {"filename": filename, "error": str(exc), "kind": "permission"},
-        }
+        return _metadata_failure_result(image_path, filename, None, str(exc), "permission")
     except OSError as exc:
-        return {
-            "filename": filename,
-            "generator": None,
-            "record": _build_metadata_error_record(image_path, filename, None, str(exc)),
-            "error": {"filename": filename, "error": str(exc), "kind": "os_error"},
-        }
+        return _metadata_failure_result(image_path, filename, None, str(exc), "os_error")
     except Exception as exc:
         logger.error("Unexpected error processing %s: %s", image_path, exc, exc_info=True)
-        return {
-            "filename": filename,
-            "generator": None,
-            "record": _build_metadata_error_record(image_path, filename, None, str(exc)),
-            "error": {"filename": filename, "error": str(exc), "kind": "unexpected"},
-        }
+        return _metadata_failure_result(image_path, filename, None, str(exc), "unexpected")
 
 
 def _cleanup_missing_scope_entries(
@@ -694,12 +699,9 @@ def scan_folder(
             stat_result = None
         timeout_seconds = SCAN_METADATA_TIMEOUT_SECONDS
         error_message = f"Metadata extraction timed out after {timeout_seconds:g} seconds"
-        return {
-            "filename": filename,
-            "generator": None,
-            "record": _build_metadata_error_record(image_path, filename, stat_result, error_message),
-            "error": {"filename": filename, "error": error_message, "kind": "timeout"},
-        }
+        return _metadata_failure_result(
+            image_path, filename, stat_result, error_message, "timeout"
+        )
 
     def _handle_timed_out_metadata_futures() -> int:
         nonlocal executor
@@ -772,13 +774,9 @@ def scan_folder(
             stat_result = os.stat(image_path)
         except OSError:
             stat_result = None
-        error_message = str(exc)
-        return {
-            "filename": filename,
-            "generator": None,
-            "record": _build_metadata_error_record(image_path, filename, stat_result, error_message),
-            "error": {"filename": filename, "error": error_message, "kind": "unexpected"},
-        }
+        return _metadata_failure_result(
+            image_path, filename, stat_result, str(exc), "unexpected"
+        )
 
     def _drain_metadata_futures(wait_for_all: bool = False, wait_for_one: bool = False) -> None:
         while in_flight:
@@ -1273,7 +1271,7 @@ def reparse_image_metadata(
             checkpoint=None,
             loras=[],
             is_readable=False,
-            read_error=parse_error,
+            read_error=describe_readability_failure(parse_error),
             source_mtime_ns=stat_result.st_mtime_ns,
             source_size=stat_result.st_size,
             metadata_status="error",
@@ -1305,7 +1303,7 @@ def reparse_image_metadata(
         checkpoint=metadata["checkpoint"],
         loras=metadata["loras"],
         is_readable=True,
-        read_error=metadata_error,
+        read_error=normalize_reported_cause(metadata_error) if metadata_error else None,
         source_mtime_ns=stat_result.st_mtime_ns,
         source_size=stat_result.st_size,
         metadata_status="error" if metadata_error else "complete",

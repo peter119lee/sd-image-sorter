@@ -182,6 +182,29 @@
         return value == null || !String(value).trim();
     }
 
+    function pathLeaf(value) {
+        var parts = String(value || '').split(/[\\/]+/).filter(Boolean);
+        return parts.length ? parts[parts.length - 1] : String(value || '');
+    }
+
+    // Old scan rows stored Pillow's str(exc) verbatim, which quotes the
+    // absolute path. formatUserError would delete the whole sentence if it
+    // saw a drive letter; this only replaces the path with its filename.
+    function sanitizeReadErrorForDisplay(raw) {
+        var original = String(raw == null ? '' : raw);
+        var text = original.replace(/(['"])([^'"]*[\\/][^'"]*)\1/g, function (_match, quote, path) {
+            return quote + pathLeaf(path) + quote;
+        });
+        text = text.replace(/(?:[A-Za-z]:[\\/]|\\\\)[^\s'"]*/g, function (path) {
+            return pathLeaf(path);
+        });
+        text = text.replace(/(^|[^A-Za-z0-9_~])(\/(?:[^\s'"/]+\/)+[^\s'"]*)/g, function (_match, prefix, path) {
+            return prefix + pathLeaf(path);
+        });
+        text = text.replace(/\s+/g, ' ').trim();
+        return text || original;
+    }
+
     function generatorId(sample) {
         return String(sample.generator == null ? '' : sample.generator).trim().toLowerCase();
     }
@@ -227,7 +250,7 @@
         for (var index = 0; index < SAMPLE_REASON_LADDER.length; index++) {
             var key = SAMPLE_REASON_LADDER[index];
             if (!REASON_TESTS[key](sample)) continue;
-            if (key === 'unreadable') return String(sample.read_error);
+            if (key === 'unreadable') return sanitizeReadErrorForDisplay(sample.read_error);
             return t(REASON_LABELS[key][0], REASON_LABELS[key][1]);
         }
         // The backend lists a row only when one of these ranks matches it, so

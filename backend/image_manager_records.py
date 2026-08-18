@@ -21,6 +21,7 @@ from image_manager_gates import (
     _source_fingerprint_matches,
 )
 from metadata_storage import compact_metadata_json
+from utils.reported_cause import describe_readability_failure, normalize_reported_cause
 
 # NOTE(decomposition): keep the historical logger channel so log routing
 # and output stay identical to the pre-split single-file module.
@@ -155,7 +156,7 @@ def _build_metadata_success_record(
         "created_at": datetime.fromtimestamp(stat_result.st_mtime),
         "model_hash": model_hash,
         "is_readable": True,
-        "read_error": metadata_error,
+        "read_error": normalize_reported_cause(metadata_error) if metadata_error else None,
         "source_mtime_ns": int(stat_result.st_mtime_ns),
         "source_size": int(stat_result.st_size),
         "metadata_status": "error" if metadata_error else "complete",
@@ -173,7 +174,11 @@ def _build_metadata_error_record(
     stat_result: Optional[os.stat_result],
     error_message: str,
 ) -> Dict[str, Any]:
-    """Build a DB record for files that failed metadata parsing."""
+    """Build a DB record for files that failed metadata parsing.
+
+    ``read_error`` is the same user-facing cause the move path stores: one line,
+    filename instead of the folder, so a later attention list can print it.
+    """
     current_file_time = datetime.fromtimestamp(stat_result.st_mtime) if stat_result else None
     source_mtime_ns = int(stat_result.st_mtime_ns) if stat_result else None
     source_size = int(stat_result.st_size) if stat_result else None
@@ -197,7 +202,7 @@ def _build_metadata_error_record(
         "created_at": current_file_time,
         "model_hash": None,
         "is_readable": False,
-        "read_error": error_message,
+        "read_error": describe_readability_failure(error_message),
         "source_mtime_ns": source_mtime_ns,
         "source_size": source_size,
         "metadata_status": "error",
