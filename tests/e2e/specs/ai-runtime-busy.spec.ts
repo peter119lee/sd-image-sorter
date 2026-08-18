@@ -22,12 +22,14 @@ import { expect, test, type Page } from '../fixtures/click-ledger'
  * of mistake as offering an action the data cannot support.
  */
 
-declare global {
-  interface Window {
-    App: { API: any }
-    AiBusy: any
-    formatUserError: (error: unknown, context?: string) => string
-  }
+// `interface Window` merges across the whole project, so declaring `App` here
+// would override `types/global.d.ts`'s `App?: any` for every other spec and
+// narrow it to whatever this file happens to need. Keep the surface local, as
+// guide-pins.spec.ts and reverse-prompt.spec.ts do.
+type AiRuntimeWindow = typeof window & {
+  App: { API: any }
+  AiBusy: any
+  formatUserError: (error: unknown, context?: string) => string
 }
 
 const IDLE = {
@@ -60,7 +62,7 @@ async function openWith(page: Page, snapshot: Record<string, unknown>): Promise<
   await page.goto('/', { waitUntil: 'domcontentloaded' })
   await expect(page.locator('#view-gallery')).toBeVisible()
   await expect
-    .poll(async () => page.evaluate(() => typeof window.AiBusy?.refresh === 'function'))
+    .poll(async () => page.evaluate(() => typeof (window as AiRuntimeWindow).AiBusy?.refresh === 'function'))
     .toBe(true)
 }
 
@@ -69,14 +71,14 @@ async function setSnapshot(page: Page, snapshot: Record<string, unknown>): Promi
   await page.unroute('**/api/system/ai-jobs*')
   await page.route('**/api/system/ai-jobs*', (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(snapshot) }))
-  await page.evaluate(() => window.AiBusy.refresh())
+  await page.evaluate(() => (window as AiRuntimeWindow).AiBusy.refresh())
 }
 
 const badge = '#nav-ai-busy'
 
 test('an idle runtime shows no badge at all', async ({ page }) => {
   await openWith(page, IDLE)
-  await page.evaluate(() => window.AiBusy.refresh())
+  await page.evaluate(() => (window as AiRuntimeWindow).AiBusy.refresh())
   await expect(page.locator(badge)).toBeHidden()
 })
 
@@ -120,9 +122,9 @@ async function refusalText(page: Page, body: Record<string, unknown>): Promise<s
     route.fulfill({ status: 409, contentType: 'application/json', body: JSON.stringify(body) }))
   return page.evaluate(async () => {
     try {
-      await window.App.API.post('/api/tag/single', { image_id: 1 })
+      await (window as AiRuntimeWindow).App.API.post('/api/tag/single', { image_id: 1 })
     } catch (error) {
-      return window.formatUserError(error, 'Tagging failed')
+      return (window as AiRuntimeWindow).formatUserError(error, 'Tagging failed')
     }
     return 'THE CALL SUCCEEDED'
   })
@@ -190,7 +192,7 @@ test('an unnamed holder is described without inventing a name', async ({ page })
 
 test('hitting the wall refreshes the badge, so the two agree', async ({ page }) => {
   await openWith(page, IDLE)
-  await page.evaluate(() => window.AiBusy.refresh())
+  await page.evaluate(() => (window as AiRuntimeWindow).AiBusy.refresh())
   await expect(page.locator(badge)).toBeHidden()
 
   // The runtime became busy between the poll and the click; the refusal itself

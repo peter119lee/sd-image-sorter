@@ -25,7 +25,6 @@ declare global {
   interface Window {
     PromptLab?: any
     initPromptLab?: any
-    App: any
   }
 }
 

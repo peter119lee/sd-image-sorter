@@ -21,7 +21,6 @@ import { expect, test, type Page } from '../fixtures/click-ledger'
 
 declare global {
   interface Window {
-    App: any
     CaptionAutocomplete: any
   }
 }
