@@ -32,6 +32,9 @@ What is enforced here
    the keys it resolves — recomputed here from the keys, not from a second
    declaration. This is what caught the live ``reparse_or_reconnect`` double
    count (3,074 advertised against 1,537 rows).
+   The quality score obeys the same rule: it charges each remedy's rows once, so
+   at most one of a remedy's keys may declare a weight. The card was fixed and
+   the score was left summing both, which is why a dead row still cost 4.0.
 4. For the one remedy backed by an enumerable job, the advertised number equals
    what that job can still change, asked of the job itself.
 
@@ -133,6 +136,12 @@ def _report(sample_limit: int = 25) -> Dict[str, Any]:
 def _count_where(sql: str) -> int:
     with db.get_db() as conn:
         return int(conn.execute(f"SELECT COUNT(*) FROM images WHERE {sql}").fetchone()[0])
+
+
+def _clear_library() -> None:
+    """Empty the library so one test can compare two whole libraries."""
+    with db.get_db() as conn:
+        conn.execute("DELETE FROM images")
 
 
 @pytest.fixture
@@ -346,6 +355,84 @@ class TestEveryNumberBesideAnActionIsWhatTheActionTargets:
         assert by_kind["missing_text"]["count"] == len(reducible)
 
 
+class TestOneBrokenRowCostsTheScoreOnce:
+    """The distinct-row rule the cards follow, applied to the score too.
+
+    ``mark_image_unreadable`` sets ``is_readable = 0`` **and**
+    ``metadata_status = 'error'``, so a dead row trips ``unreadable`` and
+    ``metadata_error`` both, and one re-scan clears both. Summing the two
+    counters deducted twice for one row: 12,569.9 of weighted penalty on the
+    owner's library where 9,495.9 is owed, publishing 60.0 for a library that
+    scores 69.8. Same false count as the ``reparse_or_reconnect`` card before
+    ``80734ce``, one layer down and left behind by it.
+    """
+
+    def test_a_dead_row_costs_what_a_parse_failure_costs(self, test_db, tmp_path: Path):
+        """Two libraries, two rows each, one broken row in each.
+
+        Both broken rows are offered the same single re-scan by the same card,
+        so the score must not care that one of them trips two keys and the other
+        trips one. Asserted as an equality between libraries rather than against
+        a recomputed score, so it pins the composition without restating the
+        curve — and so that merely zeroing ``metadata_error``'s weight, which
+        would make the readable parse failure cost nothing at all, fails it too.
+        """
+        folder = tmp_path / "broken"
+        folder.mkdir()
+
+        # A file that still opens whose metadata parse failed: metadata_error
+        # alone. reparse_image_metadata writes exactly this on a soft parse
+        # error, with is_readable left true.
+        _seed(folder, "healthy-a.png", prompt="1girl", generator="webui",
+              checkpoint="ponyRealism.safetensors", tagged=True)
+        _seed(folder, "parse-failed.png", caption=DANBOORU_CAPTION, generator="others",
+              tagged=True, metadata_status="error")
+        parse_failure = _report()
+
+        _clear_library()
+
+        # A file that is gone: unreadable, and metadata_error because marking it
+        # unreadable sets that too.
+        _seed(folder, "healthy-b.png", prompt="1girl", generator="webui",
+              checkpoint="ponyRealism.safetensors", tagged=True)
+        _seed(folder, "gone.png", caption=DANBOORU_CAPTION, tagged=True, readable=False)
+        dead_row = _report()
+
+        assert parse_failure["issue_counts"]["unreadable"] == 0
+        assert parse_failure["issue_counts"]["metadata_error"] == 1
+        assert dead_row["issue_counts"]["unreadable"] == 1
+        assert dead_row["issue_counts"]["metadata_error"] == 1
+        assert parse_failure["summary"]["total_images"] == dead_row["summary"]["total_images"]
+
+        by_kind_parse = {item["kind"]: item["count"] for item in parse_failure["recommendations"]}
+        by_kind_dead = {item["kind"]: item["count"] for item in dead_row["recommendations"]}
+        assert by_kind_parse["reparse_or_reconnect"] == 1
+        assert by_kind_dead["reparse_or_reconnect"] == 1, (
+            "one row to re-scan in both libraries, so the score owes the same"
+        )
+
+        assert dead_row["summary"]["quality_score"] == parse_failure["summary"]["quality_score"], (
+            "the same broken row costs more when the payload has two names for "
+            "what is wrong with it"
+        )
+
+    def test_no_remedy_charges_for_its_rows_twice(self):
+        """The declaration that made it possible, pinned where it is written.
+
+        Two keys resolved by one remedy describe rows one action fixes, and the
+        score charges that remedy's rows once — so at most one of its keys may
+        carry the weight.
+        """
+        by_key = {spec.key: spec for spec in ISSUE_VOCABULARY}
+
+        for remedy in ISSUE_REMEDIES:
+            weighted = [key for key in remedy.keys if by_key[key].quality_weight]
+            assert len(weighted) <= 1, (
+                f"{remedy.kind} resolves {sorted(weighted)}, each carrying its own "
+                "weight, so a row matching both is charged twice for one repair"
+            )
+
+
 class TestNothingChargesTheUserWithoutOfferingAnAction:
     def test_the_summary_totals_come_only_from_declared_contributors(
         self, library_with_every_issue
@@ -415,6 +502,17 @@ class TestTheGuardActuallyBites:
 
     def test_the_shipped_vocabulary_validates(self):
         _validate_issue_vocabulary()
+
+    def test_two_weighted_keys_under_one_remedy_are_rejected(self):
+        """``unreadable`` + ``metadata_error``'s exact shape: one repair, one
+        row, charged twice because each key carried its own weight."""
+        vocabulary = tuple(
+            spec._replace(quality_weight=2.0) if spec.key == "metadata_error" else spec
+            for spec in ISSUE_VOCABULARY
+        )
+
+        with pytest.raises(ValueError, match="charges for its rows twice"):
+            _validate_issue_vocabulary(vocabulary, ISSUE_REMEDIES)
 
     def test_a_key_that_charges_the_user_with_no_remedy_is_rejected(self):
         """``unknown_generator``'s exact shape: a 0.6 quality penalty and no

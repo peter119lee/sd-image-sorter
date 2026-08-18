@@ -86,6 +86,12 @@ class IssueSpec(NamedTuple):
     beside no action that can move it" (``missing_prompt`` in ``7c10fb6``,
     ``missing_checkpoint`` in ``5332c02``, the metadata-health population in
     ``62dc568``), so the vocabulary now refuses to express one.
+
+    ``quality_weight`` is the cost of **one row the key's remedy visits**, not of
+    one match of this key: the score charges each remedy's union once (see
+    :func:`_remedy_quality_weight`), so at most one key per remedy may declare a
+    weight and it prices every row in that union. Two keys describing the same
+    repair each carrying 2.0 is what deducted twice for every dead row.
     """
 
     key: str
@@ -161,11 +167,12 @@ ISSUE_VOCABULARY: Tuple[IssueSpec, ...] = (
         key="missing_file_size",
         sql=f"{_READABLE_SQL} AND {_NO_FILE_SIZE_SQL}",
         remedy="incomplete_scan_record",
-        # No weight and no actionable contribution on purpose: this is the second
-        # facet of one incomplete scan record, and the rows are usually the same
-        # rows missing_dimensions already charges for (all 63 of them on the
-        # owner's library). Charging twice for one re-scan is the same
-        # double-count the reparse_or_reconnect card had.
+        # The second facet of one incomplete scan record, and usually the same
+        # rows missing_dimensions already names (all 63 of them on the owner's
+        # library). The weight for the pair sits on missing_dimensions and is
+        # charged once over the union, so these rows do cost the score — they
+        # just cannot cost it twice for one re-scan. No actionable contribution
+        # for the same reason.
     ),
     IssueSpec(
         key="untagged",
@@ -205,7 +212,13 @@ ISSUE_VOCABULARY: Tuple[IssueSpec, ...] = (
         key="metadata_error",
         sql=f"{_METADATA_STATUS_SQL} = 'error'",
         remedy="reparse_or_reconnect",
-        quality_weight=2.0,
+        # The weight for a dead row sits on ``unreadable`` and is charged once
+        # over the pair's union, which is what this key's rows are: every
+        # unreadable row is also a metadata_status = 'error' row, so declaring
+        # 2.0 here as well deducted twice for the same 1,537 rows and published
+        # 60.0 for a library that scores 69.8. A readable parse failure — the
+        # rows this key holds that ``unreadable`` does not — is in the union too,
+        # so it still costs the same 2.0 it always did.
     ),
 )
 
@@ -289,6 +302,7 @@ def _validate_issue_vocabulary(
     duplicates = {key for key in keys if keys.count(key) > 1}
     if duplicates:
         raise ValueError(f"issue vocabulary declares duplicate keys: {sorted(duplicates)}")
+    by_key = {spec.key: spec for spec in vocabulary}
 
     remedy_kinds = [remedy.kind for remedy in remedies]
     duplicate_kinds = {kind for kind in remedy_kinds if remedy_kinds.count(kind) > 1}
@@ -303,6 +317,14 @@ def _validate_issue_vocabulary(
         unknown = [key for key in remedy.keys if key not in keys]
         if unknown:
             raise ValueError(f"remedy {remedy.kind!r} resolves undeclared keys: {unknown}")
+        weighted = [key for key in remedy.keys if by_key[key].quality_weight]
+        if len(weighted) > 1:
+            raise ValueError(
+                f"remedy {remedy.kind!r} charges for its rows twice: "
+                f"{sorted(weighted)} each declare a weight, and the score charges "
+                "this remedy's rows once, so a row matching both would cost double "
+                "for one repair"
+            )
 
     for spec in vocabulary:
         if spec.remedy is None:
@@ -345,16 +367,34 @@ def _issue_union_sql(remedy: IssueRemedy, by_key: Dict[str, IssueSpec]) -> str:
     return " OR ".join(f"({by_key[key].sql})" for key in remedy.keys)
 
 
+def _remedy_quality_weight(remedy: IssueRemedy, by_key: Dict[str, IssueSpec]) -> float:
+    """What one row costs the score for this remedy.
+
+    At most one of a remedy's keys may declare a weight
+    (:func:`_validate_issue_vocabulary` rejects the alternative), so the price of
+    a row is unambiguous however many of the remedy's keys it matches.
+    """
+    return next(
+        (by_key[key].quality_weight for key in remedy.keys if by_key[key].quality_weight),
+        0.0,
+    )
+
+
 def get_library_health_report(*, sample_limit: int = 8) -> Dict[str, Any]:
     """Return a read-only quality audit for the indexed image library.
 
-    ``issue_counts`` is the issue vocabulary: its keys render as issue bars, feed
-    ``actionable_count`` and carry quality-score weights, so anything in it is a
-    claim that something is wrong and that the user can act. Every member is
-    declared in :data:`ISSUE_VOCABULARY` with the remedy that names its action,
+    ``issue_counts`` is the issue vocabulary: its keys render as issue bars and
+    most of them feed ``actionable_count`` and the quality score, so anything in
+    it is a claim that something is wrong and that the user can act. Every member
+    is declared in :data:`ISSUE_VOCABULARY` with the remedy that names its action,
     or with a recorded reason for being reported without one — and a key with no
     remedy may carry no weight and no actionable contribution
     (:func:`_validate_issue_vocabulary` refuses the alternative at import).
+
+    ``summary.quality_score`` deducts per **remedy**, over the distinct rows that
+    remedy visits, which is exactly what its recommendation card advertises. Two
+    keys describing one repair therefore cost one row once, and at most one of a
+    remedy's keys may declare the weight.
 
     ``statistics`` holds counts that are true but are not defects:
     ``missing_prompt``, ``missing_checkpoint``, ``missing_negative_prompt`` and
@@ -547,10 +587,14 @@ def get_library_health_report(*, sample_limit: int = 8) -> Dict[str, Any]:
     ) + duplicate_filename_images
     quality_score = 100.0
     if total > 0:
+        # Charged per remedy over the distinct rows it visits, so the score
+        # deducts exactly what the recommendation cards advertise. Summing the
+        # per-key counters instead charged a dead row twice — every unreadable
+        # row is also a metadata_error row — for 3,074 of penalty where 1,537
+        # rows exist, the same false count the cards themselves used to make.
         weighted_penalty = sum(
-            min(issue_counts[spec.key], total) * spec.quality_weight
-            for spec in ISSUE_VOCABULARY
-            if spec.quality_weight
+            remedy_targets[remedy.kind] * _remedy_quality_weight(remedy, by_key)
+            for remedy in ISSUE_REMEDIES
         ) + min(duplicate_filename_images, total) * 0.5
         average_penalty = weighted_penalty / float(total)
         quality_score = max(0.0, round(100.0 - min(90.0, average_penalty * 22.0), 1))
