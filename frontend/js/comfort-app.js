@@ -137,11 +137,35 @@
         if (icon) icon.innerHTML = on ? "<svg class=\"icon\" aria-hidden=\"true\"><use href=\"#i-moon\"/></svg>" : "<svg class=\"icon\" aria-hidden=\"true\"><use href=\"#i-monitor\"/></svg>";
     }
 
+    // Warmth retints graphite's surfaces by a couple of points per channel.
+    // The ink palette is deliberately R=G=B true black, so the CSS selectors
+    // are scoped to graphite and warmth genuinely cannot apply there. Say so
+    // rather than leaving a select that accepts and persists a dead choice.
+    function warmthApplies() {
+        return (document.documentElement.getAttribute('data-theme') || 'graphite')
+            === 'graphite';
+    }
+
     function refreshWarmthControl() {
         const select = document.getElementById('settings-comfort-warmth');
         if (!select) return;
         const w = getWarmth();
         if (select.value !== w) select.value = w;
+
+        const applies = warmthApplies();
+        select.disabled = !applies;
+        const body = document.getElementById('settings-comfort-warmth-body');
+        if (body) {
+            // Repoint the key rather than only writing text: the #app observer
+            // re-applies data-i18n a frame later and would restore the generic
+            // description, and this way a language switch stays correct too.
+            const key = applies ? 'comfort.warmthBody' : 'comfort.warmthGraphiteOnly';
+            const fallback = applies
+                ? 'Cool studio, neutral, or slightly warm dark'
+                : 'Only Graphite is retinted — Black + Blue stays true neutral';
+            body.setAttribute('data-i18n', key);
+            body.textContent = _t(key, fallback);
+        }
     }
 
     function wireSettings() {
@@ -150,6 +174,8 @@
 
         const warmth = document.getElementById('settings-comfort-warmth');
         warmth?.addEventListener('change', () => setWarmth(warmth.value));
+
+        document.addEventListener('themeChanged', refreshWarmthControl);
 
         refreshZenButton();
         refreshWarmthControl();

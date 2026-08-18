@@ -3888,3 +3888,225 @@ def test_the_attention_list_only_names_defects_the_audit_itself_counts():
             assert re.search(
                 rf"^\s*'{re.escape(key)}'\s*:", pack, re.MULTILINE
             ), f"{pack_name} is missing {key}"
+
+
+def _css_block(css: str, selector: str) -> str:
+    start = css.index(selector)
+    depth = 0
+    i = css.index("{", start)
+    for j in range(i, len(css)):
+        if css[j] == "{":
+            depth += 1
+        elif css[j] == "}":
+            depth -= 1
+            if depth == 0:
+                return css[start : j + 1]
+    raise AssertionError(f"unclosed block for {selector}")
+
+
+def _hex_rgb(css_block: str, token: str) -> tuple[int, int, int]:
+    match = re.search(rf"{re.escape(token)}:\s*#([0-9A-Fa-f]{{6}})", css_block)
+    assert match, f"{token} hex missing from {css_block[:80]}"
+    value = match.group(1)
+    return int(value[0:2], 16), int(value[2:4], 16), int(value[4:6], 16)
+
+
+THEME_IDS = ("graphite", "ink")
+THEME_LOCALE_KEYS = (
+    "theme.open",
+    "theme.openTooltip",
+    "theme.settingsTitle",
+    "theme.settingsBody",
+    "theme.graphite",
+    "theme.graphiteHint",
+    "theme.ink",
+    "theme.inkHint",
+)
+
+
+def test_the_theme_picker_offers_only_palettes_that_are_actually_styled():
+    """Both offered palettes must be dark, because only dark ones are finished.
+
+    A light palette needs every sheet to flip, not just ``tokens.css``: the
+    other 21 stylesheets hold ~1,570 rules with hardcoded dark values and no
+    ``data-theme`` selector, so a white canvas would show black holes in
+    Censor and Dataset. Graphite and ink are both dark, so they are safe to
+    offer; ``paper`` is deliberately absent and this test keeps it absent
+    until those sheets are converged.
+    """
+    repo_root = Path(__file__).resolve().parents[2]
+    index = (repo_root / "frontend" / "index.html").read_text(encoding="utf-8")
+    tokens = (repo_root / "frontend" / "css" / "tokens.css").read_text(encoding="utf-8")
+    theme_js = (repo_root / "frontend" / "js" / "theme.js").read_text(encoding="utf-8")
+
+    assert 'data-theme="graphite"' in index
+    assert "sd-image-sorter-theme" in index
+    assert 'src="/static/js/theme.js"' in index
+    assert 'id="theme-menu"' in index
+    assert 'id="btn-theme-toggle"' in index
+    assert 'id="entry-theme-btn"' in index
+    assert ".theme-menu[hidden]" in tokens
+
+    for theme_id in THEME_IDS:
+        assert f'data-theme-id="{theme_id}"' in index
+    assert 'html[data-theme="ink"]' in tokens
+
+    # The unshipped light palette must not be reachable from any surface.
+    assert 'data-theme-id="paper"' not in index
+    assert "paper: 1" not in index
+    assert 'html[data-theme="paper"]' not in tokens
+    assert 'data-theme-swatch="paper"' not in tokens
+    assert "'paper'" not in theme_js
+
+    assert "var THEMES = ['graphite', 'ink']" in theme_js
+    assert "DEFAULT_THEME = 'graphite'" in theme_js
+    assert "if (!allowed(id)) id = DEFAULT_THEME" in theme_js
+
+    for pack_name, pack in _locale_pack_sources(repo_root).items():
+        for key in THEME_LOCALE_KEYS:
+            assert re.search(
+                rf"^\s*'{re.escape(key)}'\s*:", pack, re.MULTILINE
+            ), f"{pack_name} is missing {key}"
+        assert not re.search(r"^\s*'theme\.paper'\s*:", pack, re.MULTILINE), (
+            f"{pack_name} still translates the unshipped paper palette"
+        )
+
+    for overlay in ("--wash:", "--wash-hover:", "--chrome-float:", "--danger-ink:"):
+        assert overlay in tokens, f"missing overlay token {overlay}"
+
+    ink = _css_block(tokens, 'html[data-theme="ink"]')
+    for required in ("--wash:", "--chrome-float:", "--danger-ink:", "--shadow-modal:"):
+        assert required in ink, f"ink is missing {required}"
+
+    # True-neutral black surfaces with one steel-blue accent. A blue-tinted
+    # dark chrome is the loudest generated-UI tell, so the background stays
+    # R=G=B and only the accent carries hue.
+    ink_accent = _hex_rgb(ink, "--accent")
+    ink_bg = _hex_rgb(ink, "--bg")
+    assert ink_accent[2] > ink_accent[0] + 20 and ink_accent[1] > ink_accent[0]
+    assert max(ink_bg) - min(ink_bg) <= 2
+    assert max(ink_bg) <= 0x12
+    assert "#2F6FBD" not in ink
+
+    unification = tokens.split("App-wide unification pass", 1)[1]
+    assert "rgba(255, 255, 255, 0.03)" not in unification
+    assert "rgba(28, 28, 30, 0.94)" not in unification
+
+
+def test_the_overlay_tokens_kept_the_depths_that_were_actually_different():
+    """Naming the overlays must not flatten depths that carried meaning.
+
+    Collapsing the stray 0.025/0.045 alphas onto one wash step is deliberate —
+    the scatter is why panels read as unrelated. But an empty state, a quiet
+    idle tab and a panel-depth sticky bar were each darker or lighter *on
+    purpose*, and folding them into ``--wash`` visibly brightened empty states
+    and dropped the Dataset export bar to stage depth.
+    """
+    repo_root = Path(__file__).resolve().parents[2]
+    tokens = (repo_root / "frontend" / "css" / "tokens.css").read_text(encoding="utf-8")
+
+    root = _css_block(tokens, ":root")
+    ink = _css_block(tokens, 'html[data-theme="ink"]')
+    for palette_name, palette in (("root", root), ("ink", ink)):
+        for step in ("--wash-faint:", "--wash:", "--wash-strong:"):
+            assert step in palette, f"{palette_name} is missing {step}"
+
+    def _rule(selector: str) -> str:
+        return _css_block(tokens, selector)
+
+    # Empty states stay at their own quieter depth, not the default wash.
+    for selector in (
+        ".autosep-preview-empty--no-filters",
+        "#view-censor .queue-empty-state-v2",
+    ):
+        assert "var(--empty-bg)" in _rule(selector), (
+            f"{selector} should keep empty-state depth"
+        )
+
+    # An idle pipeline tab is the quietest fill on the screen.
+    assert "var(--wash-faint)" in _rule("#view-dataset .dataset-tab")
+
+    # The export bar floats over the tab's content at panel depth. Stage depth
+    # (--chrome-float-deep) reads as the Censor footer and is a different layer.
+    export_bar = _rule("#view-dataset .dataset-export-action-bar")
+    assert "var(--chrome-sidebar)" in export_bar
+    assert "var(--chrome-float-deep)" not in export_bar
+
+
+def test_the_theme_picker_is_reachable_from_settings_not_only_the_nav_icon():
+    """Settings is where a user looks for appearance, so it must be offered there.
+
+    The nav icon and the entry-page button are both unlabelled glyphs. The
+    Appearance group in Settings already owns UI scale, zen and warmth; a
+    palette that is only reachable from an icon is a palette most users never
+    find.
+    """
+    repo_root = Path(__file__).resolve().parents[2]
+    index = (repo_root / "frontend" / "index.html").read_text(encoding="utf-8")
+    theme_js = (repo_root / "frontend" / "js" / "theme.js").read_text(encoding="utf-8")
+
+    assert 'id="settings-theme"' in index
+    assert 'data-i18n="theme.settingsTitle"' in index
+    for theme_id in THEME_IDS:
+        assert f'<option value="{theme_id}"' in index
+
+    assert "settings-theme" in theme_js, "theme.js must wire the settings control"
+
+
+def test_the_theme_menu_announces_against_the_button_that_opened_it():
+    """Two buttons open one listbox, so a fixed label association is wrong.
+
+    The nav icon and the entry-page button both open ``#theme-menu``. If
+    ``aria-expanded`` and ``aria-labelledby`` only ever track the nav icon, a
+    screen-reader user opening the picker from the entry page is told about a
+    control that is not on screen.
+    """
+    repo_root = Path(__file__).resolve().parents[2]
+    index = (repo_root / "frontend" / "index.html").read_text(encoding="utf-8")
+    theme_js = (repo_root / "frontend" / "js" / "theme.js").read_text(encoding="utf-8")
+
+    entry_button = re.search(r"<button[^>]*id=\"entry-theme-btn\".*?>", index, re.S)
+    assert entry_button, "entry-theme-btn is missing"
+    entry_markup = entry_button.group(0)
+    for attribute in (
+        'aria-haspopup="listbox"',
+        'aria-expanded="false"',
+        'aria-controls="theme-menu"',
+    ):
+        assert attribute in entry_markup, f"entry-theme-btn is missing {attribute}"
+
+    # The open state must be driven from the pressed anchor, not one hard id.
+    assert "ANCHOR_IDS" in theme_js
+    assert "entry-theme-btn" in theme_js
+    assert "setAttribute('aria-labelledby'" in theme_js
+
+
+def test_room_warmth_says_it_is_graphite_only_instead_of_silently_doing_nothing():
+    """Warmth retints graphite's surfaces, so ink must disable it, not ignore it.
+
+    The warmth selectors are scoped to ``[data-theme="graphite"]`` because ink
+    is deliberately R=G=B true black. Left ungated the select would still
+    accept a choice, still persist it, and change nothing on screen — the
+    dead-control failure this codebase keeps finding.
+    """
+    repo_root = Path(__file__).resolve().parents[2]
+    tokens = (repo_root / "frontend" / "css" / "tokens.css").read_text(encoding="utf-8")
+    comfort = (
+        repo_root / "frontend" / "js" / "comfort-app.js"
+    ).read_text(encoding="utf-8")
+
+    assert 'html[data-theme="graphite"][data-comfort-warmth="cool"]' in tokens
+    assert (
+        re.search(r'^html\[data-comfort-warmth="cool"\]', tokens, re.MULTILINE) is None
+    ), "an unscoped warmth rule would retint ink as well"
+
+    assert "themeChanged" in comfort, (
+        "comfort-app must react to a palette change, not read it once at boot"
+    )
+    assert "disabled" in comfort
+    assert "comfort.warmthGraphiteOnly" in comfort
+
+    for pack_name, pack in _locale_pack_sources(repo_root).items():
+        assert re.search(
+            r"^\s*'comfort\.warmthGraphiteOnly'\s*:", pack, re.MULTILINE
+        ), f"{pack_name} is missing comfort.warmthGraphiteOnly"

@@ -217,6 +217,32 @@
     --shadow-modal: 0 16px 48px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.06);
     --shadow-float: 0 8px 24px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);
 
+    /* Overlays that a palette paints as white-on-dark. Named so a sibling
+       palette can remap the whole family at once instead of every rule
+       hardcoding its own alpha. Do not write rgba(255,255,255,…) in the rules
+       below — go through these names.
+
+       Three deliberate steps: faint (quietest idle fill), wash (default
+       raised surface), strong (hover). Rules that previously carried a stray
+       0.025 or 0.045 now snap onto the nearest step on purpose — the scatter
+       was the reason panels read as unrelated. Genuinely different depths
+       (empty states, chrome) keep their own names below. */
+    --wash-faint: rgba(255, 255, 255, 0.02);
+    --wash: rgba(255, 255, 255, 0.03);
+    --wash-hover: rgba(255, 255, 255, 0.06);
+    --wash-strong: rgba(255, 255, 255, 0.08);
+    --ink-faint: rgba(255, 255, 255, 0.22);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.14);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.22);
+    --chrome-float: rgba(28, 28, 30, 0.94);
+    --chrome-float-deep: rgba(14, 14, 15, 0.94);
+    --chrome-on-image: rgba(14, 14, 15, 0.72);
+    --chrome-sidebar: rgba(21, 21, 23, 0.92);
+    --chrome-sidebar-soft: rgba(21, 21, 23, 0.72);
+    --chrome-zen: rgba(14, 14, 15, 0.82);
+    --danger-ink: #ffb4b1;
+    --danger-ink-hover: #ffd0ce;
+
     /* radii: the legacy ladder collapses onto the small Graphite steps */
     --radius-xs: 3px;
     --radius-sm: 4px;
@@ -231,6 +257,68 @@
     --font-body-cjk: var(--font-body);
     --font-display-cjk: var(--font-body);
     --font-sans: var(--font-body);
+
+    color-scheme: dark;
+}
+
+/* Black + Blue — true-neutral black, one steel-blue accent.
+   Panels stay R=G=B (a blue-tinted dark chrome is the loudest generated-UI
+   tell). The blue is instrument-steel, not Tailwind blue-600 or electric cyan. */
+html[data-theme="ink"] {
+    color-scheme: dark;
+    --bg: #090909;
+    --surface-1: #141414;
+    --surface-2: #1B1B1B;
+    --surface-3: #242424;
+    --stage: #050505;
+    --border: #2C2C2C;
+    --border-strong: #3C3C3C;
+    --hairline-1: #1E1E1E;
+    --hairline-2: #262626;
+    --scrim: rgba(0, 0, 0, 0.76);
+    --text: #E8E8EA;
+    --text-2: #A6A6AB;
+    --muted: #8A8A90;
+    --text-disabled: #56565C;
+    --accent: #3A6F98;
+    --accent-rgb: 58, 111, 152;
+    --accent-bright: #4A82AD;
+    --accent-deep: #2C5A7C;
+    --accent-soft: rgba(58, 111, 152, 0.14);
+    --accent-line: rgba(58, 111, 152, 0.48);
+    --on-accent: #F2F6FA;
+    --success: #5FB37E;
+    --success-rgb: 95, 179, 126;
+    --warning: #DFB750;
+    --warning-rgb: 223, 183, 80;
+    --danger: #DE6B66;
+    --danger-rgb: 222, 107, 102;
+    --purple: #B7B7BD;
+    --purple-rgb: 183, 183, 189;
+    --purple-hover: #C9C9CE;
+    --purple-active: #9C9CA3;
+    --tag-chip-bg: rgba(255, 255, 255, 0.055);
+    --control-bg: #0C0C0C;
+    --control-bg-hover: #161616;
+    --empty-bg: rgba(255, 255, 255, 0.02);
+    --progress-track: rgba(255, 255, 255, 0.08);
+    --shadow-modal: 0 16px 48px rgba(0, 0, 0, 0.72), 0 0 0 1px rgba(255, 255, 255, 0.05);
+    --shadow-float: 0 8px 24px rgba(0, 0, 0, 0.58), 0 0 0 1px rgba(255, 255, 255, 0.04);
+    --wash-faint: rgba(255, 255, 255, 0.02);
+    --wash: rgba(255, 255, 255, 0.03);
+    --wash-hover: rgba(255, 255, 255, 0.06);
+    --wash-strong: rgba(255, 255, 255, 0.08);
+    --ink-faint: rgba(255, 255, 255, 0.22);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.16);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.26);
+    --chrome-float: rgba(27, 27, 27, 0.94);
+    --chrome-float-deep: rgba(9, 9, 9, 0.94);
+    --chrome-on-image: rgba(9, 9, 9, 0.72);
+    --chrome-sidebar: rgba(20, 20, 20, 0.92);
+    --chrome-sidebar-soft: rgba(20, 20, 20, 0.72);
+    --chrome-zen: rgba(9, 9, 9, 0.82);
+    --danger-ink: #ffb4b1;
+    --danger-ink-hover: #ffd0ce;
 }
 
 /* ==========================================================================
@@ -330,7 +418,7 @@ textarea:focus-visible,
 
     .btn-primary {
         background: var(--accent-primary);
-        color: #000000;
+        color: var(--on-accent);
     }
 }
 
@@ -409,7 +497,7 @@ textarea:focus-visible,
 .preview-section,
 .control-section,
 .artist-detail-content {
-    background: rgba(255, 255, 255, 0.03);
+    background: var(--wash);
     border: 1px solid var(--hairline-2);
     border-radius: var(--r-card);
 }
@@ -435,7 +523,7 @@ textarea:focus-visible,
    stomps .btn-primary (same specificity, later wins). */
 .btn:not(.btn-primary):not(.btn-grad):not(.danger):not(.btn-danger),
 .btn-help {
-    background: rgba(255, 255, 255, 0.03);
+    background: var(--wash);
     color: var(--text);
 }
 
@@ -450,7 +538,7 @@ textarea:focus-visible,
 .btn-secondary:hover:not(:disabled),
 .btn-help:hover:not(:disabled),
 .btn-ghost:hover:not(:disabled) {
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--wash-hover);
     border-color: var(--border-strong);
     color: var(--text);
     box-shadow: none;
@@ -461,7 +549,7 @@ textarea:focus-visible,
 .btn-ghost.danger {
     border-color: rgba(var(--danger-rgb), 0.42);
     background: rgba(var(--danger-rgb), 0.10);
-    color: #ffb4b1;
+    color: var(--danger-ink);
 }
 
 .btn.danger:hover:not(:disabled),
@@ -469,7 +557,7 @@ textarea:focus-visible,
 .btn-ghost.danger:hover:not(:disabled) {
     border-color: rgba(var(--danger-rgb), 0.62);
     background: rgba(var(--danger-rgb), 0.18);
-    color: #ffd0ce;
+    color: var(--danger-ink-hover);
 }
 
 /* Re-assert solid blue primary AFTER the generic .btn rules (Phase 1
@@ -582,7 +670,7 @@ textarea:focus-visible,
 /* Idle select toggle is a mode switch, not the screen's primary CTA —
    keep it quiet until armed (then pink = user decision). */
 #btn-toggle-select.btn-primary:not(.selection-active):not([aria-pressed="true"]) {
-    background: rgba(255, 255, 255, 0.03);
+    background: var(--wash);
     color: var(--text);
     border-color: var(--border);
     box-shadow: none;
@@ -647,13 +735,13 @@ textarea:focus-visible,
 }
 
 .star-rating-interactive .star:hover ~ .star {
-    color: rgba(255, 255, 255, 0.22);
+    color: var(--ink-faint);
 }
 
 /* Browse chips: quiet neutral — pink only for real selection, not chrome. */
 .gallery-chip.is-active,
 .aesthetic-quick.is-active {
-    background: rgba(255, 255, 255, 0.06);
+    background: var(--wash-hover);
     border-color: var(--border-strong);
     color: var(--text);
 }
@@ -780,12 +868,12 @@ textarea:focus-visible,
 
 .autosep-preview-empty--no-filters {
     border: 1px dashed var(--border-strong);
-    background: rgba(255, 255, 255, 0.02);
+    background: var(--empty-bg);
 }
 
 /* Onboarding step numbers: blue = next action, not decorative amber. */
 .onboarding-step {
-    background: rgba(255, 255, 255, 0.03);
+    background: var(--wash);
     border: 1px solid var(--border);
     border-radius: var(--r-card);
 }
@@ -936,7 +1024,7 @@ a:hover,
 @media (min-width: 1280px) {
     * {
         scrollbar-width: thin;
-        scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
+        scrollbar-color: var(--scrollbar-thumb) transparent;
     }
 
     *::-webkit-scrollbar {
@@ -945,14 +1033,14 @@ a:hover,
     }
 
     *::-webkit-scrollbar-thumb {
-        background: rgba(255, 255, 255, 0.14);
+        background: var(--scrollbar-thumb);
         border-radius: 999px;
         border: 2px solid transparent;
         background-clip: padding-box;
     }
 
     *::-webkit-scrollbar-thumb:hover {
-        background: rgba(255, 255, 255, 0.22);
+        background: var(--scrollbar-thumb-hover);
         background-clip: padding-box;
     }
 
@@ -1130,27 +1218,27 @@ a:hover,
 /* Floating toolbar + footer: one light glass layer only (over the stage).
    !important needed — ui-refresh pins legacy rgba backgrounds with !important. */
 #view-censor .censor-toolbar-v2 {
-    background: rgba(28, 28, 30, 0.94) !important;
+    background: var(--chrome-float) !important;
     border: 1px solid var(--border) !important;
     border-radius: var(--r-pill) !important;
     box-shadow: var(--shadow-float) !important;
 }
 
 #view-censor .censor-footer-bars {
-    background: rgba(14, 14, 15, 0.94) !important;
+    background: var(--chrome-float-deep) !important;
     border-top: 1px solid var(--border) !important;
 }
 
 #view-censor .zoom-controls-bar,
 #view-censor .zoom-controls-v2 {
-    background: rgba(28, 28, 30, 0.92) !important;
+    background: var(--chrome-float) !important;
     border: 1px solid var(--border) !important;
     box-shadow: var(--shadow-float) !important;
 }
 
 #view-censor .property-section,
 #view-censor .queue-control-card {
-    background: rgba(255, 255, 255, 0.03) !important;
+    background: var(--wash) !important;
     border: 1px solid var(--border) !important;
     border-radius: var(--r-card);
     box-shadow: none !important;
@@ -1170,7 +1258,7 @@ a:hover,
 
 /* Tool buttons: quiet chrome; active tool = blue (current action mode). */
 #view-censor .tool-btn-v2 {
-    background: rgba(255, 255, 255, 0.03);
+    background: var(--wash);
     border: 1px solid var(--border);
     border-radius: var(--r-ctl);
     color: var(--text-2);
@@ -1300,14 +1388,14 @@ a:hover,
     color: var(--text-2);
     border: 1px dashed var(--border-strong);
     border-radius: var(--r-card);
-    background: rgba(255, 255, 255, 0.02);
+    background: var(--empty-bg);
 }
 
 /* Review conveyor: AI conf = purple; approve = user pink when armed. */
 #view-censor .censor-review-region {
     border: 1px solid var(--border);
     border-radius: var(--r-ctl);
-    background: rgba(255, 255, 255, 0.03);
+    background: var(--wash);
 }
 
 #view-censor .censor-review-region-conf {
@@ -1325,14 +1413,14 @@ a:hover,
    demote every .btn-primary, then re-promote the true screen primary
    (save/apply pipeline) + one empty-state escape. */
 #view-censor .btn.btn-primary {
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--wash);
     color: var(--text);
     border: 1px solid var(--border);
     box-shadow: none;
 }
 
 #view-censor .btn.btn-primary:hover:not(:disabled) {
-    background: rgba(255, 255, 255, 0.07);
+    background: var(--wash-strong);
     border-color: var(--border-strong);
     color: var(--text);
 }
@@ -1382,7 +1470,7 @@ a:hover,
 #view-censor #btn-review-detect,
 #view-censor #btn-apply-filters,
 #view-censor #btn-open-queue-manager {
-    background: rgba(255, 255, 255, 0.03);
+    background: var(--wash);
     color: var(--text);
     border: 1px solid var(--border);
 }
@@ -1406,7 +1494,7 @@ a:hover,
 }
 
 #view-dataset .dataset-count-pill {
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--wash);
     border: 1px solid var(--border);
     color: var(--text-2);
     font-family: var(--font-mono);
@@ -1421,7 +1509,7 @@ a:hover,
 /* Tabs: step numbers = blue pipeline. */
 #view-dataset .dataset-tab {
     border: 1px solid var(--border);
-    background: rgba(255, 255, 255, 0.02);
+    background: var(--wash-faint);
     color: var(--text-2);
     border-radius: var(--r-ctl);
 }
@@ -1480,7 +1568,7 @@ a:hover,
 }
 
 #view-dataset .dataset-queue-item:hover {
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--wash);
     border-color: var(--border);
 }
 
@@ -1501,8 +1589,8 @@ a:hover,
 }
 
 #view-dataset .dataset-queue-select-toggle {
-    border: 1px solid rgba(255, 255, 255, 0.28);
-    background: rgba(14, 14, 15, 0.72);
+    border: 1px solid var(--ink-faint);
+    background: var(--chrome-on-image);
     border-radius: 4px;
 }
 
@@ -1539,7 +1627,7 @@ a:hover,
 
 /* Cards / inputs */
 #view-dataset .dataset-card {
-    background: rgba(255, 255, 255, 0.025);
+    background: var(--wash);
     border: 1px solid var(--hairline-2);
     border-radius: var(--r-card);
 }
@@ -1564,9 +1652,10 @@ a:hover,
     background: rgba(var(--pink-rgb), 0.18);
 }
 
-/* Export sticky bar + cross-step CTA (ONE gradient on this tab). */
+/* Export sticky bar + cross-step CTA (ONE gradient on this tab). Sits at
+   panel depth, not stage depth — it floats over the tab's own content. */
 #view-dataset .dataset-export-action-bar {
-    background: rgba(21, 21, 23, 0.96);
+    background: var(--chrome-sidebar);
     border-bottom: 1px solid var(--border);
     box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
 }
@@ -1589,7 +1678,7 @@ a:hover,
 }
 
 #view-dataset .dataset-export-cta:disabled {
-    background: rgba(255, 255, 255, 0.045);
+    background: var(--wash);
     color: var(--text-disabled);
     box-shadow: none;
     filter: grayscale(0.4);
@@ -1599,14 +1688,14 @@ a:hover,
 /* Primary discipline inside Dataset:
    demote generic primaries; re-promote tab-appropriate CTAs only. */
 #view-dataset .btn.btn-primary {
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--wash);
     color: var(--text);
     border: 1px solid var(--border);
     box-shadow: none;
 }
 
 #view-dataset .btn.btn-primary:hover:not(:disabled) {
-    background: rgba(255, 255, 255, 0.07);
+    background: var(--wash-strong);
     border-color: var(--border-strong);
     color: var(--text);
 }
@@ -1667,7 +1756,7 @@ a:hover,
 
 /* Project save = secondary chrome, not competing primary. */
 #view-dataset #btn-dataset-project-save {
-    background: rgba(255, 255, 255, 0.03);
+    background: var(--wash);
     border: 1px solid var(--border);
     color: var(--text-2);
 }
@@ -1702,14 +1791,14 @@ a:hover,
 
 /* Filter open icon is utility, not primary. */
 #btn-open-filters.btn-primary {
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--wash);
     color: var(--text);
     border: 1px solid var(--border);
     box-shadow: none;
 }
 
 #btn-open-filters.btn-primary:hover:not(:disabled) {
-    background: rgba(255, 255, 255, 0.08);
+    background: var(--wash-strong);
     color: var(--text);
 }
 
@@ -1775,7 +1864,7 @@ html.gallery-comfort-room #view-gallery .filter-sidebar,
 }
 
 html.gallery-comfort-room .filter-sidebar {
-    background: rgba(21, 21, 23, 0.92);
+    background: var(--chrome-sidebar);
     border-color: var(--hairline-2);
     box-shadow: none;
 }
@@ -1784,7 +1873,7 @@ html.gallery-comfort-room .filter-sidebar {
 #gallery-empty-state .empty-state-onboarding {
     max-width: min(880px, 92%);
     padding: 28px 24px 22px;
-    background: rgba(21, 21, 23, 0.72);
+    background: var(--chrome-sidebar-soft);
     border: 1px solid var(--border);
     box-shadow: var(--shadow-card);
 }
@@ -1916,7 +2005,7 @@ html.gallery-comfort-has-hero #view-gallery .gallery-container::after {
     letter-spacing: 0.02em;
     padding: 6px 12px;
     border-radius: var(--r-pill);
-    background: rgba(14, 14, 15, 0.72);
+    background: var(--chrome-on-image);
     border: 1px solid var(--border);
 }
 
@@ -1968,7 +2057,7 @@ html.gallery-comfort-peeking {
 }
 
 .gallery-daily-loop-dismiss:hover {
-    background: rgba(255, 255, 255, 0.08);
+    background: var(--wash-strong);
     color: var(--text);
 }
 
@@ -1997,7 +2086,7 @@ html.gallery-comfort-peeking {
    perceptible temperature shift of the SAME graphite, not two extra themes:
    the delta is a couple of points per channel, the accent never changes, and
    neither variant reintroduces a blue/violet cast. */
-html[data-comfort-warmth="cool"] {
+html[data-theme="graphite"][data-comfort-warmth="cool"] {
     --bg: #0D0E10;
     --surface-1: #141518;
     --surface-2: #1B1C1F;
@@ -2007,11 +2096,11 @@ html[data-comfort-warmth="cool"] {
     --text-2: #A3A6AC;
 }
 
-html[data-comfort-warmth="neutral"] {
+html[data-theme="graphite"][data-comfort-warmth="neutral"] {
     /* Graphite defaults are already dead neutral; identity. */
 }
 
-html[data-comfort-warmth="warm"] {
+html[data-theme="graphite"][data-comfort-warmth="warm"] {
     --bg: #100F0D;
     --surface-1: #171614;
     --surface-2: #1E1D1A;
@@ -2026,8 +2115,8 @@ html[data-comfort-warmth="warm"] {
 }
 
 /* Remap legacy tokens when warmth overrides canonicals. */
-html[data-comfort-warmth="cool"] ,
-html[data-comfort-warmth="warm"] {
+html[data-theme="graphite"][data-comfort-warmth="cool"],
+html[data-theme="graphite"][data-comfort-warmth="warm"] {
     --bg-dark: var(--bg);
     --bg-card: var(--surface-1);
     --bg-card-solid: var(--surface-1);
@@ -2050,15 +2139,15 @@ html[data-comfort-warmth="warm"] {
     --border-color: var(--border);
 }
 
-html[data-comfort-warmth="cool"] body,
-html[data-comfort-warmth="warm"] body {
+html[data-theme="graphite"][data-comfort-warmth="cool"] body,
+html[data-theme="graphite"][data-comfort-warmth="warm"] body {
     background: var(--bg);
     color: var(--text);
 }
 
 /* --- Soft zen (chrome recedes; nav still reachable) --- */
 html.comfort-zen .nav-bar {
-    background: rgba(14, 14, 15, 0.82);
+    background: var(--chrome-zen);
     box-shadow: none;
     border-bottom-color: transparent;
 }
@@ -2077,7 +2166,7 @@ html.comfort-zen .nav-actions .btn:not(.btn-primary) {
 }
 
 html.comfort-zen .filter-sidebar {
-    background: rgba(14, 14, 15, 0.78);
+    background: var(--chrome-zen);
     border-color: transparent;
 }
 
@@ -2090,7 +2179,7 @@ html.comfort-zen .similar-header {
 
 html.comfort-zen #view-censor .censor-sidebar-v2,
 html.comfort-zen #view-censor .censor-sidebar-v2.right {
-    background: rgba(14, 14, 15, 0.88) !important;
+    background: var(--chrome-zen) !important;
     border-color: transparent !important;
 }
 
@@ -2560,7 +2649,76 @@ li > .icon {
    future — instead of naming each button. Guarded by
    tests/e2e/specs/desktop-layout-guards.spec.ts, which fails if any element
    carrying `hidden` computes to something other than display:none. */
+.theme-menu {
+    position: fixed;
+    z-index: 2700;
+    display: grid;
+    gap: 2px;
+    min-width: 228px;
+    padding: 4px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-card);
+    box-shadow: var(--shadow-float);
+}
+
+.theme-choice {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 7px 8px;
+    border: 0;
+    border-radius: var(--r-ctl);
+    background: transparent;
+    color: var(--text);
+    text-align: left;
+    cursor: pointer;
+    font: inherit;
+}
+
+.theme-choice:hover {
+    background: var(--surface-3);
+}
+
+.theme-choice.is-current {
+    background: var(--accent-soft);
+    box-shadow: inset 0 0 0 1px var(--accent-line);
+}
+
+.theme-choice-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+}
+
+.theme-choice-hint {
+    color: var(--muted);
+    font-size: var(--fs-footnote);
+    line-height: 1.35;
+}
+
+.theme-swatch {
+    flex: 0 0 18px;
+    width: 18px;
+    height: 18px;
+    border-radius: 3px;
+    border: 1px solid var(--border);
+}
+
+.theme-swatch[data-theme-swatch="graphite"] {
+    background: #0E0E0F;
+    box-shadow: inset 0 0 0 2px #C8873C;
+}
+
+.theme-swatch[data-theme-swatch="ink"] {
+    background: #090909;
+    box-shadow: inset 0 0 0 2px #3A6F98;
+}
+
 .btn[hidden],
+.theme-menu[hidden],
 .helper-text[hidden],
 .sepcon-health-results[hidden],
 .dup-summary[hidden],

@@ -1,7 +1,20 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="graphite">
 
 <head>
+    <script>
+        /* Apply the saved palette before CSS so the first paint is the chosen theme. */
+        (function () {
+            var KEY = 'sd-image-sorter-theme';
+            var ALLOWED = { graphite: 1, ink: 1 };
+            var theme = 'graphite';
+            try {
+                var saved = localStorage.getItem(KEY);
+                if (saved && ALLOWED[saved]) theme = saved;
+            } catch (e) { /* private mode */ }
+            document.documentElement.setAttribute('data-theme', theme);
+        })();
+    </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SD Image Sorter</title>
@@ -208,6 +221,10 @@
                 <!-- Owner 2026-07-07: language switch + update check reachable
                      from the main page, not only inside the Library's top bar.
                      They proxy the top-bar buttons' handlers. -->
+                <button type="button" class="entry-settings-btn" id="entry-theme-btn"
+                        aria-label="Color theme" data-i18n-aria="theme.open"
+                        data-i18n-title="theme.openTooltip" title="Color theme"
+                        aria-haspopup="listbox" aria-expanded="false" aria-controls="theme-menu"><svg class="icon" aria-hidden="true"><use href="#i-palette"/></svg></button>
                 <button type="button" class="entry-settings-btn" id="entry-lang-btn"
                         aria-label="Switch language" data-i18n-aria="lang.switchLabel"
                         data-i18n-title="lang.switchTooltip" title="Switch language"><svg class="icon" aria-hidden="true"><use href="#i-globe"/></svg></button>
@@ -665,6 +682,14 @@
                             <span aria-hidden="true"><svg class="icon" aria-hidden="true"><use href="#i-broom"/></svg></span>
                             <span data-i18n="massTag.mobileOpen">Mass Tag</span>
                         </button>
+                        <button class="btn btn-ghost full-width theme-choice" type="button" data-theme-id="graphite">
+                            <span class="theme-swatch" data-theme-swatch="graphite" aria-hidden="true"></span>
+                            <span data-i18n="theme.graphite">Graphite</span>
+                        </button>
+                        <button class="btn btn-ghost full-width theme-choice" type="button" data-theme-id="ink">
+                            <span class="theme-swatch" data-theme-swatch="ink" aria-hidden="true"></span>
+                            <span data-i18n="theme.ink">Black + Blue</span>
+                        </button>
                         <button class="btn btn-ghost full-width" id="mobile-btn-language" aria-label="Switch language" data-i18n-aria="lang.switchLabel">
                             <span aria-hidden="true"><svg class="icon" aria-hidden="true"><use href="#i-globe"/></svg></span>
                             <span data-i18n="lang.toggle">中文</span>
@@ -684,6 +709,9 @@
                 <!-- Group 1: Config & meta (least frequent) -->
                 <button id="btn-open-model-manager" class="btn btn-ghost btn-icon-only" type="button" title="Settings & Models" aria-label="Open Settings & Models" data-i18n-title="models.managerTooltip" data-i18n-aria="models.title">
                     <span aria-hidden="true"><svg class="icon" aria-hidden="true"><use href="#i-settings"/></svg></span>
+                </button>
+                <button id="btn-theme-toggle" class="btn btn-ghost btn-icon-only" type="button" title="Color theme" aria-label="Color theme" data-i18n-title="theme.openTooltip" data-i18n-aria="theme.open" aria-haspopup="listbox" aria-expanded="false" aria-controls="theme-menu">
+                    <span aria-hidden="true"><svg class="icon" aria-hidden="true"><use href="#i-palette"/></svg></span>
                 </button>
                 <button id="btn-language-toggle" class="btn btn-ghost btn-icon-only btn-language" title="Switch language" aria-label="Switch language" data-i18n-title="lang.switchTooltip" data-i18n-aria="lang.switchLabel">
                     <span aria-hidden="true"><svg class="icon" aria-hidden="true"><use href="#i-globe"/></svg></span>
@@ -727,6 +755,23 @@
                 </button>
             </div>
         </nav>
+
+        <div id="theme-menu" class="theme-menu" hidden role="listbox" aria-labelledby="btn-theme-toggle">
+            <button type="button" class="theme-choice" role="option" data-theme-id="graphite" aria-selected="true">
+                <span class="theme-swatch" data-theme-swatch="graphite" aria-hidden="true"></span>
+                <span class="theme-choice-copy">
+                    <span data-i18n="theme.graphite">Graphite</span>
+                    <span class="theme-choice-hint" data-i18n="theme.graphiteHint">Dark grey, amber accent</span>
+                </span>
+            </button>
+            <button type="button" class="theme-choice" role="option" data-theme-id="ink" aria-selected="false">
+                <span class="theme-swatch" data-theme-swatch="ink" aria-hidden="true"></span>
+                <span class="theme-choice-copy">
+                    <span data-i18n="theme.ink">Black + Blue</span>
+                    <span class="theme-choice-hint" data-i18n="theme.inkHint">True black, steel blue</span>
+                </span>
+            </button>
+        </div>
 
         <!-- Background Tagging Progress Bar (visible when tagging runs in background) -->
         <div id="bg-tag-progress" class="bg-tag-progress" style="display: none;" role="status" aria-live="polite">
@@ -5430,8 +5475,21 @@
                     </div>
                     <div class="settings-row">
                         <div class="settings-row-copy">
+                            <strong data-i18n="theme.settingsTitle">Color theme</strong>
+                            <span data-i18n="theme.settingsBody">Both palettes are dark; only the accent and surface depth change</span>
+                        </div>
+                        <label class="settings-inline-control">
+                            <span data-i18n="theme.open">Color theme</span>
+                            <select id="settings-theme" class="input-field">
+                                <option value="graphite" data-i18n="theme.graphite" selected>Graphite</option>
+                                <option value="ink" data-i18n="theme.ink">Black + Blue</option>
+                            </select>
+                        </label>
+                    </div>
+                    <div class="settings-row">
+                        <div class="settings-row-copy">
                             <strong data-i18n="comfort.warmthTitle">Room warmth</strong>
-                            <span data-i18n="comfort.warmthBody">Cool studio, neutral, or slightly warm dark</span>
+                            <span id="settings-comfort-warmth-body" data-i18n="comfort.warmthBody">Cool studio, neutral, or slightly warm dark</span>
                         </div>
                         <label class="settings-inline-control">
                             <span data-i18n="comfort.warmthLabel">Tone</span>
@@ -7816,6 +7874,7 @@
     <script src="/static/js/lang/zh-CN.js"></script>
     <script src="/static/js/guide-translations.js"></script>
     <script src="/static/js/i18n.js"></script>
+    <script src="/static/js/theme.js"></script>
     <!-- guide.js decomposition (contextual-guide family; smart-tag precedent).
          Classic static tags sharing one global lexical scope: copy (data
          consts) -> engine (the window.Guide singleton object) -> boot (LAST:
