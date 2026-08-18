@@ -54,12 +54,14 @@ such test; this file cannot write it for them.
 """
 from __future__ import annotations
 
+import ast
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import pytest
 
 import database as db
+import db_facets
 from db_facets import (
     ISSUE_REMEDIES,
     ISSUE_VOCABULARY,
@@ -574,8 +576,58 @@ class TestTheGuardActuallyBites:
     only against a vocabulary that already passes.
     """
 
-    def test_the_shipped_vocabulary_validates(self):
-        _validate_issue_vocabulary()
+    def test_the_validator_is_wired_to_import(self):
+        """What is worth pinning, in place of a call that could not fail.
+
+        This test used to call ``_validate_issue_vocabulary()`` with its
+        defaults. That cannot fail: the import at the top of this file already
+        ran the same call, so an invalid shipped vocabulary raises during
+        collection and this assertion is never reached. What no other test here
+        covers is that the call happens **at import at all** — delete the last
+        line of ``db_facets`` and every guard below still passes while a
+        vocabulary that charges without a remedy ships.
+        """
+        module = ast.parse(Path(db_facets.__file__).read_text(encoding="utf-8"))
+        top_level_calls = {
+            node.value.func.id
+            for node in module.body
+            if isinstance(node, ast.Expr)
+            and isinstance(node.value, ast.Call)
+            and isinstance(node.value.func, ast.Name)
+        }
+
+        assert "_validate_issue_vocabulary" in top_level_calls, (
+            "the guard is defined but nothing runs it when the module loads"
+        )
+
+    def test_an_empty_vocabulary_is_rejected(self):
+        """Every rule here is a loop over the declarations, so empty input
+        satisfies all of them. A guard that passes on nothing is not a guard —
+        this project's most repeated lesson.
+        """
+        with pytest.raises(ValueError, match="declares no issue key"):
+            _validate_issue_vocabulary((), ())
+
+        with pytest.raises(ValueError, match="offers no remedy"):
+            _validate_issue_vocabulary(ISSUE_VOCABULARY, ())
+
+    def test_a_remedy_no_issue_key_names_is_rejected(self):
+        """An orphan card. Its keys are declared and its action is written, so
+        every other rule passes, yet no key points at it — and because it
+        resolves ``untagged`` it would draw a second card advertising the same
+        rows as the ``untagged`` one.
+        """
+        remedies = ISSUE_REMEDIES + (
+            IssueRemedy(
+                kind="untagged_again",
+                keys=("untagged",),
+                severity="info",
+                action="Run AI tagging, again.",
+            ),
+        )
+
+        with pytest.raises(ValueError, match="no issue key names"):
+            _validate_issue_vocabulary(ISSUE_VOCABULARY, remedies)
 
     def test_two_weighted_keys_under_one_remedy_are_rejected(self):
         """``unreadable`` + ``metadata_error``'s exact shape: one repair, one

@@ -306,7 +306,16 @@ def _validate_issue_vocabulary(
 
     Called at import, so a key that claims consequence without naming an action
     stops the process rather than quietly becoming a permanent issue bar.
+
+    Every rule below walks the declarations, so empty input would satisfy all of
+    them; both blocks are required to be non-empty first, because a guard that
+    passes on nothing is not a guard.
     """
+    if not vocabulary:
+        raise ValueError("issue vocabulary declares no issue key")
+    if not remedies:
+        raise ValueError("issue vocabulary offers no remedy for any of its keys")
+
     keys = [spec.key for spec in vocabulary]
     duplicates = {key for key in keys if keys.count(key) > 1}
     if duplicates:
@@ -318,6 +327,7 @@ def _validate_issue_vocabulary(
     if duplicate_kinds:
         raise ValueError(f"issue remedies declare duplicate kinds: {sorted(duplicate_kinds)}")
 
+    claimed_kinds = {spec.remedy for spec in vocabulary if spec.remedy is not None}
     for remedy in remedies:
         if not remedy.keys:
             raise ValueError(f"remedy {remedy.kind!r} resolves no issue key")
@@ -326,6 +336,12 @@ def _validate_issue_vocabulary(
         unknown = [key for key in remedy.keys if key not in keys]
         if unknown:
             raise ValueError(f"remedy {remedy.kind!r} resolves undeclared keys: {unknown}")
+        if remedy.kind not in claimed_kinds:
+            raise ValueError(
+                f"remedy {remedy.kind!r} is one no issue key names, so its card "
+                "would appear beside no bar — and if it resolves keys another "
+                "remedy already owns, twice for the same rows"
+            )
         weighted = [key for key in remedy.keys if by_key[key].quality_weight]
         if len(weighted) > 1:
             raise ValueError(
