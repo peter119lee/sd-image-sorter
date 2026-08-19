@@ -1,10 +1,11 @@
-// Round-2 fix verification using the user's real aihubmix API.
+// Round-2 verification. Live VLM calls need AIHUBMIX_API_KEY in the
+// environment; never commit a provider key.
 const { chromium } = require('playwright');
 
 const BASE = process.env.BASE_URL || 'http://127.0.0.1:8488';
-const AIHUBMIX_KEY = 'sk-MMyoG6qtt0LieQKAD0C55fA85eAe44D6832532Db124e495c';
-const AIHUBMIX_NO_V1 = 'https://aihubmix.com';
-const VLM_MODEL = 'gemini-3.1-flash-lite';
+const AIHUBMIX_KEY = String(process.env.AIHUBMIX_API_KEY || '').trim();
+const AIHUBMIX_NO_V1 = process.env.AIHUBMIX_ENDPOINT || 'https://aihubmix.com';
+const VLM_MODEL = process.env.AIHUBMIX_MODEL || 'gemini-3.1-flash-lite';
 
 async function main() {
     const browser = await chromium.launch({ headless: true });
@@ -46,36 +47,39 @@ async function main() {
     await page.click('.guide-modal-close');
     await page.waitForTimeout(200);
 
-    // --- (1) save endpoint without /v1, then verify backend normalized it ---
-    const saveResp = await page.request.post(BASE + '/api/vlm/settings', {
-        data: {
-            provider: 'openai_compat',
-            endpoint: AIHUBMIX_NO_V1,
-            api_key: AIHUBMIX_KEY,
-            model: VLM_MODEL,
-            // Clear leftover state from prior runs that would otherwise nuke
-            // network connectivity (bogus proxy / 1s timeout).
-            http_proxy: '',
-            https_proxy: '',
-            socks_proxy: '',
-            timeout_seconds: 60.0,
-            concurrent_requests: 2,
-            max_retries: 3,
-            retry_delay_seconds: 2.0,
-        },
-    });
-    if (!saveResp.ok()) throw new Error('settings save failed: HTTP ' + saveResp.status());
+    // --- (1+2) live VLM save + Fetch Models. Optional: needs AIHUBMIX_API_KEY ---
+    if (!AIHUBMIX_KEY) {
+        console.log('[skip] (1+2) live VLM checks need AIHUBMIX_API_KEY');
+    } else {
+        const saveResp = await page.request.post(BASE + '/api/vlm/settings', {
+            data: {
+                provider: 'openai_compat',
+                endpoint: AIHUBMIX_NO_V1,
+                api_key: AIHUBMIX_KEY,
+                model: VLM_MODEL,
+                // Clear leftover state from prior runs that would otherwise nuke
+                // network connectivity (bogus proxy / 1s timeout).
+                http_proxy: '',
+                https_proxy: '',
+                socks_proxy: '',
+                timeout_seconds: 60.0,
+                concurrent_requests: 2,
+                max_retries: 3,
+                retry_delay_seconds: 2.0,
+            },
+        });
+        if (!saveResp.ok()) throw new Error('settings save failed: HTTP ' + saveResp.status());
 
-    // --- (2) Fetch Available Models — should auto-pad /v1 and succeed ---
-    const fetchResp = await page.request.post(BASE + '/api/vlm/models', { data: {} });
-    const fetchData = await fetchResp.json();
-    console.log('[info] /api/vlm/models →', JSON.stringify(fetchData).slice(0, 200));
-    if (!fetchResp.ok()) throw new Error('models fetch HTTP ' + fetchResp.status());
-    const models = Array.isArray(fetchData?.models) ? fetchData.models : [];
-    if (models.length === 0) {
-        throw new Error('Fetch Available Models returned 0 results — endpoint normalization or auth broken');
+        const fetchResp = await page.request.post(BASE + '/api/vlm/models', { data: {} });
+        const fetchData = await fetchResp.json();
+        console.log('[info] /api/vlm/models →', JSON.stringify(fetchData).slice(0, 200));
+        if (!fetchResp.ok()) throw new Error('models fetch HTTP ' + fetchResp.status());
+        const models = Array.isArray(fetchData?.models) ? fetchData.models : [];
+        if (models.length === 0) {
+            throw new Error('Fetch Available Models returned 0 results — endpoint normalization or auth broken');
+        }
+        console.log('[ok] (1+2) endpoint normalized + Fetch Models returned', models.length, 'entries');
     }
-    console.log('[ok] (1+2) endpoint normalized + Fetch Models returned', models.length, 'entries');
 
     // --- (3) NL source choices exist ---
     await page.click('#btn-tag');

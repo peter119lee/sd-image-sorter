@@ -102,7 +102,9 @@ with no encryption. On a shared machine, protect the folder at the OS level.
 - Parameterize every SQL query; never interpolate a value into SQL.
 - Never render user-derived HTML; use `textContent`.
 - Never send a stack trace or a full filesystem path to the client.
-- No hardcoded secrets.
+- No hardcoded secrets. Live provider keys belong in environment
+  variables (for example `AIHUBMIX_API_KEY` for optional VLM checks),
+  never in tracked test scripts.
 - A new network-facing feature needs a security review first.
 
 ---

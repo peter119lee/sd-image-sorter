@@ -93,7 +93,7 @@ def test_github_can_find_the_security_policy_and_model_attribution():
     statement for weights this project downloads but never redistributes.
     """
     tracked = _tracked_paths()
-    for required in ("SECURITY.md", "THIRD_PARTY_MODELS.md"):
+    for required in ("SECURITY.md", "THIRD_PARTY_MODELS.md", "docs/architecture.md"):
         assert required in tracked, f"{required} is not tracked, so GitHub cannot read it"
 
     security = (REPO_ROOT / "SECURITY.md").read_text(encoding="utf-8")
