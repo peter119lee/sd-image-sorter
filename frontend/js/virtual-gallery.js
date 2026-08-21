@@ -1,7 +1,8 @@
 /**
- * SD Image Sorter - Virtual Scrolling Gallery
- * Renders only visible gallery items for performance with large collections.
- * Replaces the default Gallery.render() with a virtualized version.
+ * SD Image Sorter - Virtual Scrolling Gallery (legacy helper)
+ * Live gallery virtualization lives in gallery/virtual-layout.js.
+ * This file is a no-op when initVirtualScroll already exists; do not treat
+ * it as a replacement for Gallery.render().
  */
 
 // Shared generator color map (DRY — also used in gallery.js).

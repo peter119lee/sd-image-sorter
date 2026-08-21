@@ -34,9 +34,8 @@ import { expect, test, type Page } from '../fixtures/click-ledger'
  *
  * No DB seeding and no Kaloscope/LSNet models: every case drives ArtistIdent in-page via
  * direct method calls + route-mocked /api/artists/* (and /api/images) responses. This
- * avoids the `.tmp/e2e-data-<port>` cross-run pollution pitfall and the missing-model
- * dependency (the feature is experimental — routers/artists.py needs models absent on a
- * clean machine). It MUST pass before AND after the refactor.
+ * avoids the `.tmp/e2e-data-<port>` cross-run pollution pitfall. CI often has no
+ * Kaloscope weights. This file does not claim Style Finder is fake.
  */
 
 test.describe.configure({ mode: 'serial' })

@@ -71,7 +71,8 @@
                 { icon: '📖', nameKey: 'nav.reader', name: 'Reader', descKey: 'catalog.reader', desc: 'Drop an image to read its prompt, model, and generation parameters', run: () => goView('reader') },
                 { icon: '🗂️', nameKey: 'nav.sorting', name: 'Organize', descKey: 'catalog.sorting', desc: 'Auto-separate by filters, then hand-sort a batch with WASD keys', run: () => goView('sorting') },
                 { icon: '🔳', nameKey: 'nav.censor', name: 'Censor Edit', descKey: 'catalog.censor', desc: 'Brush/pen censoring, AI detection, review conveyor, safe export', run: () => goView('censor') },
-                { icon: '🔎', nameKey: 'nav.similar', name: 'Find Similar', descKey: 'catalog.similar', desc: 'Search by image and surface near-duplicates with CLIP', run: () => goView('similar') },
+                { icon: '🔎', nameKey: 'nav.similar', name: 'Find Similar', descKey: 'catalog.similar', desc: 'Search by image, text, or upload; find near-duplicates. Needs CLIP via Prepare.', run: () => goView('similar') },
+                { icon: '📦', nameKey: 'nav.dataset', name: 'Dataset', descKey: 'catalog.dataset', desc: 'Build a LoRA training set: captions, Smart Tag, and paired image + .txt export', run: () => goView('dataset') },
             ],
         },
         {
@@ -87,10 +88,10 @@
             items: [
                 { icon: '🛡️', nameKey: 'tools.obfuscation', name: 'Privacy Tools', descKey: 'catalog.obfuscation', desc: 'Obfuscate images for upload sites and restore them back (inside Reader)', run: () => openReaderTool('obfuscation') },
                 { icon: '🧹', nameKey: 'dup.navTitle', name: 'Duplicate Cleanup', descKey: 'catalog.dup', desc: 'Scan the whole library for duplicates and clean them in one pass', run: () => { goView('gallery'); window.requestAnimationFrame(() => clickWhenReady('nav-tools-dup-cleaner', 10)); } },
-                { icon: '#i-wand', nameKey: 'nav.reverse', name: 'Reverse Prompt', descKey: 'catalog.reverse', desc: 'Drop one image to recover its prompt: the record inside the file first, AI inference only when there is none', run: () => goView('reverse') },
+                { icon: '#i-wand', nameKey: 'nav.reverse', name: 'Reverse Prompt', descKey: 'catalog.reverse', desc: 'Drop one image. If the file stored a prompt, that record is shown first; you can still infer from pixels to compare.', run: () => goView('reverse') },
                 { icon: '🧪', nameKey: 'nav.promptlab', name: 'Prompt Helper', descKey: 'catalog.promptlab', desc: 'Build prompts from your library: weights, templates, negatives', run: () => goView('promptlab') },
-                { icon: '🖌️', nameKey: 'nav.artist', name: 'Style Finder', descKey: 'catalog.artist', desc: 'Identify artists with a similar style (experimental)', run: () => goView('artist') },
-                { icon: '📦', nameKey: 'entry.tileModels', name: 'Model Center', descKey: 'catalog.models', desc: 'Download and manage the AI models every feature runs on', run: () => openSettingsTab('models') },
+                { icon: '🖌️', nameKey: 'nav.artist', name: 'Style Finder', descKey: 'catalog.artist', desc: 'Identify artists with a similar style', run: () => goView('artist') },
+                { icon: '📦', nameKey: 'entry.tileModels', name: 'Model Center', descKey: 'catalog.models', desc: 'Download and manage the AI models used by tagging, similarity, artist, censor, and captions', run: () => openSettingsTab('models') },
                 { icon: '⚙️', nameKey: 'settings.tabGeneral', name: 'Settings', descKey: 'catalog.settings', desc: 'Sound, entry page, UI scale, language, disk cache, updates', run: () => openSettingsTab('general') },
             ],
         },

@@ -84,12 +84,11 @@ def test_model_inventory_flags_recommended_essentials(monkeypatch):
         "clip",
         "aesthetic",
         "artist",
-        "sam3",
         "florence2",
         "lucida",
     } == recommended_ids
     # Optional/advanced models must NOT be flagged as essentials.
-    assert not any(item["recommended"] for item in inventory if item["id"] in {"toriigate", "oppai-oracle", "censor-legacy"})
+    assert not any(item["recommended"] for item in inventory if item["id"] in {"toriigate", "oppai-oracle", "censor-legacy", "sam3"})
 
 
 def test_recommended_ids_match_bulk_bundle():

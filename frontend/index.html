@@ -42,7 +42,7 @@
     <link rel="stylesheet" href="/static/css/entry.css">
     <link rel="stylesheet" href="/static/css/ai-busy.css">
     <link rel="stylesheet" href="/static/css/reverse-prompt.css">
-    <!-- tokens.css must stay the LAST stylesheet: it owns the Aurora palette
+    <!-- tokens.css must stay the LAST stylesheet: it owns the Graphite palette
          and remaps every legacy token defined by the sheets above. -->
     <link rel="stylesheet" href="/static/css/tokens.css">
     <!-- Adaptive UI scaling for large/high-res desktops. Loaded synchronously
@@ -202,8 +202,8 @@
     <!-- Screen Reader Live Region for Announcements -->
     <div id="a11y-live-region" aria-live="polite" aria-atomic="true" class="sr-only" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;"></div>
 
-    <!-- v4.0 Aurora shell: mission entry (canvas #11a). Shown at launch unless
-         the 跳过入口页 setting is on; every tile is a shortcut, never a cage. -->
+    <!-- Graphite entry shell: mission tiles at launch unless skip-entry is on;
+         every tile is a shortcut, never a cage. -->
     <section id="entry-page" class="entry-page" hidden aria-label="Mission entry" data-i18n-aria="settings.entryTitle">
         <div class="entry-hero" id="entry-hero" aria-hidden="true"></div>
         <div class="entry-veil-x" aria-hidden="true"></div>
@@ -437,7 +437,7 @@
                     <button type="button" class="hero-mode-btn" data-mode="slideshow" data-i18n="entry.showModeSlideshow" title="Auto-rotating covers" data-i18n-title="entry.showModeSlideshowTip">Slideshow</button>
                     <button type="button" class="hero-mode-btn" data-mode="film" data-i18n="entry.showModeFilm" title="Rolling film strips" data-i18n-title="entry.showModeFilmTip">Film</button>
                 </span>
-                <span data-i18n="entry.localNote">· Runs locally — images never leave this PC</span>
+                <span data-i18n="entry.localNote">· Runs locally by default — cloud VLM captioning is opt-in and sends images to the provider you configure</span>
             </div>
         </footer>
     </section>
@@ -458,8 +458,8 @@
             </button>
 
                 <!-- v3.3.3 WS1: tabs reordered to read as the actual pipeline
-                     (view -> sort -> censor -> similar -> dataset); experimental/
-                     power tools (Prompt Helper, Style Finder) sit after the
+                     (view -> sort -> censor -> similar -> dataset); later
+                     tools (Prompt Helper, Style Finder) sit after the
                      divider. switchView + the .nav-tab click binding are both
                      order-agnostic (keyed on data-view), so this is a pure
                      reorder. Glyphs disambiguated: Sort 🗂️ (was 📁), Similar 🔎
@@ -563,7 +563,6 @@
                                     data-i18n-title="nav.artist" title="Style Finder">
                                 <span class="tab-icon" aria-hidden="true"><svg class="icon" aria-hidden="true"><use href="#i-brush"/></svg></span>
                                 <span class="tab-text" data-i18n="nav.artist">Style Finder</span>
-                                <span class="nav-tools-badge" data-i18n="nav.experimental">Experimental</span>
                             </button>
                             <!-- Owner 2026-07-07: mirrors for tucked core tabs (dataset
                                  leaves the default bar; the customize checklist can tuck
@@ -1333,7 +1332,7 @@
                                     <span aria-hidden="true" class="onboarding-step-icon"><svg class="icon" aria-hidden="true"><use href="#i-tag"/></svg></span>
                                     <div class="onboarding-step-copy">
                                         <strong data-i18n="onboarding.step2Title">AI-tag images</strong>
-                                        <span data-i18n="onboarding.step2Hint">Click <em>Tag Images</em> to auto-tag with WD14 / Camie / PixAI. The 4 tabs in the modal cover local taggers, NL captions, aesthetic score, and color analysis.</span>
+                                        <span data-i18n="onboarding.step2Hint">After Prepare, open <em>AI Tag Images</em>. Five tabs: Smart Tag, local taggers, NL captions, aesthetic score, and color analysis.</span>
                                     </div>
                                 </li>
                                 <li class="onboarding-step">
@@ -1932,7 +1931,6 @@
                             <button type="button" class="sort-mode-btn" data-sort-mode="cull" role="tab" aria-selected="false">
                                 <span aria-hidden="true"><svg class="icon" aria-hidden="true"><use href="#i-scale"/></svg></span> <span data-i18n="manual.modeCull">Keep / Reject</span>
                             </button>
-                            <span class="sort-mode-soon" title="Coming soon"><span aria-hidden="true">▦</span> <span data-i18n="manual.modeMoreSoon">More modes soon</span></span>
                         </div>
 
                         <!-- Named full-config presets: save/load/delete the whole setup
@@ -3067,7 +3065,7 @@
                         <div class="workspace-start-copy">
                             <span class="workspace-start-eyebrow" data-i18n="similar.startEyebrow">Start Here</span>
                             <h3 data-i18n="similar.startTitle">Find similar images in three simple steps</h3>
-                            <p class="workspace-start-description" data-i18n="similar.startDescription">Build the local index once, then search by image ID or upload a reference image when you need it.</p>
+                            <p class="workspace-start-description" data-i18n="similar.startDescription">Build the local index once, then search by image ID, text, or a reference image. Needs CLIP via Prepare.</p>
                         </div>
                         <ol class="workspace-start-steps">
                             <li>
@@ -3634,7 +3632,7 @@
                             </li>
                             <li>
                                 <strong data-i18n="artist.startStep2Title">2. Check the vocabulary</strong>
-                                <span data-i18n="artist.startStep2Text">An artist the model was never trained on can never be predicted, so it will always be named as somebody else.</span>
+                                <span data-i18n="artist.startStep2Text">An artist the model was never trained on can never be predicted.</span>
                             </li>
                             <li>
                                 <strong data-i18n="artist.startStep3Title">3. Review then jump to Gallery</strong>
@@ -5405,7 +5403,7 @@
                 <div class="modal-header">
                     <div>
                         <h2 id="entry-catalog-title" data-i18n="entry.tileCatalog">All Features</h2>
-                        <p class="modal-description" data-i18n="catalog.body">Everything this app can do — click any row to go there.</p>
+                        <p class="modal-description" data-i18n="catalog.body">Main views and pipelines — click a row to go there. Some tools live inside another view.</p>
                     </div>
                 </div>
                 <div class="entry-catalog-body" id="entry-catalog-body"></div>
@@ -6250,7 +6248,7 @@
 
                 <div class="tagger-nl-workflow-card tagger-nl-status-card" id="tagger-nl-workflow-card" data-tagger-shows="nl" style="display:none">
                     <span id="tagger-nl-workflow-title" data-i18n="tagger.nlToriiTitle">ToriiGate (local model)</span>
-                    <span id="tagger-nl-workflow-hint" class="tagger-nl-card-hint" data-i18n="tagger.nlToriiHint">Heavy local VLM. Needs a one-time ~5 GB model download from the Setup page.</span>
+                    <span id="tagger-nl-workflow-hint" class="tagger-nl-card-hint" data-i18n="tagger.nlToriiHint">Heavy local captioner. Needs a one-time ~9.6 GB BF16 download from Model Manager.</span>
                     <span class="tagger-nl-workflow-status" id="vlm-banner-current" style="display:none">Not configured</span>
                     <div id="vlm-progress-container" style="display:none" class="progress-container tagger-nl-progress">
                         <div class="progress-bar"><div class="progress-fill" id="vlm-progress-fill"></div></div>
@@ -6268,7 +6266,7 @@
                         <span class="tagger-nl-icon" aria-hidden="true"><svg class="icon" aria-hidden="true"><use href="#i-cpu"/></svg></span>
                         <div>
                             <strong data-i18n="tagger.nlToriiTitle">ToriiGate (local model)</strong>
-                            <p class="tagger-nl-card-hint" data-i18n="tagger.nlToriiHint">Heavy local VLM. Needs a one-time ~5 GB model download from the Setup page.</p>
+                            <p class="tagger-nl-card-hint" data-i18n="tagger.nlToriiHint">Heavy local captioner. Needs a one-time ~9.6 GB BF16 download from Model Manager.</p>
                         </div>
                     </div>
                     <div class="tagger-nl-card-actions"></div>
@@ -7920,6 +7918,9 @@
          api.js first, both after the stage-2 leaves, before app.js. -->
     <script src="/static/js/app/api.js"></script>
     <script src="/static/js/app/api-features.js"></script>
+    <!-- First-use model install overlay. After API + showConfirm, before
+         tagging-flow / similar / artist / smart-tag callers. -->
+    <script src="/static/js/app/ensure-model.js"></script>
     <!-- app.js decomposition, stage 4: the state core (FilterModalController,
          saved-filter hydration, store creation + window handles, AppState, both
          store subscriptions, state setters). ONE load-time EXEC chunk; keep the
@@ -8145,7 +8146,7 @@
     <script src="/static/js/modules/dup-cleaner.js"></script>
     <script src="/static/js/modules/publish-set.js"></script>
     <!-- artist family: verbatim Object.assign decomposition of artist-ident.js
-         (experimental Style Finder: Kaloscope/LSNet artist identification —
+         (Style Finder: Kaloscope/LSNet artist identification —
          stats grid + artist cards, per-artist detail, batch identify with
          progress bar, runtime diagnostics banner, saved preferences).
          core.js declares the ONE ArtistIdent object + the window.ArtistIdent

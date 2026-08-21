@@ -1,25 +1,24 @@
 """
-LSNet-style Artist Identification for SD Image Sorter.
+Kaloscope 2.0 artist/style classifier for SD Image Sorter.
 
-Identifies the artist/style of an image using a classification model.
-Based on the LSNet concept from: https://github.com/spawner1145/comfyui-lsnet
+Uses the LSNet runtime (https://github.com/spawner1145/comfyui-lsnet) and
+Heathcliff02 Kaloscope 2.0 weights (39,261 classes).
 
-Features:
-- Identifies artist/style from image
-- Returns "undefined" for predictions below threshold
-- Supports multiple model sources (HuggingFace, ModelScope, local)
+A name is written to ``artist`` only at confidence_level ``high``
+(>= 0.20 and the caller floor). The threshold slider can only tighten that
+floor; lowering it cannot assert a name below 0.20. Low scores return
+``artist="undefined"`` and keep the guess in ``candidate_artist``.
 
-Model Sources:
-- HuggingFace: Search for "artist-classification" or "style-classification"
-- ModelScope: https://modelscope.cn/models (search for artist/style models)
-- Local: Provide path to ONNX or PyTorch model
+Model sources:
+- HuggingFace / ModelScope: the pinned Kaloscope 2.0 ids in config.py
+- Local: path to the ``.pth`` checkpoint plus ``class_mapping.csv``
 
 Usage:
     from artist_identifier import ArtistIdentifier
 
-    identifier = ArtistIdentifier(threshold=0.03)
+    identifier = ArtistIdentifier()
     result = identifier.identify("path/to/image.png")
-    # Returns: {"artist": "some_artist", "confidence": 0.85, "top_predictions": [...]}
+    # result["artist"] is a name only when result["confidence_level"] == "high"
 """
 import logging
 import os
@@ -72,7 +71,6 @@ from artist.assets import (
     _locate_existing_kaloscope_files,
     prepare_artist_assets,
 )
-from artist.default_artists import DEFAULT_ARTISTS
 from artist.device import _onnx_providers_for, _resolve_artist_device
 from artist.downloads import (
     ARTIST_MODELSCOPE_REVISION,
@@ -241,11 +239,12 @@ _EXPECTED_ARTIST_FILE_SHA256: Dict[str, Tuple[str, ...]] = {
 
 class ArtistIdentifier:
     """
-    LSNet-style artist identification using classification models.
+    Kaloscope 2.0 artist/style classifier (39,261 classes).
 
-    Identifies the artist/style of an image and returns:
-    - "undefined" if confidence is below threshold
-    - Top predictions with confidence scores
+    Returns:
+    - artist: a real name only when confidence_level is "high"
+    - candidate_artist: the best guess when the result is not asserted
+    - top_predictions: ranked class scores
     """
 
     def __init__(
@@ -262,9 +261,9 @@ class ArtistIdentifier:
         Args:
             model_path: Path to local model file (ONNX or PyTorch)
             model_source: "huggingface", "modelscope", or "local"
-            threshold: Minimum confidence threshold. Kaloscope logits are
-                usually quite low, so values around 0.02-0.08 are more
-                realistic than the old 0.35 default.
+            threshold: Extra confidence floor. Can only tighten results.
+                A name is asserted only at the high tier (>= 0.20). Lowering
+                this cannot mint names below that floor.
             artists_list: Custom list of artist names (optional)
             use_gpu: Use CUDA when available. None falls back to the
                 ARTIST_USE_GPU config default. Set False (or
@@ -275,14 +274,17 @@ class ArtistIdentifier:
         self.model_source = model_source
         self.threshold = threshold
         self.use_gpu = ARTIST_USE_GPU if use_gpu is None else bool(use_gpu)
-        self.artists = artists_list or DEFAULT_ARTISTS
+        if artists_list is None:
+            self.artists = ["undefined"]
+            self._has_class_mapping = False
+        else:
+            self.artists = list(artists_list)
+            self._has_class_mapping = True
         # True only when a real label source is present (an explicit
         # ``artists_list``, a Kaloscope class_mapping.csv, or a transformers
         # ``id2label``). Local ONNX / generic torch models have no label
-        # source, so ``identify`` must NOT map their raw class indices through
-        # the hardcoded DEFAULT_ARTISTS sample list and pass them off as real
-        # predictions. See ``identify`` for the honest-refusal path.
-        self._has_class_mapping: bool = artists_list is not None
+        # source, so ``identify`` must NOT map raw class indices onto invented
+        # names. See ``identify`` for the refusal path.
         # Lazily built lowercase index over ``artists`` for knows_artist(); the
         # Kaloscope vocabulary is 39,261 entries, so a linear scan per lookup
         # would be wasteful.
@@ -428,8 +430,13 @@ class ArtistIdentifier:
         self._backend = "kaloscope"
         logger.info("Loaded Kaloscope model '%s' with %d artist classes", model_name, len(self.artists))
 
+    def _has_live_model(self) -> bool:
+        return self._model not in (None, "placeholder")
+
     def load(self):
         """Load the model (lazy loading)."""
+        if self._model == "placeholder":
+            self._model = None
 
         if self._model is not None:
             return
@@ -438,14 +445,21 @@ class ArtistIdentifier:
             if self._model is not None:
                 return
 
-            # Try to load based on source
             if self.model_path and os.path.exists(self.model_path):
                 self._load_local_model(self.model_path)
             elif self.model_source == "modelscope":
                 self._load_from_modelscope()
             else:
-                # Default: try HuggingFace or fall back to placeholder
                 self._load_from_huggingface()
+
+    def _mark_load_failed(self, error: BaseException | str) -> None:
+        """Leave the identifier unloaded so the next load() can retry."""
+        self._model = None
+        self._session = None
+        self._processor = None
+        self._transform = None
+        self._backend = "unloaded"
+        self._load_error = str(error)
 
     def _load_local_model(self, path: str):
         """Load model from local file."""
@@ -469,7 +483,7 @@ class ArtistIdentifier:
                     # files contain pickled config classes outside the safe
                     # globals allowlist; without this override they would
                     # silently fall through to the ONNX path (which fails on
-                    # .pth) and end up in placeholder mode. The file is
+                    # .pth) and leave the identifier unloaded. The file is
                     # user-placed inside the artist model directory, so we
                     # treat it as a trusted source.
                     try:
@@ -515,8 +529,7 @@ class ArtistIdentifier:
             logger.info(f"Loaded model from: {path}")
         except Exception as e:
             logger.warning(f"Failed to load model: {e}")
-            self._model = "placeholder"
-            self._load_error = str(e)
+            self._mark_load_failed(e)
 
     def _load_from_huggingface(self):
         """Load model from HuggingFace."""
@@ -548,9 +561,7 @@ class ArtistIdentifier:
             self._load_error = None
         except Exception as e:
             logger.warning(f"HuggingFace load failed: {e}")
-            logger.info("Using placeholder mode (no model loaded)")
-            self._model = "placeholder"
-            self._load_error = str(e)
+            self._mark_load_failed(e)
 
     def _load_from_modelscope(self):
         """Load model from ModelScope."""
@@ -561,9 +572,7 @@ class ArtistIdentifier:
             self._load_error = None
         except Exception as e:
             logger.warning(f"ModelScope load failed: {e}")
-            logger.info("Using placeholder mode (no model loaded)")
-            self._model = "placeholder"
-            self._load_error = str(e)
+            self._mark_load_failed(e)
 
     def identify(
         self,
@@ -621,7 +630,7 @@ class ArtistIdentifier:
             "artist": "undefined",
             "confidence": 0.0,
             "top_predictions": [],
-            "model_loaded": self._model is not None and self._model != "placeholder",
+            "model_loaded": self._has_live_model(),
             "confidence_level": ARTIST_CONFIDENCE_NONE,
             "candidate_artist": None,
             "out_of_vocabulary_likely": False,
@@ -629,11 +638,11 @@ class ArtistIdentifier:
             "advisory": "",
         }
 
-        if self._model == "placeholder":
+        if not self._has_live_model():
             result["error"] = (
                 self._load_error
-                or "Artist model unavailable. Install the required dependencies and restart the app, "
-                   "or configure a working local model."
+                or "Artist model is not loaded. Prepare Kaloscope from Setup / Download, then identify. / "
+                   "画师模型尚未加载。请先在设置里准备 Kaloscope，再开始识别。"
             )
             return result
 
@@ -661,8 +670,7 @@ class ArtistIdentifier:
                 else:
                     # No real label source (e.g. a local ONNX / generic torch
                     # model without a class_mapping.csv or embedded id2label).
-                    # Surface the raw class index honestly instead of inventing
-                    # a name from the hardcoded DEFAULT_ARTISTS sample list.
+                    # Surface the raw class index instead of inventing a name.
                     artist_name = f"class_{idx}"
                 confidence = float(predictions[idx])
                 result["top_predictions"].append({
@@ -797,9 +805,8 @@ class ArtistIdentifier:
     def vocabulary_size(self) -> int:
         """How many artists this model can actually name.
 
-        Zero when no real label source is loaded, so callers never quote the
-        hardcoded DEFAULT_ARTISTS sample list as if it were the model's answer
-        set.
+        Zero when no real label source is loaded, so callers never quote an
+        unloaded identifier as if it already had Kaloscope's answer set.
         """
         return len(self.artists) if self._has_class_mapping else 0
 
@@ -854,7 +861,6 @@ def _identifier_requires_rebuild(
         or identifier.model_source != model_source
         or identifier.model_path != normalized_path
         or identifier.use_gpu != resolved_use_gpu
-        or identifier._model == "placeholder"
     )
 
 

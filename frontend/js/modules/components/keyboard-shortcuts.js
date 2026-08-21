@@ -7,7 +7,6 @@ const KeyboardShortcutsPanel = (function () {
         global: [
             { key: '?', descKey: 'shortcuts.global.help', fallback: 'Open the keyboard shortcuts panel.' },
             { key: 'Esc', descKey: 'shortcuts.global.escape', fallback: 'Close a modal or cancel the current action.' },
-            { key: '1-7', descKey: 'shortcuts.global.views', fallback: 'Switch tabs quickly.' },
         ],
         gallery: [
             { key: 'Arrow Left/Right', descKey: 'shortcuts.gallery.navigate', fallback: 'Navigate images in the detail modal.' },

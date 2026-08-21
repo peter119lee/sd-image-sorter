@@ -267,10 +267,10 @@ def test_startup_readiness_marks_gpu_tagger_ready_when_recommendation_prefers_gp
     readiness = get_startup_readiness(
         health={
             "wd14": {"available": True},
-            "clip": {"available": True, "message": "clip ready"},
+            "clip": {"available": True, "feature_ready": True, "message": "clip ready"},
             "censor": {
                 "legacy": {"available": True},
-                "nudenet": {"available": True},
+                "nudenet": {"available": True, "model_downloaded": True},
                 "sam3": {"available": False, "message": "sam3 missing"},
             },
             "artist": {"available": False, "message": "artist missing"},
@@ -489,3 +489,76 @@ def test_sam3_checkpoint_detected_in_huggingface_hub_cache_layout(tmp_path, monk
     assert found is not None
     assert Path(found, "config.json").exists()
     assert Path(found, "model.safetensors").exists()
+
+
+def test_startup_readiness_similar_search_needs_clip_text_as_well_as_vision():
+    readiness = get_startup_readiness(
+        health={
+            "wd14": {"available": True},
+            "clip": {
+                "available": True,
+                "feature_ready": False,
+                "message": "vision files only",
+            },
+            "censor": {
+                "legacy": {"available": False},
+                "nudenet": {"available": False, "model_downloaded": False},
+                "sam3": {"available": False, "message": "sam3 missing"},
+            },
+            "artist": {"available": False, "message": "artist missing"},
+        },
+        system_info={
+            "gpu_name": "RTX 3090",
+            "total_ram_gb": 32,
+            "gpu_vram_total_mb": 24576,
+            "onnx_providers": ["CUDAExecutionProvider", "CPUExecutionProvider"],
+            "onnxruntime_conflict": False,
+        },
+        recommendation={
+            "recommended_batch_size": 32,
+            "recommended_use_gpu": True,
+            "message": "GPU detected and ready",
+        },
+    )
+
+    assert readiness["features"]["similarity"]["level"] == "warn"
+    assert "ready" not in readiness["features"]["similarity"]["headline"].lower()
+    assert "vision files only" in readiness["features"]["similarity"]["detail"]
+
+
+def test_startup_readiness_nudenet_pip_without_weights_is_not_ready():
+    readiness = get_startup_readiness(
+        health={
+            "wd14": {"available": False},
+            "clip": {
+                "available": False,
+                "feature_ready": False,
+                "message": "clip missing",
+            },
+            "censor": {
+                "legacy": {"available": False},
+                "nudenet": {
+                    "available": True,
+                    "model_downloaded": False,
+                    "message": "NudeNet runtime is installed, but 320n.onnx is missing.",
+                },
+                "sam3": {"available": False, "message": "sam3 missing"},
+            },
+            "artist": {"available": False, "message": "artist missing"},
+        },
+        system_info={
+            "gpu_name": "RTX 3090",
+            "total_ram_gb": 32,
+            "gpu_vram_total_mb": 24576,
+            "onnx_providers": ["CUDAExecutionProvider", "CPUExecutionProvider"],
+            "onnxruntime_conflict": False,
+        },
+        recommendation={
+            "recommended_batch_size": 32,
+            "recommended_use_gpu": True,
+            "message": "GPU detected and ready",
+        },
+    )
+
+    assert readiness["features"]["censor"]["level"] == "warn"
+    assert "NudeNet ready" not in readiness["features"]["censor"]["detail"]

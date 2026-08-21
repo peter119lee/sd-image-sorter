@@ -1939,7 +1939,8 @@ Use this structure for future entries:
 
 ### ADR-AI-20260429-57: Tested repository seams are not dead code just because services still call `database.py`
 
-- Status: accepted
+- Status: superseded (2026-08-19)
+- Superseded by: `backend/db_repos/` removed in `9a4663f`; `backend/tests/test_architecture_contract.py` forbids unadopted reintroduction. The keep-as-partial-seam decision was wrong — nothing in production imported it.
 - Area: backend architecture / debt triage
 - Context:
   The 2026-04-29 debt audit flagged `backend/db_repos/` as a deletion quick win because production services mostly still import `database.py` directly. Current workspace evidence contradicts that: repository helpers are referenced by pagination/path-equivalence tests and ADR-AI-20260428-25 lists `ImageRepository` cursor contract files as part of the opaque pagination invariant.

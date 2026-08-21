@@ -20,20 +20,24 @@ from services.image_service import ImageService
     summary="Get images with optional filters",
     description="""
 Retrieve a list of images from the database with comprehensive filtering options.
-Uses cursor-based pagination for efficient large dataset handling.
+Cursor pagination (`cursor` / `next_cursor`) is available for `sort_by=newest` and
+`sort_by=oldest` only. Other sorts use offset or a single page; `random` has no
+stable cursor.
 
-All filter parameters support comma-separated values. Tag filters use AND logic
-(all tags must be present). Generator/rating filters use OR logic.
+Tag, generator, rating, checkpoint, LoRA, prompt-term, and color-hue filters
+accept comma-separated values. Other filters are single values. Tag filters use
+AND logic by default. Generator/rating filters use OR logic.
 
 **Example requests:**
 - `GET /api/images?generators=comfyui,nai&limit=100` - Get ComfyUI and NAI images
 - `GET /api/images?tags=1girl,solo&ratings=general,sensitive` - Get safe solo girl images
-- `GET /api/images?search=landscape&sort_by=random` - Random images with 'landscape' in prompt
+- `GET /api/images?search=landscape&sort_by=random` - Random images matching filename, checkpoint, prompt, or sidecar text
 - `GET /api/images?min_width=1920&aspect_ratio=landscape` - High-res landscape images
 
 **Pagination:**
-Use the `cursor` parameter with the `next_cursor` value from the previous response to get the next page.
-Treat `next_cursor` as an opaque token and pass it back unchanged.
+Use the `cursor` parameter with the `next_cursor` value from the previous response
+when sorting by newest or oldest. Treat `next_cursor` as an opaque token and pass
+it back unchanged.
     """,
     responses={
         200: {
@@ -53,7 +57,6 @@ Treat `next_cursor` as an opaque token and pass it back unchanged.
                                 "checkpoint_normalized": "sd_xl_base_1.0",
                                 "width": 1024,
                                 "height": 1536,
-                                "rating": "general",
                                 "library_order_time": "2024-01-15T10:30:00Z",
                                 "source_file_mtime": "2024-02-01T08:45:12Z",
                                 "created_at": "2024-01-15T10:30:00Z"
@@ -79,7 +82,7 @@ Treat `next_cursor` as an opaque token and pass it back unchanged.
 async def get_images(
     generators: Optional[str] = Query(
         default=None,
-        description="Comma-separated list of generators to filter. Options: comfyui, nai, webui, forge",
+        description="Comma-separated list of generators to filter. Options include comfyui, nai, webui, forge, reforge, fooocus, unknown, and others.",
         examples=["comfyui,nai"],
     ),
     generator: Optional[str] = Query(
@@ -146,7 +149,7 @@ async def get_images(
     search: Optional[str] = Query(
         default=None,
         max_length=1000,
-        description="Free-text search in image prompts",
+        description="Free-text search in filename, checkpoint, prompt, and sidecar caption",
         examples=["landscape"],
     ),
     artist: Optional[str] = Query(
@@ -157,7 +160,7 @@ async def get_images(
     ),
     sort_by: str = Query(
         default="newest",
-        description="Sort order: newest, oldest, name_asc, name_desc, generator, generator_desc, prompt_length, prompt_length_asc, tag_count, tag_count_asc, rating, rating_desc, character_count, character_count_asc, random, file_size, file_size_asc, aesthetic, aesthetic_asc, user_rating, user_rating_asc",
+        description="Sort order: newest, oldest, name_asc, name_desc, generator, generator_desc, prompt_length, prompt_length_asc, tag_count, tag_count_asc, rating, rating_desc, character_count, character_count_asc, random, file_size, file_size_asc, aesthetic, aesthetic_asc, brightness, brightness_asc, saturation, saturation_asc, brightness_skew, brightness_skew_asc, user_rating, user_rating_asc. Cursor pagination works for newest/oldest only.",
         examples=["newest"],
     ),
     limit: int = Query(
@@ -230,12 +233,12 @@ async def get_images(
     date_from: Optional[str] = Query(
         default=None,
         pattern=r"^\d{4}-\d{2}-\d{2}$",
-        description="Only images whose file time is on/after this day (YYYY-MM-DD, inclusive).",
+        description="Only images whose library-order time (COALESCE(library_order_time, created_at)) is on/after this day (YYYY-MM-DD, inclusive). Not file mtime.",
     ),
     date_to: Optional[str] = Query(
         default=None,
         pattern=r"^\d{4}-\d{2}-\d{2}$",
-        description="Only images whose file time is on/before this day (YYYY-MM-DD, inclusive).",
+        description="Only images whose library-order time (COALESCE(library_order_time, created_at)) is on/before this day (YYYY-MM-DD, inclusive). Not file mtime.",
     ),
     min_aesthetic: Optional[float] = Query(
         default=None,

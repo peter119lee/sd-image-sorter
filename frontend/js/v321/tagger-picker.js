@@ -192,7 +192,7 @@ Object.assign(window.V321Integration, {
             return i18n('tagger.nlVlmApiHint', 'Send images to a remote VLM endpoint. Configure provider + model in VLM Settings.');
         }
         if (lower.includes('toriigate')) {
-            return i18n('tagger.nlToriiHint', 'Heavy local VLM. Needs a one-time ~5 GB model download from the Setup page.');
+            return i18n('tagger.nlToriiHint', 'Heavy local captioner. Needs a one-time ~9.6 GB BF16 download from Model Manager.');
         }
         if (activeTab === 'local' && value === 'custom') {
             return i18n('tagger.customSubtitle', 'Custom local ONNX tagger with a selectable model profile.');

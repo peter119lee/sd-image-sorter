@@ -194,9 +194,13 @@ Object.assign(window.ArtistIdent, {
         const progressFill = document.getElementById('artist-progress-fill');
         const progressText = document.getElementById('artist-progress-text');
 
-        if (this.diagnostics && this.diagnostics.available === false) {
-            showToast(this.tText('Finish setup first, then start identification.', '请先完成准备，再开始识别。'), 'warning');
-            return;
+        if (typeof window.ensureFeatureModel === 'function') {
+            const ensured = await window.ensureFeatureModel('artist', {
+                label: this.tText('Kaloscope 2.0', 'Kaloscope 2.0'),
+                sizeHint: '~2.8 GB',
+                confirmBytes: 2.8 * 1024 * 1024 * 1024,
+            });
+            if (!ensured.ok) return;
         }
 
         this.isIdentifying = true;
@@ -357,9 +361,13 @@ Object.assign(window.ArtistIdent, {
             return;
         }
 
-        if (this.diagnostics && this.diagnostics.available === false) {
-            showToast(this.tText('Finish setup first, then start identification.', '请先完成准备，再开始识别。'), 'warning');
-            return;
+        if (typeof window.ensureFeatureModel === 'function') {
+            const ensured = await window.ensureFeatureModel('artist', {
+                label: this.tText('Kaloscope 2.0', 'Kaloscope 2.0'),
+                sizeHint: '~2.8 GB',
+                confirmBytes: 2.8 * 1024 * 1024 * 1024,
+            });
+            if (!ensured.ok) return;
         }
 
         this.isIdentifying = true;

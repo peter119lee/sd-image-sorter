@@ -513,19 +513,19 @@ function renderFeatureAvailabilityNotice() {
     const readyItems = [
         appT('features.ready.gallery', 'Import / scan folders, browse gallery, read SD metadata'),
         appT('features.ready.filters', 'Filter, search, batch select, auto-separate, and WASD manual sort'),
-        appT('features.ready.prompts', 'Prompt Lab, tag library, export sidecar .txt / .json files'),
+        appT('features.ready.prompts', 'Prompt Helper, tag library, export sidecar .txt / .json files'),
         appT('features.ready.censorManual', 'Manual censor editor tools: brush, pen, eraser, clone, preview/save'),
         appT('features.ready.colorAnalysis', 'Color analysis: dominant colors, brightness, saturation, color temperature'),
         appT('features.ready.loraExport', 'LoRA training export: Caption Editor, template presets, batch export'),
     ];
     const prepareItems = [
-        appT('features.prepare.wd14', 'WD14 / ONNX tagging: downloads model files and repairs Windows GPU runtime when needed'),
-        appT('features.prepare.clip', 'CLIP similarity / duplicate search: installs fastembed and downloads CLIP files'),
-        appT('features.prepare.aesthetic', 'Aesthetic scoring: installs torch + open-clip and downloads CLIP/head files'),
-        appT('features.prepare.artist', 'Artist ID: installs torch/transformers/timm/safetensors/triton and downloads Kaloscope files'),
-        appT('features.prepare.censorAi', 'AI censor detectors: NudeNet / Privacy YOLO / SAM3 install their own runtimes and model files'),
-        appT('features.prepare.toriigate', 'ToriiGate VLM tagging: heavy PyTorch runtime + about 5 GB model download on first use'),
-        appT('features.prepare.florence2', 'Florence-2 Base local captioning: installs the local runtime and downloads the pinned model on first use'),
+        appT('features.prepare.wd14', 'WD14 / ONNX tagging: first use downloads the selected model and shows install progress; Windows GPU runtime is repaired when needed'),
+        appT('features.prepare.clip', 'CLIP similarity / duplicate search: first use installs fastembed and downloads the vision+text pair (~580 MB) with progress'),
+        appT('features.prepare.aesthetic', 'Aesthetic scoring: first use installs torch + open-clip and downloads CLIP / scoring head files (~1.7 GB; confirm first)'),
+        appT('features.prepare.artist', 'Artist ID: first use installs torch / transformers / timm / safetensors / triton and downloads Kaloscope (~2.8 GB; confirm first)'),
+        appT('features.prepare.censorAi', 'AI censor detectors: first use of NudeNet installs its runtime and model. Privacy YOLO and SAM3 stay opt-in.'),
+        appT('features.prepare.toriigate', 'ToriiGate local captioner: first use installs PyTorch / Transformers and downloads about 9.6 GB BF16 weights after you confirm'),
+        appT('features.prepare.florence2', 'Florence-2 Base local captioning: first use installs the local runtime and downloads the pinned model with progress'),
         appT('features.prepare.vlm', 'VLM natural language captioning: requires API keys (OpenAI/Anthropic/Gemini) or local Ollama'),
     ];
 
@@ -535,8 +535,8 @@ function renderFeatureAvailabilityNotice() {
             <ul>${readyItems.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>
         </div>
         <div class="feature-availability-card is-prepare">
-            <strong>${escapeHtml(appT('features.prepareTitle', 'Needs Prepare / Download'))}</strong>
-            <p>${escapeHtml(appT('features.prepareRestartNote', 'If Prepare installs Python packages, restart the app before using that feature. The UI will warn you when this happens.'))}</p>
+            <strong>${escapeHtml(appT('features.prepareTitle', 'Downloads on first use'))}</strong>
+            <p>${escapeHtml(appT('features.prepareRestartNote', 'If install adds Python packages, restart the app before using that feature. The UI will warn you when this happens.'))}</p>
             <ul>${prepareItems.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>
         </div>
     `;

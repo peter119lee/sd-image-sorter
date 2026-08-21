@@ -444,8 +444,8 @@ CLIP_MODEL_NAME: str = os.environ.get(
 # Text tower paired with the vision model above — the SAME OpenAI CLIP
 # ViT-B/32 checkpoint split by fastembed (512-dim), so natural-language
 # queries land in the stored image-embedding space (fastembed
-# supported-models registry). Downloads on first use (~65 MB) into the
-# CLIP model dir.
+# supported-models registry). Text ONNX is ~243 MB; vision ONNX is ~335 MB;
+# the pair is about 580 MB. Prepare downloads both into the CLIP model dir.
 CLIP_TEXT_MODEL_NAME: str = os.environ.get(
     "SD_IMAGE_SORTER_CLIP_TEXT_MODEL",
     "Qdrant/clip-ViT-B-32-text"

@@ -119,11 +119,10 @@ async def get_image_file(
     description="""
 Get a cached thumbnail of the image.
 
-Thumbnails are cached in backend/thumbnails/ using WebP format for optimal
-compression. Cache invalidation is based on source file modification time.
-
-Supported cache sizes: 256, 384, 512 (requested sizes are normalized to nearest).
-Custom sizes between 1-4096 are generated on-demand but not cached.
+Thumbnails are cached under `data/thumbnails/` using WebP. Requested sizes
+snap to 256, 384, or 512 and those files are cached. Cache invalidation
+uses the source file modification time. There is no uncached 1–4096
+on-demand size.
     """,
     responses={
         200: {

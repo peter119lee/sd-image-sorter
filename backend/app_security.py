@@ -58,7 +58,11 @@ def _is_rate_limit_exempt(path: str) -> bool:
 
 
 async def localhost_only_middleware(request: Request, call_next):
-    """Reject non-local clients even if the server is started on a wider bind address."""
+    """Reject non-loopback clients.
+
+    Production bind in ``main.py`` is already loopback. This is a second
+    guard if the bind host is ever widened.
+    """
     client_host = request.client.host if request.client else None
     if client_host and not _is_loopback_host(client_host):
         logger.warning("Rejected non-local request from %s to %s", client_host, request.url.path)
@@ -136,7 +140,7 @@ def configure_security_middleware(app: FastAPI) -> None:
         CORSMiddleware,
         allow_origin_regex=CORS_ORIGIN_REGEX,
         allow_credentials=False,
-        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=[
             "Content-Type",
             "Accept",

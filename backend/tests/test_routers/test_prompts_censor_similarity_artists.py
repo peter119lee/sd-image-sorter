@@ -2756,7 +2756,6 @@ class TestArtistsRouterValidation:
                     "confidence": 0.91,
                     "top_predictions": [{"artist": "fixture_artist", "confidence": 0.91}],
                     "model_loaded": True,
-                    "experimental": True,
                 }
 
         async def fake_run_in_threadpool(func, **kwargs):
@@ -3207,9 +3206,9 @@ class TestArtistsRouterValidation:
 
     def test_bulk_bundle_endpoint_excludes_wenaka_and_toriigate(self, test_client):
         """The "Download all recommended models" button intentionally
-        skips Wenaka Privacy YOLO (opt-in) and ToriiGate (5 GB
-        alternative tagger). The default WD14 variant is selected
-        instead of all WD14 models."""
+        skips Wenaka Privacy YOLO (opt-in) and ToriiGate (~9.6 GB
+        captioner). SAM3 is listed but not recommended or preselected.
+        The default WD14 variant is selected instead of all WD14 models."""
         response = test_client.get("/api/models/bulk-bundle")
 
         assert response.status_code == 200
@@ -3241,6 +3240,9 @@ class TestArtistsRouterValidation:
         assert cl_tagger["default_selected"] is False
         assert cl_tagger["gated_download"] is True
         assert cl_tagger["requires_auth"] is True
+        sam3 = next(it for it in data["items"] if it["id"] == "sam3")
+        assert sam3["recommended"] is False
+        assert sam3["default_selected"] is False
         # Excluded list documents the rationale
         excluded_ids = {e["id"] for e in data.get("excluded", [])}
         assert {"censor-legacy", "toriigate"}.issubset(excluded_ids)

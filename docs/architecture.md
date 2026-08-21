@@ -40,7 +40,7 @@ Each router handles a specific domain:
 - **`censor.py`**: NSFW detection (YOLOv8/NudeNet/SAM3), censoring preview/save
 - **`similarity.py`**: CLIP embedding, similarity search, duplicate detection
 - **`prompts.py`**: Prompt generation, tag categorization, exclusion rules
-- **`artists.py`**: Artist/style identification (experimental)
+- **`artists.py`**: Artist/style identification (Kaloscope)
 - **`models.py`**: Local model/runtime preparation and readiness
 - **`obfuscation.py`**: Image obfuscation encode/decode/batch operations
 - **`aesthetic.py`**: Local aesthetic scoring (single and batch)
@@ -58,14 +58,14 @@ Business logic layer with dependency injection:
 - **`similarity_service.py`**: CLIP embedding and similarity search
 
 #### Core Modules
-- **`database.py`**: SQLite layer with raw SQL (no ORM), connection pooling
+- **`database.py`**: raw-SQL facade over `db_*` modules. Each `get_db()` opens one SQLite connection and closes it; WAL + `busy_timeout` handle contention. No ORM.
 - **`metadata_parser.py`**: SD metadata extraction (ComfyUI/NAI/WebUI/Forge)
 - **`image_manager.py`**: File operations (scan, move, copy, delete)
 - **`tagger.py`**: WD14 tagger via ONNX Runtime
 - **`censor.py`**: YOLOv8 ONNX + Pillow censoring
 - **`model_health.py`**: Unified local model discovery and readiness reporting
 - **`similarity.py`**: CLIP-based image similarity
-- **`artist_identifier.py`**: Artist classification (experimental)
+- **`artist_identifier.py`**: Artist classification (Kaloscope)
 
 #### Utilities (`utils/`)
 - **`path_validation.py`**: Path traversal prevention, filename sanitization
@@ -129,7 +129,7 @@ images (id, path, filename, generator, prompt, negative_prompt,
         checkpoint, loras, width, height, file_size, metadata_json,
         created_at, tagged_at)
 
-tags (id, image_id, tag, confidence)
+tags (id, image_id, tag, confidence, source, category)
 
 collections (id, slug, name, description)
 collection_items (id, collection_id, source_image_id, copied_path, ...)
@@ -152,18 +152,19 @@ artist_predictions (image_id, artist, confidence, top_predictions)
 
 ### 5. AI Models
 
-Models are loaded lazily on first use:
+The core app starts without AI weights. Using a feature downloads that feature's files with a progress overlay; downloads of about 1 GB or more ask for confirmation first. Heavy optionals (SAM3, gated taggers) stay off until chosen.
 
 | Model | Purpose | Format | Typical local size | Notes |
 |-------|---------|--------|--------------------|-------|
 | WD14 SwinV2 | Default auto-tagging | ONNX | ~446MB | Preferred out-of-box tagger |
-| WD14 EVA02 | Optional high-quality tagging | ONNX | ~1.2GB | Heavier optional pack |
+| WD14 EVA02 | Optional high-quality tagging | ONNX | ~1.2GB | Heavier optional pack; confirm before first-use download |
 | Wenaka privacy YOLO | Privacy-part censor detection | ONNX/.pt | ~46MB / ~23MB | Recommended legacy censor model; app positions it as the fast fixed-class privacy detector |
 | YOLO26 / YOLOv8s | Compatibility object segmentation | ONNX/.pt | ~40-45MB / ~22MB | Verified; current packaged files are fixed-class COCO models rather than open-text detectors |
 | NudeNet | Body part detection | ONNX | ~12MB | Works without manual path selection |
-| Kaloscope2.0 | Experimental artist identification | `.pth` | ~2.8GB | Requires LSNet runtime checkout |
-| CLIP | Image similarity | ONNX | ~335MB | Local-first model path now reported in UI |
-| SAM3 | Optional mask refinement | `.pt` | ~3.3GB | Current verified setup should be treated as CUDA-only |
+| Kaloscope2.0 | Artist/style classification (39,261 classes) | `.pth` | ~2.8GB | Requires LSNet runtime + class_mapping.csv |
+| CLIP | Image similarity | ONNX | ~580MB | Vision ~335 MB + text ~243 MB FastEmbed pair; bulk download lists 600 MB |
+| ToriiGate 0.5 | Local natural-language captioner | safetensors | ~9.6GB | BF16 weights; confirm before first-use download |
+| SAM3 | Optional mask refinement | safetensors dir | ~3.3GB | CUDA-only; needs `config.json` + `model.safetensors` + tokenizer files, not a lone `sam3.pt` |
 
 ## Data Flow
 
@@ -265,7 +266,7 @@ The project is intentionally a local-first monolith, but individual files should
 - Configurable cleanup by age
 
 ### Database
-- Connection pooling via context manager
+- Each `get_db()` opens one SQLite connection and closes it; WAL + `busy_timeout` handle contention
 - Indexes on frequently queried columns
 - Cursor-based pagination for large datasets
 

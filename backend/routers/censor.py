@@ -51,9 +51,9 @@ Run detection on an image to find regions that may need censoring.
 - `"nudenet"`: NudeNet v3 body part detection (recommended for NSFW)
 - `"both"`: Run both detectors and merge results
 
-**NudeNet detects 20 body part classes including:**
-- `exposed_breasts`, `exposed_buttocks`, `exposed_genitalia`
-- `covered_breasts`, `covered_buttocks`, etc.
+**NudeNet mapped labels include:**
+- `breasts`, `buttocks`, `pussy`, `dick`, `anus`, `belly`, `feet`, `armpits`
+- covered variants such as `breasts_covered`, `buttocks_covered`
 
 Use `exposed_only=true` to detect only exposed (not covered) parts.
     """,
@@ -69,7 +69,7 @@ Use `exposed_only=true` to detect only exposed (not covered) parts.
                         "detections": [
                             {
                                 "box": [100, 200, 300, 400],
-                                "label": "exposed_breasts",
+                                "label": "breasts",
                                 "confidence": 0.89,
                                 "source": "nudenet"
                             }
@@ -182,7 +182,8 @@ async def refine_mask(
 
     Takes a detection bounding box and returns a refined binary mask
     that follows the actual contours of the detected region.
-    Falls back gracefully if SAM3 is unavailable.
+    Returns HTTP 503 if SAM3 is not prepared. There is no silent fallback
+    to another detector.
     """
     return await run_in_threadpool(service.refine_mask, request)
 

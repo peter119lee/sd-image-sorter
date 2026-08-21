@@ -58,9 +58,12 @@ Even with a trusted-local threat model, these are enforced in code:
 
 ## Dependency security
 
-`scripts/security_check.py` runs `pip-audit` over the fully resolved dependency
-tree and is a **blocking** step in CI (`scripts/run_ci.py`). A new, unreviewed
-advisory fails the build on purpose.
+`scripts/security_check.py` is a **blocking** step in CI (`scripts/run_ci.py`).
+It first scans git-tracked text for live-looking provider tokens, then runs
+`pip-audit` over the fully resolved dependency tree. A new, unreviewed
+advisory fails the build on purpose. The secret scan does not walk git
+history: a revoked key can still exist in old commits, and we do not
+rewrite public history for that.
 
 ```bash
 python scripts/security_check.py

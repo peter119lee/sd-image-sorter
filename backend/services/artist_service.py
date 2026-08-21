@@ -388,7 +388,7 @@ class ArtistService:
         if not written:
             raise ServiceError(ARTIST_PUBLISH_STALE_ERROR)
 
-        return {"image_id": image_id, "experimental": True, **result}
+        return {"image_id": image_id, **result}
 
     def run_batch_identification(
         self,
@@ -676,10 +676,8 @@ class ArtistService:
     def list_artists(self) -> Dict[str, Any]:
         """Return the loaded model's artist vocabulary.
 
-        Before a real label source is loaded, ``ArtistIdentifier.artists`` still
-        holds the hardcoded DEFAULT_ARTISTS sample list. Returning that as "the
-        known artists" would misrepresent what the model can actually name, so
-        an unloaded identifier reports an empty vocabulary instead.
+        Before a real label source is loaded, an unloaded identifier reports
+        an empty vocabulary instead of inventing names.
         """
         identifier = self._identifier_getter()
         vocabulary_size = int(getattr(identifier, "vocabulary_size", 0) or 0)

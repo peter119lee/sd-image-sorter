@@ -39,18 +39,14 @@
   </sub>
 </p>
 
-<p align="center">
-  <img src="docs/screenshots/gallery_hero.png" alt="SD Image Sorter gallery hero screenshot" width="100%">
-</p>
-
 > [!IMPORTANT]
-> This is a local-only app. Your images stay on your machine. Models run locally. No cloud upload, no account, no nonsense.
+> Local-first: gallery, tagging, and models stay on disk. Optional cloud VLM captioning runs only with a user-supplied API key and does upload images to that provider. No account required.
 
 <a name="zh-cn"></a>
 
 ## 简体中文
 
-> 你说得对，但这就是 **SD Image Sorter**🤚。能扫几千张 SD 图👌，能自动识别 ComfyUI / NovelAI / WebUI / Forge 元数据✌️，能把 prompt、negative prompt、checkpoint、LoRA、VAE、seed 一口气全扒出来🤙。有 Gallery 管图库✊，有 Image Reader 拖图即读👍，有 WD14 AI 打标👈，有分级和后台批处理👐，有 Auto-Separate 一键搬运🙌，还有 WASD 手动狂飙分拣😨。然后还有 CLIP 相似图查重😰，还有 Prompt Lab 反炼提示词😭，还有 Artist Identification 认风格🖐️，还有 Image Obfuscate 加扰解扰🤚，还有 Aesthetic Score 本地打分😵。然后 Censor Edit 还能 YOLO 自动检测👊🏿😭👊🏿，还能手动画笔、马赛克、高斯模糊、黑白条、批量保存🖐️😭🤚。Reader、Tagger、Sorter、Similarity、Prompt Lab、Artist ID、Obfuscate、Aesthetic、Censor 一套全开，文件夹就啊啊啊啊啊啊。
+> 你说得对，但这就是 **SD Image Sorter**🤚。能扫几千张 SD 图👌，能自动识别 ComfyUI / NovelAI / WebUI / Forge 元数据✌️，能把 prompt、negative prompt、checkpoint、LoRA、VAE、seed 一口气全扒出来🤙。有 Gallery 管图库✊，有 Image Reader 拖图即读👍，有 WD14 AI 打标👈，有分级和后台批处理👐，有 Auto-Separate 一键搬运🙌，还有 WASD 手动狂飙分拣😨。然后还有 CLIP 相似图查重😰，还有 Prompt Helper 反炼提示词😭，还有 Artist Identification 认风格🖐️，还有 Image Obfuscate 加扰解扰🤚，还有 Aesthetic Score 本地打分😵。然后 Censor Edit 还能 YOLO 自动检测👊🏿😭👊🏿，还能手动画笔、马赛克、高斯模糊、黑白条、批量保存🖐️😭🤚。Reader、Tagger、Sorter、Similarity、Prompt Helper、Artist ID、Obfuscate、Aesthetic、Censor 一套全开，文件夹就啊啊啊啊啊啊。
 
 ### 一句话宣传
 
@@ -58,7 +54,7 @@
 
 ### 为什么选 SD Image Sorter？
 
-**SD Image Sorter — 唯一为 AI 画师打造的图片管理工具**
+**SD Image Sorter — 为 Stable Diffusion 工作流设计的本地图库**
 
 通用图片管理器把 AI 生成图当照片处理，SD Image Sorter 从零开始为 Stable Diffusion 工作流设计。它理解你的元数据，说你的语言，提供匹配 AI 画师实际工作方式的工具。
 
@@ -66,18 +62,18 @@
 
 | 对比维度 | SD Image Sorter | Allusion | TagStudio | DigiKam | Hydrus |
 |---------|----------------|----------|-----------|---------|--------|
-| **SD 元数据** | 原生支持 ComfyUI/NAI/WebUI/Forge | ❌ | ❌ | ❌ | ❌ |
-| **AI 自动打标** | WD14 全家桶（7 个模型） | ❌ | ❌ | 仅人脸识别 | 需插件 |
-| **VLM 描述** | 5 厂商 + Ollama | ❌ | ❌ | ❌ | ❌ |
+| **SD 元数据** | 原生支持 ComfyUI/NAI/WebUI/Forge | PNG Parameters 检视 | ❌ | ❌ | ❌ |
+| **AI 自动打标** | 9 个本地打标模型 + ToriiGate 描述器 | ❌ | ❌ | 仅人脸识别 | 需插件 |
+| **VLM 描述** | OpenAI 兼容 / Anthropic / Gemini | ❌ | ❌ | ❌ | ❌ |
 | **CLIP 相似搜索** | ✅ | ❌ | ❌ | ❌ | ✅（第三方） |
 | **键盘分拣** | WASD 四向 + 多模式 | ❌ | ❌ | ❌ | ❌ |
 | **打码工具** | YOLO + 画笔 + 批处理 | ❌ | ❌ | ❌ | ❌ |
-| **Prompt Lab** | ✅ 反推提示词 | ❌ | ❌ | ❌ | ❌ |
+| **Prompt Helper** | ✅ 反推提示词 | ❌ | ❌ | ❌ | ❌ |
 | **LoRA 导出** | 模板引擎 + 预设 | ❌ | ❌ | ❌ | ❌ |
-| **部署方式** | 单文件便携版 | 安装程序 | 需要 Python | 完整 KDE 栈 | 复杂设置 |
+| **部署方式** | 便携 zip/tarball + 启动器 | 安装程序 | 需要 Python | 完整 KDE 栈 | 复杂设置 |
 | **学习曲线** | 低-中 | 低 | 中 | 中 | 高 |
 
-详见 [Why Choose Us](docs/WHY_CHOOSE_US.md) 完整对比。
+Eagle、Billfish 是通用素材库，不列入这张 SD 工作流细表。详见 [Why Choose Us](docs/WHY_CHOOSE_US.md) 完整对比。
 
 ### 它到底解决什么问题
 
@@ -90,7 +86,7 @@
 
 ### 为什么这个仓库值得点 Star
 
-- **真本地**：浏览器只是界面，核心在本机跑，图片不上传。
+- **真本地优先**：浏览器只是界面，核心在本机跑。默认不上传；只有你自己填了云端 VLM API key 时，才会把图片发到对应厂商。
 - **真懂 SD 图**：能读 ComfyUI、NovelAI、WebUI / A1111、Forge 等常见元数据。
 - **真能干活**：不是只看图，是完整的筛选、打标、排序、查重、打码工作流。
 - **真适合大图库**：几千张图不是展示案例，是默认使用场景。
@@ -99,35 +95,7 @@
 
 ## 截图
 
-<p align="center">
-  <img src="docs/screenshots/gallery_hero.png" alt="Gallery with images" width="100%">
-</p>
-
-<p align="center">
-  <img src="docs/screenshots/gallery_filters.png" alt="Gallery filter modal" width="48%">
-  <img src="docs/screenshots/autosep_workbench.png" alt="Auto-Separate 3-pane workbench" width="48%">
-</p>
-
-<p align="center">
-  <img src="docs/screenshots/caption_editor_fullscreen.png" alt="Caption Editor full-screen" width="48%">
-  <img src="docs/screenshots/tagger_modal.png" alt="Tagger with 4 tabs" width="48%">
-</p>
-
-<p align="center">
-  <img src="docs/screenshots/reader_workspace.png" alt="Reader workspace" width="48%">
-  <img src="docs/screenshots/censor_workspace.png" alt="Censor Edit workspace" width="48%">
-</p>
-
-<p align="center">
-  <img src="docs/screenshots/model_manager.png" alt="Model Manager" width="48%">
-  <img src="docs/screenshots/batch_export_modal.png" alt="LoRA export with presets" width="48%">
-</p>
-
-<p align="center">
-  <img src="docs/screenshots/similar_search.png" alt="Similar image search" width="32%">
-  <img src="docs/screenshots/prompt_lab.png" alt="Prompt Lab" width="32%">
-  <img src="docs/screenshots/artist_identification.png" alt="Artist identification" width="32%">
-</p>
+顶部 GitHub 附图是目前仓库能稳定显示的界面预览。`docs/screenshots/` 目录没有随仓库发布的 PNG，因此不再嵌入会裂图的本地路径。
 
 ## 核心功能
 
@@ -184,7 +152,7 @@
 - 用库内图片搜相似图
 - 用外部图片搜图库里的相似结果
 
-### 8. Prompt Lab 提示词工坊
+### 8. Prompt Helper 提示词助手
 
 - 从你自己的图库标签反推可复用 prompt
 - 自动处理部分互斥标签
@@ -193,23 +161,23 @@
 
 ### 9. 其他实用模块
 
-- **Artist Identification**：实验性画师 / 风格识别
+- **Artist Identification**：Kaloscope 2.0（39,261 类画师/风格分类器）
 - **Image Reader**：拖放或选择原始 PNG，立刻读参数，不用先扫描图库；剪贴板图片会明确提示可能丢失 SD metadata
 - **Image Obfuscate**：图片加扰 / 解扰，适合带密码分享
 - **Aesthetic Score**：本地美学评分
 
 ### 10. VLM 自然语言打标
 
-- 多厂商 VLM 打标：OpenAI / Anthropic / Gemini / Vertex AI / Ollama
+- VLM 打标：OpenAI 兼容（含 Ollama）、Anthropic、Gemini（可选 Vertex）
 - 一键部署本地 Ollama 视觉模型（Gemma 3、Qwen 2.5 VL、MiniCPM-V 等）
-- 5 个 LoRA 训练 prompt preset（通用 NL、Anima 详细、短句、角色 LoRA、NSFW 兼容）
+- 设置里有 7 个 VLM prompt 预设（通用 NL、Anima 详细、短句、角色 LoRA、NSFW 兼容、Danbooru、Hybrid）；Krea 2 长 NL 走 target-model 路径
 - VLM 也能输出 danbooru 结构化标签
 - 支持 HTTP / HTTPS / SOCKS 代理
 
 ### 11. LoRA 训练导出
 
 - 模板引擎：7 个内建 preset（Anima、Illustrious/Pony、NoobAI、FLUX、Kohya、自定义）
-- 14 个模板变量：`{trigger}`、`{tags}`、`{nl_caption}`、`{rating}`、`{count}` 等
+- 17 个模板变量：`{trigger}`、`{tags}`、`{tags:filtered}`、`{nl_caption}`、`{characters}`、`{copyright}`、`{artists}` 等
 - Caption Editor 工作台（三栏：图片队列 / 编辑器 / 共同标签工具）
 - 全屏专用编辑模式
 - 下划线转空格（保留 `score_*`），可手动关闭
@@ -323,7 +291,7 @@ run.bat
 
 | 状态 | 功能 | 说明 |
 |:--|:--|:--|
-| 第一次 `run.bat` 后直接可用 | 扫描 / 导入图库、浏览、筛选、搜索、批量选择、自动分类、WASD 手动分类、Prompt Lab、元数据读取、手动打码编辑器、导出同名 sidecar | 只依赖轻量核心包；不会主动拉 Torch / SAM3 / NudeNet / Ultralytics / FastEmbed。 |
+| 第一次 `run.bat` 后直接可用 | 扫描 / 导入图库、浏览、筛选、搜索、批量选择、自动分类、WASD 手动分类、Prompt Helper、元数据读取、手动打码编辑器、导出同名 sidecar | 只依赖轻量核心包；不会在启动时主动拉 Torch / SAM3 / NudeNet / Ultralytics / FastEmbed。用到对应功能时再下载该模型，并显示安装进度。 |
 | 需要下载模型文件，但不需要额外 Python 包 | WD14 / Camie / PixAI ONNX 打标 | 点击 **功能准备 / Prepare** 或首次打标时下载模型文件；ONNX Runtime 已在核心依赖里。 |
 | 需要 Prepare / Download，可能要求重启 | CLIP 相似搜索、美学评分、画师识别、NudeNet、Privacy YOLO、SAM3、ToriiGate | 如果准备过程安装了 Python 包，界面会提示重启。一般 Torch 功能在 macOS 上仅支持 macOS 14+ Apple Silicon；SAM3 仍需 Windows/Linux 的 NVIDIA CUDA。ToriiGate 首次模型约 5 GB，SAM3 / Torch 也会占用较多空间。 |
 
@@ -388,7 +356,7 @@ run.bat
 
 | 功能 | 内存 | GPU |
 |:--|:--|:--|
-| Gallery / Filters / Sort / Prompt Lab | 4 GB | 可无 |
+| Gallery / Filters / Sort / Prompt Helper | 4 GB | 可无 |
 | WD14 打标（SwinV2 / ConvNeXt / ViT） | 8 GB | 可选 |
 | WD14 打标（EVA02 / Camie / PixAI） | 16 GB | 建议 |
 | ToriiGate 多模态打标 | 24 GB | 强烈建议 CUDA |
@@ -502,7 +470,7 @@ run.bat
 </details>
 
 <details>
-<summary><b>模型体积（首次使用自动下载）</b></summary>
+<summary><b>模型体积（在模型中心准备 / 下载）</b></summary>
 
 | 模型 | 大小 | 用途 |
 |:--|:--|:--|
@@ -510,12 +478,12 @@ run.bat
 | wd-eva02-large-tagger-v3 | ~1.2 GB | 更高质量打标 |
 | camie-tagger-v2 | ~1.3 GB | 更新标签空间 |
 | pixai-tagger-v0.9 | ~1.2 GB | 更新标签空间 |
-| clip-ViT-B-32-vision | ~335 MB | 相似图搜索 |
+| CLIP ViT-B/32 vision + text | ~600 MB | 相似图搜索（FastEmbed 成对估计） |
 | wenaka_yolov8s-seg | ~46 MB | 打码检测 |
 | NudeNet 320n | ~12 MB | 打码检测 |
 | Kaloscope 2.0 | ~2.8 GB | 画师识别 |
-| SAM3 | ~3.3 GB | 打码精修 |
-| CLIP ViT-L/14 + aesthetic head | ~400 MB | 美学评分 |
+| SAM3 | ~3.3 GB | 可选打码精修 |
+| CLIP ViT-L/14 + aesthetic head | ~1.7 GB | 美学评分 |
 
 </details>
 
@@ -526,7 +494,6 @@ sd-image-sorter/
 ├── backend/            # FastAPI + SQLite + AI model orchestration
 ├── frontend/           # Vanilla HTML / JS / CSS UI
 ├── data/               # 运行时状态（images.db、thumbnails、models、state 等）
-├── docs/screenshots/   # README 展示图
 ├── models/             # 发布时附带的基础模型文件（运行时会同步到 data/models）
 ├── run-portable.bat    # Windows 便携版入口
 ├── run.bat             # Windows 源码运行入口
@@ -550,8 +517,8 @@ sd-image-sorter/
 | [ToriiGate](https://huggingface.co/Minthy/ToriiGate-0.5) | ToriiGate 多模态 VLM Tagger |
 | [Wenaka2004](https://github.com/Wenaka2004/auto-censor) | 自动打码思路与 YOLO 隐私检测模型 |
 | [NudeNet](https://github.com/notAI-tech/NudeNet) | NudeNet NSFW 检测模型 |
-| [SAM3 / Segment Anything](https://github.com/facebookresearch/sam2) | SAM3 文本引导分割精修 |
-| [Spawner1145](https://github.com/spawner1145/comfyui-lsnet)、DraconicDragon、[heathcliff01](https://www.modelscope.cn/models/Heathcliff02/Kaloscope-2.0/summary) | LSNet / Kaloscope 画师识别模型 |
+| [SAM3 / Segment Anything](https://github.com/facebookresearch/sam3) | SAM3 文本引导分割精修 |
+| [Spawner1145](https://github.com/spawner1145/comfyui-lsnet)、DraconicDragon、[Heathcliff02](https://www.modelscope.cn/models/Heathcliff02/Kaloscope-2.0/summary) | LSNet / Kaloscope 画师识别模型 |
 | [LAION](https://github.com/LAION-AI/aesthetic-predictor) | Aesthetic Score 美学评分模型 |
 | [OpenCLIP](https://github.com/mlfoundations/open_clip) | CLIP ViT-L/14 相似图搜索 |
 | [Receyuki](https://github.com/receyuki/stable-diffusion-prompt-reader) | Prompt Reader 方向启发 |
@@ -577,7 +544,7 @@ It scans folders, reads SD metadata, tags images with WD14 models, finds similar
 
 ### Why SD Image Sorter?
 
-**SD Image Sorter — The Only Image Manager Built for AI Artists**
+**SD Image Sorter — a local image manager built for Stable Diffusion workflows**
 
 Unlike general-purpose image managers that treat AI-generated images like photos, SD Image Sorter is designed from the ground up for Stable Diffusion workflows.
 
@@ -585,18 +552,18 @@ Unlike general-purpose image managers that treat AI-generated images like photos
 
 | Feature | SD Image Sorter | Allusion | TagStudio | DigiKam | Hydrus |
 |---------|----------------|----------|-----------|---------|--------|
-| **SD Metadata** | Native ComfyUI/NAI/WebUI/Forge | ❌ | ❌ | ❌ | ❌ |
-| **AI Auto-Tagging** | WD14 family (7 models) | ❌ | ❌ | Face detect only | Via plugins |
-| **VLM Captioning** | 5 providers + Ollama | ❌ | ❌ | ❌ | ❌ |
+| **SD Metadata** | Native ComfyUI/NAI/WebUI/Forge | PNG Parameters view | ❌ | ❌ | ❌ |
+| **AI Auto-Tagging** | 9 local taggers + ToriiGate captioner | ❌ | ❌ | Face detect only | Via plugins |
+| **VLM Captioning** | OpenAI-compat / Anthropic / Gemini | ❌ | ❌ | ❌ | ❌ |
 | **CLIP Similarity** | ✅ | ❌ | ❌ | ❌ | ✅ (third-party) |
 | **Keyboard Sorting** | WASD 4-way + multi-mode | ❌ | ❌ | ❌ | ❌ |
 | **Censor Tools** | YOLO + brush + batch | ❌ | ❌ | ❌ | ❌ |
-| **Prompt Lab** | ✅ Reverse-engineer prompts | ❌ | ❌ | ❌ | ❌ |
+| **Prompt Helper** | ✅ Reverse-engineer prompts | ❌ | ❌ | ❌ | ❌ |
 | **LoRA Export** | Template engine + presets | ❌ | ❌ | ❌ | ❌ |
-| **Deployment** | Portable single-file | Installer | Python required | Full KDE stack | Complex setup |
+| **Deployment** | Portable zip/tarball + launcher | Installer | Python required | Full KDE stack | Complex setup |
 | **Learning Curve** | Low-Medium | Low | Medium | Medium | High |
 
-See [Why Choose Us](docs/WHY_CHOOSE_US.md) for detailed comparison.
+Eagle and Billfish are general asset managers and are not in this SD-workflow table. See [Why Choose Us](docs/WHY_CHOOSE_US.md) for detailed comparison.
 
 ### Promo Line
 
@@ -614,10 +581,10 @@ See [Why Choose Us](docs/WHY_CHOOSE_US.md) for detailed comparison.
 - **Star Ratings**: 1-5 star rating system visible in gallery grid
 - **Censor Edit**: YOLO / NudeNet / SAM3 detection, brush tools, queue workflow, batch save
 - **Similar search**: CLIP embeddings for duplicates and near-matches
-- **Prompt Lab**: generate reusable prompts from your own library
-- **Extra tools**: Artist ID, Image Reader (original file / drag-drop is metadata-safe; clipboard images may lose SD PNG metadata), Image Obfuscate, Aesthetic Score
-- **VLM Captioning**: Multi-provider natural language captioning (OpenAI, Anthropic, Gemini, Ollama) with one-click local model deployment
-- **LoRA Training Export**: Template engine with 7 presets, 14 variables, Caption Editor workbench (3-pane + full-screen), underscore normalization
+- **Prompt Helper**: generate reusable prompts from your own library
+- **Extra tools**: Artist identification (Kaloscope 2.0, 39,261-class artist/style classifier), Image Reader (original file / drag-drop is metadata-safe; clipboard images may lose SD PNG metadata), Image Obfuscate, Aesthetic Score
+- **VLM Captioning**: OpenAI-compatible (incl. Ollama), Anthropic, and Gemini (optional Vertex); one-click local Ollama deploy
+- **LoRA Training Export**: Template engine with 7 presets and 17 variables, Caption Editor workbench (3-pane + full-screen), underscore normalization
 - **Color Analysis**: Dominant colors, brightness/saturation sort, color temperature filter, histogram shape classification
 - **Mass Tag Editor**: Bulk find/replace, add, remove tags across entire library
 - **Reader Metadata Editor**: Edit and save-as-new with format choice (PNG/WebP/JPG)
@@ -626,35 +593,7 @@ See [Why Choose Us](docs/WHY_CHOOSE_US.md) for detailed comparison.
 
 ### Screenshots
 
-<p align="center">
-  <img src="docs/screenshots/gallery_hero.png" alt="Gallery with images" width="100%">
-</p>
-
-<p align="center">
-  <img src="docs/screenshots/gallery_filters.png" alt="Gallery filter modal" width="48%">
-  <img src="docs/screenshots/autosep_workbench.png" alt="Auto-Separate 3-pane workbench" width="48%">
-</p>
-
-<p align="center">
-  <img src="docs/screenshots/caption_editor_fullscreen.png" alt="Caption Editor full-screen" width="48%">
-  <img src="docs/screenshots/tagger_modal.png" alt="Tagger with 4 tabs" width="48%">
-</p>
-
-<p align="center">
-  <img src="docs/screenshots/reader_workspace.png" alt="Reader workspace" width="48%">
-  <img src="docs/screenshots/censor_workspace.png" alt="Censor Edit workspace" width="48%">
-</p>
-
-<p align="center">
-  <img src="docs/screenshots/model_manager.png" alt="Model Manager" width="48%">
-  <img src="docs/screenshots/batch_export_modal.png" alt="LoRA export with presets" width="48%">
-</p>
-
-<p align="center">
-  <img src="docs/screenshots/similar_search.png" alt="Similar image search" width="32%">
-  <img src="docs/screenshots/prompt_lab.png" alt="Prompt Lab" width="32%">
-  <img src="docs/screenshots/artist_identification.png" alt="Artist identification" width="32%">
-</p>
+The GitHub attachment at the top of this README is the screenshot that currently ships with the repository. `docs/screenshots/` is empty in this tree, so local PNG embeds were removed to avoid broken images.
 
 ### Quick Start
 
@@ -726,7 +665,7 @@ cd sd-image-sorter
 
 | Status | Features | Notes |
 |:--|:--|:--|
-| Ready after first launch | Scan/import, gallery browsing, metadata reading, filters/search, batch selection, auto-separate, WASD manual sort, Prompt Lab, manual censor editor, sidecar export | Uses only the lightweight core install. It does not pull Torch / SAM3 / NudeNet / Ultralytics / FastEmbed automatically. |
+| Ready after first launch | Scan/import, gallery browsing, metadata reading, filters/search, batch selection, auto-separate, WASD manual sort, Prompt Helper, manual censor editor, sidecar export | Uses only the lightweight core install. It does not pull Torch / SAM3 / NudeNet / Ultralytics / FastEmbed at startup. Using a feature downloads that model with install progress. |
 | Needs model files only | WD14 / Camie / PixAI ONNX tagging | Click **Setup Now / Prepare** or start tagging to download model files; ONNX Runtime is already part of core. |
 | Needs Prepare / Download and may need restart | CLIP similarity, aesthetic scoring, Artist ID, NudeNet, Privacy YOLO, SAM3, ToriiGate | If Prepare installs Python packages, restart before using that feature. General Torch-backed features on macOS require macOS 14+ Apple Silicon; SAM3 still requires NVIDIA CUDA on Windows/Linux. ToriiGate is about 5 GB; SAM3 / Torch can also be large. |
 
@@ -744,7 +683,7 @@ If an old install already pulled full AI Python packages, use **Setup Now → Di
 ### Notes
 
 - Local-only by design
-- Models download on first use
+- Models are fetched through Model Manager Prepare / Download
 - Can't access HuggingFace? Open **Setup Now** and switch **Download Source** to hf-mirror or ModelScope
 - See [CHANGELOG.md](CHANGELOG.md) for recent fixes and release history
 
@@ -846,8 +785,8 @@ Practical rule:
 | [ToriiGate](https://huggingface.co/Minthy/ToriiGate-0.5) | ToriiGate multimodal VLM tagger |
 | [Wenaka2004](https://github.com/Wenaka2004/auto-censor) | Auto-censor concept & YOLO privacy detection model |
 | [NudeNet](https://github.com/notAI-tech/NudeNet) | NudeNet NSFW detection model |
-| [SAM3 / Segment Anything](https://github.com/facebookresearch/sam2) | SAM3 text-guided segmentation refinement |
-| [Spawner1145](https://github.com/spawner1145/comfyui-lsnet), DraconicDragon, [heathcliff01](https://www.modelscope.cn/models/Heathcliff02/Kaloscope-2.0/summary) | LSNet / Kaloscope artist identification model |
+| [SAM3 / Segment Anything](https://github.com/facebookresearch/sam3) | SAM3 text-guided segmentation refinement |
+| [Spawner1145](https://github.com/spawner1145/comfyui-lsnet), DraconicDragon, [Heathcliff02](https://www.modelscope.cn/models/Heathcliff02/Kaloscope-2.0/summary) | LSNet / Kaloscope artist identification model |
 | [LAION](https://github.com/LAION-AI/aesthetic-predictor) | Aesthetic Score predictor model |
 | [OpenCLIP](https://github.com/mlfoundations/open_clip) | CLIP ViT-L/14 for similar image search |
 | [Receyuki](https://github.com/receyuki/stable-diffusion-prompt-reader) | Prompt Reader inspiration |

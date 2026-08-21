@@ -658,16 +658,23 @@ def test_health_all_subsystems_unavailable_in_zero_model_state(monkeypatch, tmp_
     assert health["artist"]["available"] is False
 
 
-def test_health_wd14_installed_models_lists_every_configured_tagger(
+def test_health_wd14_installed_models_lists_wd14_family_only(
     monkeypatch, tmp_path
 ):
     from config import TAGGER_MODELS
 
     _wire_clean_state(monkeypatch, tmp_path)
     wd14 = model_health.get_model_health()["wd14"]
+    wd14_names = {
+        name
+        for name, config in TAGGER_MODELS.items()
+        if str(config.get("writer_family") or "").strip().lower() == "wd14"
+    }
 
     assert isinstance(wd14["installed_models"], list)
-    assert len(wd14["installed_models"]) == len(TAGGER_MODELS)
+    assert {entry["name"] for entry in wd14["installed_models"]} == wd14_names
+    assert len(wd14["installed_models"]) == len(wd14_names)
+    assert len(wd14["installed_models"]) < len(TAGGER_MODELS)
     for entry in wd14["installed_models"]:
         assert set(entry) == {"name", "available"}
         assert entry["available"] is False  # zero-model state

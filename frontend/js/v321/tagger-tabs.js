@@ -342,7 +342,7 @@ Object.assign(window.V321Integration, {
             }
             if (hint) {
                 hint.setAttribute('data-i18n', 'tagger.nlToriiHint');
-                hint.textContent = i18n('tagger.nlToriiHint', 'Heavy local VLM. Needs a one-time ~5 GB model download from the Setup page.');
+                hint.textContent = i18n('tagger.nlToriiHint', 'Heavy local captioner. Needs a one-time ~9.6 GB BF16 download from Model Manager.');
             }
             if (vlmStatus) vlmStatus.style.display = 'none';
             if (startBtn && !startBtn.disabled) {

@@ -54,7 +54,7 @@
                         'Browse every scanned image in one place, inspect prompts and metadata, and narrow the list with filters before you move or edit anything.',
                     ],
                     steps: [
-                        'Start with "Scan Folder" to import images into the database.',
+                        'Start with "Import Images" to scan a folder into the library.',
                         'Use generator tabs, filters, and sort controls to narrow the gallery to the images you actually want.',
                         'Open an image to inspect its prompt, tags, LoRAs, parameters, and prompt format conversions.',
                         'Turn on "Select Images" when you want batch export, censor editing, or other multi-image actions.',
@@ -208,7 +208,7 @@
                 },
                 promptlab: {
                     icon: '🧪',
-                    title: 'Prompt Lab',
+                    title: 'Prompt Helper',
                     purpose: [
                         'Turn your own library data into usable prompt drafts, recipes, comparisons, and reusable Random/Build starting points.',
                     ],
@@ -243,12 +243,12 @@
                     ],
                     features: [
                         'Batch identification with progress tracking.',
-                        'Stats cards for total images, identified images, undefined results, and artist count.',
+                        'Stats cards for total images, confident matches, unconfirmed candidates, no-match, and artist count.',
                         'Direct bridge back into Gallery filtering.',
                     ],
                     tips: [
                         'Treat this as an assistive classifier, not a guaranteed attribution tool.',
-                        'Raise the threshold if too many weak guesses are cluttering the result list.',
+                        'Raise the threshold if too many weak guesses are cluttering the result list. The slider can only tighten; it cannot assert a name below the 0.20 high tier.',
                     ],
                 },
             },
@@ -432,7 +432,7 @@
                 },
                 promptlab: {
                     icon: '🧪',
-                    title: '提示词工坊',
+                    title: '提示词助手',
                     purpose: [
                         '把你自己的图库数据转成可直接使用的提示词草稿、配方、对比结果，以及可复用的 Random / Build 起手模板。',
                     ],
@@ -467,12 +467,12 @@
                     ],
                     features: [
                         '支持批量识别，并带进度反馈。',
-                        '顶部统计卡会显示总图片数、已识别数、未定义数和画师数。',
+                        '顶部统计卡会显示总图片数、高置信匹配、未确认候选、没有匹配，以及画师数。',
                         '结果可直接回流到图库继续处理。',
                     ],
                     tips: [
                         '这更适合作为辅助分类，而不是严格的作者归属工具。',
-                        '如果弱匹配太多，可以适当提高阈值来减少噪声。',
+                        '如果弱匹配太多，可以提高阈值来减少噪声。滑条只能收紧，无法把低于 0.20 高档的猜测当成识别结果。',
                     ],
                 },
             },
@@ -485,7 +485,6 @@
             global: [
                 { key: '?', desc: 'Open keyboard shortcuts panel' },
                 { key: 'Esc', desc: 'Close modal or cancel action' },
-                { key: '1–7', desc: 'Switch tabs' },
             ],
             gallery: [
                 { key: 'G / L / W', desc: 'Switch to Grid / Large / Waterfall view' },
@@ -524,7 +523,6 @@
             global: [
                 { key: '?', desc: '打开快捷键面板' },
                 { key: 'Esc', desc: '关闭弹窗或取消操作' },
-                { key: '1–7', desc: '切换标签页' },
             ],
             gallery: [
                 { key: 'G / L / W', desc: '切换 网格 / 大图 / 瀑布流 视图' },

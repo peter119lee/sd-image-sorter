@@ -116,7 +116,8 @@ tests/e2e/.pw-out/
 
 # Loose test screenshots that sometimes get dropped at the repo root by
 # ad-hoc playwright runs. Keep them out of git AND the release builder.
-# Real product screenshots live under docs/screenshots/.
+# Product screenshots belong under docs/screenshots/ when they are checked in.
+# Until that folder is populated, README uses GitHub user-attachments.
 /e2e-*.png
 /e2e-*.jpg
 /e2e-*.jpeg

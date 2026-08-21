@@ -1,6 +1,6 @@
 /* ========================================
    SD Image Sorter - Stylesheet
-   Cyberpunk / Neon aesthetic with glassmorphism
+   Graphite layout and components. tokens.css loads last and owns the palette.
 
    TABLE OF CONTENTS:
    ------------------
@@ -189,7 +189,7 @@
 
 /* ===== Utility Classes ===== */
 
-/* Glass Effect - Reusable glassmorphism */
+/* Glass Effect — leftover class name. Graphite tokens override the look. */
 .glass-effect {
     background: var(--glass-bg);
     border: 1px solid var(--glass-border);
@@ -430,12 +430,6 @@ body::before {
     font-weight: 700;
     line-height: 1.4;
     text-transform: uppercase;
-}
-
-.tab-badge-experimental {
-    background: rgba(var(--accent-rgb), 0.18);
-    color: #D39F64;
-    border: 1px solid rgba(var(--accent-rgb), 0.35);
 }
 
     .nav-actions {
@@ -2858,6 +2852,59 @@ body::before {
         justify-content: center;
         padding: 24px;
         background: rgba(0, 0, 0, 0.7);
+    }
+
+    .feature-model-install-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 12000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        background: rgba(0, 0, 0, 0.72);
+    }
+
+    .feature-model-install-overlay[hidden] {
+        display: none;
+    }
+
+    .feature-model-install-card {
+        width: min(100%, 420px);
+        background: var(--glass-bg, #1c1c1c);
+        border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.12));
+        border-radius: 16px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        padding: 24px;
+        text-align: center;
+    }
+
+    .feature-model-install-title {
+        margin: 0 0 8px;
+        font-size: 16px;
+        font-weight: 700;
+        color: var(--text-primary);
+    }
+
+    .feature-model-install-status {
+        margin: 0 0 16px;
+        font-size: 13px;
+        color: var(--text-secondary);
+        word-break: break-word;
+    }
+
+    .feature-model-install-bar {
+        height: 8px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.08);
+        overflow: hidden;
+    }
+
+    .feature-model-install-fill {
+        height: 100%;
+        width: 0%;
+        background: var(--accent, #d39f64);
+        transition: width 0.2s ease;
     }
 
     .guide-backdrop {
@@ -8055,13 +8102,6 @@ input[type="radio"] {
     border-color: rgba(var(--accent-primary-rgb), 0.45);
     box-shadow: none;
 }
-.sort-mode-soon {
-    margin-left: auto;
-    font-size: 11px;
-    color: var(--text-muted);
-    padding: 0 12px;
-}
-
 .sort-bracket-intro {
     margin-bottom: 16px;
     padding: 12px 16px;

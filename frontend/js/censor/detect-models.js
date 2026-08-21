@@ -274,7 +274,7 @@ function renderCensorCapabilityPanel(options = {}) {
         const caps = nudenet.capabilities || {};
         cards.push(buildCapabilityCardHtml(
             nudenet.name,
-            nudenet.available ? censorT('common.ready', null, 'Ready') : censorT('censor.optional', null, 'Optional'),
+            nudenet.available ? censorT('common.ready', null, 'Ready') : censorT('censor.downloadsOnFirstUse', null, 'Downloads on first detect'),
             [
                 formatCensorCapabilityLine('censor.capabilityInput', caps.input_mode_label || censorT('censor.capabilityBuiltInNsfwLabels', null, 'Built-in NSFW labels'), 'Input'),
                 formatCensorCapabilityLine('censor.capabilityOutput', caps.output_mode_label || censorT('censor.capabilityDetectionBoxes', null, 'Detection boxes'), 'Output'),
@@ -349,7 +349,7 @@ function renderCensorCapabilityPanel(options = {}) {
         segmentButton.disabled = !sam3?.available;
         segmentButton.title = sam3?.available
             ? ''
-            : (sam3?.message || censorT('censor.sam3UnavailableMessage', null, 'SAM3 is not available in this environment yet.'));
+            : (sam3?.message || censorT('censor.sam3UnavailableMessage', null, 'SAM3 is not set up on this machine. Open Model Center and Prepare SAM3 (CUDA).'));
     }
     if (batchRefineButton) {
         batchRefineButton.disabled = !sam3?.available;

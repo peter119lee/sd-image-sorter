@@ -18,7 +18,7 @@ SD Image Sorter provides a local REST API for managing, tagging, sorting, censor
 - **Censoring**: NSFW detection with multiple backends (privacy YOLO, NudeNet, optional SAM3 refinement)
 - **Similarity Search**: CLIP-based image similarity and duplicate detection
 - **Prompt Generation**: Prompt builder with exclusion rules and presets
-- **Artist Identification**: Experimental artist/style classification
+- **Artist Identification**: Kaloscope artist/style classification
 
 ---
 
@@ -97,7 +97,10 @@ Most errors use structured JSON:
 
 ## Rate Limiting
 
-A lightweight in-memory rate limit is applied to API requests. Static files and image-serving endpoints are exempt.
+A lightweight in-memory rate limit exists, but the default production path is
+loopback-only (`RATE_LIMIT_APPLY_TO_LOOPBACK=False`), so localhost clients are
+not limited unless that flag is enabled. Static files and image-serving
+endpoints are exempt.
 
 ---
 
@@ -1239,7 +1242,7 @@ The response also includes richer counters and recent issue details:
 Find similar images by image ID.
 
 #### POST /api/similarity/search-text
-Semantic text-to-image search (v3.5.x, competitive roadmap #1). Body: `{query (1-512 chars), limit?: 100, threshold?: 0.0, offset?: 0, collection_id?}`. Embeds the natural-language query with the CLIP TEXT tower paired with the image-embedding model (`Qdrant/clip-ViT-B-32-text`, the same ViT-B/32 checkpoint and 512-dim space as the stored embeddings; downloads on first use, ~65 MB) and ranks embedded images by cosine. Cross-modal scores run far lower than image-image scores (matches ≈ 0.2-0.35), so the default threshold is 0.0 = pure top-k ranking. Requires images to be embedded (`POST /api/similarity/embed`). 503 while the text model is unavailable. Returns the upload-search shape plus `query`: `{query, results, count, total, has_more, offset, limit}`.
+Semantic text-to-image search (v3.5.x, competitive roadmap #1). Body: `{query (1-512 chars), limit?: 100, threshold?: 0.0, offset?: 0, collection_id?}`. Embeds the natural-language query with the CLIP TEXT tower paired with the image-embedding model (`Qdrant/clip-ViT-B-32-text`, the same ViT-B/32 checkpoint and 512-dim space as the stored embeddings; text ONNX ~243 MB, vision+text pair ~580 MB) and ranks embedded images by cosine. Cross-modal scores run far lower than image-image scores (matches ≈ 0.2-0.35), so the default threshold is 0.0 = pure top-k ranking. Requires images to be embedded (`POST /api/similarity/embed`). 503 while the text model is unavailable. Returns the upload-search shape plus `query`: `{query, results, count, total, has_more, offset, limit}`.
 
 #### POST /api/similarity/search-upload
 Find similar images by uploaded file.
@@ -1336,9 +1339,7 @@ Compare prompt generation options.
 
 ### Artists
 
-> **Warning: Experimental Feature**
->
-> Artist identification is experimental. Only a `confidence_level` of `high` is an identification; everything below it is an unconfirmed suggestion, and roughly two thirds of a typical Danbooru-sourced library falls outside the model's artist vocabulary entirely.
+Only a `confidence_level` of `high` is an identification; everything below it is an unconfirmed suggestion. Roughly two thirds of a typical Danbooru-sourced library falls outside the model's artist vocabulary entirely.
 
 **Confidence tiers.** Measured on 250 ground-truth images against the shipped Kaloscope weights:
 
@@ -1375,8 +1376,7 @@ Identify artist for one image.
     {"artist": "greg_rutkowski", "confidence": 0.78},
     {"artist": "alphonse_mucha", "confidence": 0.45}
   ],
-  "model_loaded": true,
-  "experimental": true
+  "model_loaded": true
 }
 ```
 
@@ -1412,7 +1412,7 @@ Get artist stats. `undefined_count`, `low_confidence_count` and `confident_count
 List images associated with an artist prediction. Each entry carries a `confidence_level` derived from its stored confidence, so pre-tiering labels are still marked as suspect.
 
 #### GET /api/artists/list
-Get the loaded model's artist list. `vocabulary_loaded` is false (and `artists` empty) until a real label source is loaded, rather than returning the placeholder sample list.
+Get the loaded model's artist list. `vocabulary_loaded` is false (and `artists` empty) until a real label source is loaded.
 
 #### GET /api/artists/vocabulary
 Check whether specific artists exist in the loaded model's answer set.

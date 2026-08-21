@@ -291,9 +291,9 @@ def _tagging_worker_main(
         if request.model_path:
             send("running", "Loading custom model...")
         elif runtime_backend == "toriigate":
-            # ToriiGate first-use pulls Qwen2.5-VL (~5 GB). Detect the empty
-            # cache and surface a clear size warning BEFORE the download starts
-            # so users on slow / metered links know what is about to happen.
+            # ToriiGate first-use can still snapshot_download Qwen3.5-VL (~9.6 GB
+            # BF16). Surface the size BEFORE the download starts so users on
+            # slow / metered links know what is about to happen.
             try:
                 from config import get_toriigate_model_dir
 
@@ -304,7 +304,7 @@ def _tagging_worker_main(
             if not already_cached:
                 send(
                     "running",
-                    "First-time ToriiGate download: ~5 GB from HuggingFace. "
+                    "First-time ToriiGate captioner download: ~9.6 GB BF16 from HuggingFace. "
                     "This runs once; keep the app open until it completes.",
                 )
             else:

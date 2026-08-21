@@ -38,6 +38,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from app_info import APP_VERSION
 from config import TAGGER_MODELS, get_artist_model_dir, get_florence2_model_dir, get_sam3_model_dir, get_toriigate_model_dir, get_wd14_model_dir, get_yolo_model_dir
 from model_health import (
+    SAM3_CHECKPOINT_REQUIRED_FILES,
     get_model_health,
     get_sam3_checkpoint_path,
     get_torch_onnx_runtime_health,
@@ -456,7 +457,6 @@ RECOMMENDED_MODEL_IDS = frozenset({
     "clip",
     "aesthetic",
     "artist",
-    "sam3",
     "florence2",
     "lucida",
 })
@@ -472,10 +472,14 @@ def _sam3_inventory_setup_steps() -> List[str]:
     through the facade at call time (so get_sam3_model_dir stays a
     facade-bound monkeypatch seam).
     """
+    required = ", ".join(SAM3_CHECKPOINT_REQUIRED_FILES)
     return [
         "Click Prepare / Download to install SAM3 Python runtime packages if they are missing.",
         "Restart SD Image Sorter if the Prepare result says Python packages were installed.",
-        "Click Prepare / Download again to fetch model.safetensors, or place sam3.pt / model.safetensors manually only if the download fails: " + str(Path(get_sam3_model_dir()) / "facebook-sam3-modelscope"),
+        "Click Prepare / Download again to fetch the SAM3 checkpoint files ("
+        + required
+        + ") into "
+        + str(Path(get_sam3_model_dir()) / "facebook-sam3-modelscope"),
     ]
 
 

@@ -219,8 +219,8 @@ _text_embed_model = None
 def _get_text_embed_model():
     """FastEmbed CLIP TEXT tower (singleton) — the same OpenAI CLIP ViT-B/32
     checkpoint as the vision model, split by fastembed, so text queries are
-    cosine-comparable with the stored image embeddings. Downloads on first
-    use (~65 MB) into the CLIP model dir."""
+    cosine-comparable with the stored image embeddings. Text ONNX is ~243 MB;
+    the vision+text pair is about 580 MB."""
     global _text_embed_model
     if _text_embed_model is None:
         with _embed_lock:

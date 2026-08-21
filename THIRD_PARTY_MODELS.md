@@ -4,7 +4,8 @@ SD Image Sorter is local-first, but model weights and large runtime assets are
 user data. The application source and every portable/archive package contain
 no model payloads. The Model Manager downloads a selected model from its
 official source, verifies the required files, and stores them under the user's
-`data/models/` directory.
+`data/models/` directory. The aesthetic linear head is an exception: it lives
+in `models/aesthetic/` at the project root.
 
 ## Delivery Rules
 

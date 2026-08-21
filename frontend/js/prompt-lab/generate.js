@@ -15,7 +15,7 @@ Object.assign(window.PromptLab, {
         const { showToast } = window.App;
 
         if (!this.isReady) {
-            showToast(this._t('promptlab.loadingWait', 'Prompt Lab is still loading. Please wait a moment.'), 'info');
+            showToast(this._t('promptlab.loadingWait', 'Prompt Helper is still loading. Please wait a moment.'), 'info');
             return;
         }
 
@@ -63,7 +63,7 @@ Object.assign(window.PromptLab, {
 
     async randomize() {
         if (!this.isReady) {
-            window.App.showToast(this._t('promptlab.loadingWait', 'Prompt Lab is still loading. Please wait a moment.'), 'info');
+            window.App.showToast(this._t('promptlab.loadingWait', 'Prompt Helper is still loading. Please wait a moment.'), 'info');
             return;
         }
 
@@ -106,7 +106,7 @@ Object.assign(window.PromptLab, {
         const { showToast } = window.App;
 
         if (!this.isReady) {
-            showToast(this._t('promptlab.loadingWait', 'Prompt Lab is still loading. Please wait a moment.'), 'info');
+            showToast(this._t('promptlab.loadingWait', 'Prompt Helper is still loading. Please wait a moment.'), 'info');
             return;
         }
 

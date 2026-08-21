@@ -96,9 +96,6 @@ class IdentifyResponse(BaseModel):
     advisory: str = ""
     top_predictions: List[dict]
     model_loaded: bool
-    # P0-5: Artist identifier uses a hardcoded label list, not a real trained model.
-    # Always True to inform callers this feature is experimental.
-    experimental: bool = True
 
 
 class BatchProgress(BaseModel):
@@ -192,13 +189,8 @@ set_artist_service = _artist_service_provider.set
     response_model=IdentifyResponse,
     summary="Identify artist of single image",
     description="""
-Identify the artist or art style of a single image.
-
-Uses a classification model to predict the most likely artist.
-Returns "undefined" if confidence is below the threshold.
-
-**Note:** This feature is experimental. The artist identification
-uses a predefined label list and may not accurately identify all artists.
+Identify the artist or art style of a single image using the Kaloscope classifier.
+Returns "undefined" when the result is not in the high confidence tier.
     """,
     responses={
         200: {
@@ -209,12 +201,16 @@ uses a predefined label list and may not accurately identify all artists.
                         "image_id": 1,
                         "artist": "greg_rutkowski",
                         "confidence": 0.78,
+                        "confidence_level": "high",
+                        "candidate_artist": "greg_rutkowski",
+                        "out_of_vocabulary_likely": False,
+                        "vocabulary_size": 39261,
+                        "advisory": "Confident match. ...",
                         "top_predictions": [
                             {"artist": "greg_rutkowski", "confidence": 0.78},
                             {"artist": "alphonse_mucha", "confidence": 0.45}
                         ],
-                        "model_loaded": True,
-                        "experimental": True
+                        "model_loaded": True
                     }
                 }
             }
@@ -235,7 +231,7 @@ async def identify_artist(
     Args:
         request: IdentifyRequest with:
             - image_id: ID of image to analyze
-            - threshold: Minimum confidence to assign artist (default 0.03)
+            - threshold: Extra confidence floor; tightens only (cannot assert below 0.20)
             - top_k: Number of top predictions to return (default 5)
 
     Returns:
@@ -245,7 +241,6 @@ async def identify_artist(
         - confidence: Confidence score for top prediction
         - top_predictions: List of top-k predictions with scores
         - model_loaded: Whether model was loaded successfully
-        - experimental: Always True (feature is experimental)
 
     Raises:
         HTTPException 404: Image not found or file missing on disk
@@ -288,7 +283,7 @@ Results are stored in the artist_predictions table.
                 }
             }
         },
-        400: {"description": "Batch already running"}
+        409: {"description": "Batch already running"}
     }
 )
 async def identify_batch(
@@ -392,7 +387,7 @@ async def list_models():
         name=f"{ARTIST_HF_MODEL_ID} (HuggingFace)",
         source="huggingface",
         available=health["available"],
-        artist_count=0,  # Will be determined when loaded
+        artist_count=0,  # class count is GET /api/artists/vocabulary, not this listing
     ))
 
     models.append(ModelInfo(
@@ -450,9 +445,7 @@ async def get_artist_diagnostics():
     live_error: Optional[str] = None
     try:
         identifier = get_artist_identifier()
-        live_loaded = bool(
-            identifier._model is not None and identifier._model != "placeholder"
-        )
+        live_loaded = bool(identifier._has_live_model())
         live_backend = getattr(identifier, "_backend", None)
         live_error = getattr(identifier, "_load_error", None)
     except Exception:  # identifier import/init must not crash diagnostics
@@ -521,8 +514,7 @@ identification run over their images will name somebody else. Checking here is
 strictly more informative than reading the nearest wrong match.
 
 `vocabulary_loaded` is false when no real label source is loaded yet (run an
-identification first); in that case `known` is empty rather than answered from
-the placeholder sample list.
+identification first); in that case `known` is empty.
     """,
 )
 async def lookup_artist_vocabulary(

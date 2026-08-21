@@ -404,6 +404,14 @@ async function startTagging() {
 
     persistTaggerDefaultsFromDom();
 
+    if (!isCustomModel && typeof window.ensureFeatureModel === 'function') {
+        const spec = typeof window.prepareSpecForTagger === 'function'
+            ? window.prepareSpecForTagger(options.modelName)
+            : { modelId: 'wd14', variant: options.modelName, label: options.modelName };
+        const ensured = await window.ensureFeatureModel(spec.modelId, spec);
+        if (!ensured.ok) return;
+    }
+
     // Aurora Phase 3: the batch action bar's Tag button scopes this run to the
     // Gallery selection (explicit id selections only; token selections keep
     // the whole-library semantics of this modal).

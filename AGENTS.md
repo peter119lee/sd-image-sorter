@@ -37,7 +37,7 @@ FastAPI (backend/main.py)
   +-- routers/censor.py     → YOLOv8 detection + Pillow censoring
   +-- routers/prompts.py    → prompt generation endpoints
   +-- routers/similarity.py → CLIP embedding similarity search
-  +-- routers/artists.py    → artist identification (experimental)
+  +-- routers/artists.py    → artist identification
   |
   +-- database.py         → SQLite (raw SQL, no ORM)
   +-- metadata_parser.py  → SD metadata extraction (ComfyUI/NAI/WebUI/Forge)
@@ -52,7 +52,7 @@ FastAPI (backend/main.py)
 - **Backend**: Python 3.12+, FastAPI, Uvicorn, SQLite, Pillow, ONNX Runtime
 - **Frontend**: Vanilla HTML5 / CSS3 / JavaScript (no framework, no build step)
 - **AI Models**: WD14 Tagger (ONNX, from HuggingFace), YOLOv8 (segmentation, .pt/.onnx)
-- **UI Style**: Glassmorphism (backdrop-filter, translucency, blur)
+- **UI Style**: Graphite (flat neutral surfaces, one amber accent; `tokens.css` last)
 
 ## Quick Start
 
@@ -88,7 +88,7 @@ sd-image-sorter/
 │   │   ├── censor.py         # YOLO detect, preview, save endpoints
 │   │   ├── prompts.py        # Prompt generation endpoints
 │   │   ├── similarity.py     # CLIP embedding similarity search
-│   │   ├── artists.py        # Artist identification (experimental)
+│   │   ├── artists.py        # Artist identification
 │   ├── services/
 │   │   ├── image_service.py          # Image workflows
 │   │   ├── image_metadata_writer.py  # Reader metadata save helpers
@@ -100,24 +100,24 @@ sd-image-sorter/
 ├── frontend/
 │   ├── index.html            # Single-page app (all views in one file)
 │   ├── css/
-│   │   ├── styles.css        # Main glassmorphism styles
+│   │   ├── styles.css        # Base layout and component styles
 │   │   └── censor-v2.css     # Censor editor styles
 │   └── js/
 │       ├── modules/core/     # earliest prerequisites (storage, request manager)
 │       ├── stores/           # FilterStore / SelectionStore (key-by-key allowlists —
 │       │                     #   a new filter field MUST be added to BOTH functions)
 │       ├── app/              # the former app.js god file, decomposed 2026-07 into
-│       │                     #   36 modules (state-core, api, filters, flows, binders);
+│       │                     #   41 modules (state-core, api, filters, flows, binders);
 │       │                     #   static script tags, dependency order, one shared
 │       │                     #   classic-script global scope
 │       ├── app.js            # boot remainder only (~240 lines): initEventListeners
 │       │                     #   composer + DOMContentLoaded + buildAppContext/seal
-│       ├── gallery.js        # Gallery grid, image detail modal
-│       ├── dataset/          # Dataset Maker family (22 by-feature modules, dynamic
+│       ├── gallery.js        # servable shim; gallery grid lives in gallery/
+│       ├── dataset/          # Dataset Maker family (27 by-feature modules, dynamic
 │       │                     #   _appendOrderedScript loader in dataset/core.js)
 │       ├── censor/           # Censor editor family (16 ordered classic scripts)
-│       ├── autosep.js        # Auto-Separate tab logic
-│       ├── manual-sort.js    # WASD keyboard sort session
+│       ├── autosep.js        # servable shim; Auto-Separate lives in autosep/
+│       ├── manual-sort.js    # servable shim; WASD session lives in manual-sort/
 │       └── audio.js          # Sound effects for sorting
 ├── models/
 │   └── yolo/                 # YOLOv8 segmentation model
@@ -159,7 +159,7 @@ Server runs at `http://127.0.0.1:8487` by default. API docs at `/docs`.
 
 ### Database
 
-SQLite database at `backend/images.db`. Schema auto-migrated on startup via `database.init_db()`.
+SQLite database defaults to `data/images.db` (override `SD_IMAGE_SORTER_DB_PATH`). Schema migrates on startup via `database.init_db()`.
 
 ### Important Patterns
 
@@ -173,8 +173,8 @@ SQLite database at `backend/images.db`. Schema auto-migrated on startup via `dat
 - Manual Sort supports one persisted active session at a time and restores it from disk on startup
 - No authentication (local-only tool)
 - Thumbnail endpoint serves cached, downsized thumbnails (`thumbnail_cache.py`, LANCZOS); full-resolution pixels are served only by the separate image-file endpoint
-- Gallery pagination uses offset/has_more; no cursor-based pagination
-- CORS is restricted by regex to `localhost`, `127.0.0.1`, and `[::1]` (any port). A `localhost_only_middleware` in `main.py` additionally rejects any non-loopback client IP, even if the bind host is widened.
+- Gallery pagination is cursor-based (`next_cursor` / `has_more`); random sort cannot use a stable cursor
+- CORS is restricted by regex to `localhost`, `127.0.0.1`, and `[::1]` (any port). `localhost_only_middleware` in `backend/app_security.py` rejects non-loopback client IPs even if the bind host is widened.
 
 ---
 

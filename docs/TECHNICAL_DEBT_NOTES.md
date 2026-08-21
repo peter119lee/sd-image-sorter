@@ -683,12 +683,12 @@ Quality bar:
 - Router service lifecycle boilerplate now uses shared `ServiceProvider`; simple routers no longer carry per-file `_service = None` / `get_*` / `set_*` clones, and Tagging/Sorting compatibility state is lazy instead of constructing services at import time.
 - The dead `GALLERY_MAX_LIMIT` config/env knob was removed; gallery request limits are enforced by the images router/service contracts (`le=1000` / `LIMIT_MAX`) instead of a disconnected config constant.
 - Interrupted-scan metadata recovery now uses the database-owned stale-metadata error constant directly from `image_manager.py`, removing the last alias left from the duplicated error-message quick win.
-- The audit's proposed deletion of `backend/db_repos/` was rejected: current tests and ADR-AI-20260428-25 still use it as a repository/path-equivalence seam, so the debt is partial adoption rather than dead code.
+- `backend/db_repos/` was deleted (`9a4663f`). It had zero production importers. Reintroduction is forbidden by `backend/tests/test_architecture_contract.py` unless callers migrate in the same change.
 - The audit's `nudenet_detector.py` singleton deletion quick win was rejected: `_nudenet_instance` backs `get_nudenet_detector()` and is imported by censor/model-service paths, so deleting it would break runtime callers.
 
 ### Still Intentionally Deferred
 
-- Frontend God-file decomposition (`app.js`, `censor-edit.js`, `gallery.js`) remains risky and should be done only behind broader E2E coverage. Local listener cleanup is improved, but a full view lifecycle/teardown model is still intentionally deferred.
+- God-file splits for `app.js`, `gallery.js`, and the censor editor are done (`app.js` is boot-only; `gallery.js` is a shim; `censor-edit.js` was replaced by `frontend/js/censor/`). Remaining debt is view lifecycle/teardown, not the initial decomposition. Local listener cleanup is improved, but a full view lifecycle/teardown model is still intentionally deferred.
 - CSS ownership is still split across several large files; variables are aligned, but selector duplication and `!important` debt remain.
 - Archive-size budgets are conservative guardrails, not a full artifact provenance system; full portable release package smoke and model-asset install smoke are still missing.
 - Several older services still raise FastAPI `HTTPException`; this pass fixed the audit-named Aesthetic/Artist path and added ModelService, not a whole-service-layer exception migration.

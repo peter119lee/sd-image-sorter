@@ -133,9 +133,8 @@
         bindHandlers();
     }
 
-    // Public hooks for other modules (Color Analysis "Send to Dataset
-    // Maker" will eventually call openSmartTagModal() after pushing
-    // images into the queue).
+    // Public hooks for other modules. Color Analysis sends images to Dataset
+    // Maker from the gallery; the live opener is window.SmartTag.open.
     // Plain open: clear any stale one-shot scope so callers that mean
     // "whatever is queued now" (e.g. Dataset Maker) are not poisoned by a
     // previous Gallery-armed open.

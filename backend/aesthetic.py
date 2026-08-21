@@ -2,7 +2,9 @@
 LAION Aesthetic Predictor integration.
 
 Uses CLIP ViT-L/14 embeddings + a tiny linear head trained on human aesthetic ratings.
-Outputs a score from ~1 to ~10. Model downloads automatically on first use (~400MB).
+Outputs a score from ~1 to ~10. The bulk download is about 1.7 GB (ViT-L/14
+backbone + head). Model Manager Prepare / Download is the supported install
+path. If files are still missing, scoring may fetch them from Hugging Face.
 """
 import logging
 import os

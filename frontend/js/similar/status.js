@@ -100,8 +100,8 @@ Object.assign(window.SimilarImages, {
         if (workflowCard) {
             const fullyReady = phase === 'ready' && pending === 0 && !running;
             if (!modelReady) {
-                // Model-health owns the CTA; hide duplicate workflow messaging.
-                workflowCard.hidden = true;
+                // First-use: Start Indexing downloads CLIP with a progress overlay.
+                workflowCard.hidden = false;
             } else if (fullyReady) {
                 workflowCard.hidden = true;
             } else {
@@ -128,7 +128,7 @@ Object.assign(window.SimilarImages, {
         const failed = Number(progress.failed || progress.errors || 0);
         const setupNeedsDetail = this._t(
             'similar.setupNeedsDetail',
-            'Finish the CLIP setup first, then come back to build the index.'
+            'Click Generate Embeddings to download CLIP (about 580 MB) with install progress. Setup / Download is optional.'
         );
         const issueBreakdown = this._t(
             'similar.statusIssueBreakdown',
@@ -148,10 +148,12 @@ Object.assign(window.SimilarImages, {
         cta.textContent = this._t('similar.startIndexing', 'Start Indexing');
 
         if (!modelReady) {
-            badge.textContent = this._t('similar.statusModelMissing', 'CLIP model is not ready');
+            badge.textContent = this._t('similar.statusModelMissing', 'CLIP will download on first index');
             detail.textContent = setupNeedsDetail;
             card.classList.add('is-warning');
-            cta.hidden = true;
+            cta.hidden = false;
+            cta.disabled = false;
+            cta.textContent = this._t('similar.startIndexing', 'Start Indexing');
         } else if (!total && !running) {
             badge.textContent = this._t('similar.statusEmptyLibrary', 'No images in the library yet');
             detail.textContent = this._t('similar.statusEmptyLibraryDetail', 'Scan a folder first, then start indexing.');
@@ -235,11 +237,10 @@ Object.assign(window.SimilarImages, {
         const uploadInput = document.getElementById('similar-upload-input');
         const uploadDropzone = document.getElementById('similar-upload-dropzone');
 
-        // Building the index needs CLIP: don't leave the blue "Generate
-        // Embeddings" primary enabled while the model is missing — the real next
-        // action is Open Setup / Download (promoted to primary in the banner).
+        // Building the index can start while CLIP is missing: first use
+        // downloads it with a progress overlay. Search stays gated.
         const btnEmbed = document.getElementById('btn-similar-embed');
-        if (btnEmbed) btnEmbed.disabled = !modelReady || this.isEmbedding || this.isCheckingEmbeddingStatus;
+        if (btnEmbed) btnEmbed.disabled = this.isEmbedding || this.isCheckingEmbeddingStatus;
 
         if (searchInput) searchInput.disabled = disableSearchActions;
         if (btnSearch) btnSearch.disabled = disableSearchActions;
@@ -277,10 +278,10 @@ Object.assign(window.SimilarImages, {
             banner.className = classes.join(' ');
             const title = result.available
                 ? this._t('similar.setupReadyTitle', 'Similarity setup is ready')
-                : this._t('similar.setupNeedsTitle', 'Similarity setup needs one more step');
+                : this._t('similar.setupNeedsTitle', 'CLIP will download when you start indexing');
             const description = result.available
                 ? this._t('similar.setupReadyDetail', 'You can search or rebuild the index any time after scanning more images.')
-                : this._t('similar.setupNeedsDetail', 'Finish the CLIP setup first, then come back to build the index.');
+                : this._t('similar.setupNeedsDetail', 'Click Generate Embeddings to download CLIP (about 580 MB) with install progress. Setup / Download is optional.');
             const detailItems = [];
             if (result.message_key || result.message) {
                 // Prefer the backend's message_key so the tech detail is
@@ -300,13 +301,10 @@ Object.assign(window.SimilarImages, {
                     </details>
                 `
                 : '';
-            // ENTRY-06: shared "needs setup -> open Model Manager" affordance.
-            // The data-action button reuses the global delegated handler.
-            // When CLIP is missing this IS the screen's next action, so it gets
-            // the single blue primary — the Generate Embeddings button is
-            // disabled (updateActionAvailability) because it can't succeed yet.
+            // Setup / Download remains available; first-use install now starts
+            // from Generate Embeddings, so keep this button secondary.
             const setupBtnHtml = result.available ? '' : `
-                <button type="button" class="btn btn-primary btn-small model-health-setup-btn" data-action="open-model-guidance">
+                <button type="button" class="btn btn-secondary btn-small model-health-setup-btn" data-action="open-model-guidance">
                     <svg class="icon" aria-hidden="true"><use href="#i-settings"/></svg> ${escapeHtml(this._t('models.openSetup', 'Open Setup / Download'))}
                 </button>
             `;

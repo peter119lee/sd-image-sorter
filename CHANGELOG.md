@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Accepting a character tag also inserts its series / 接受角色标签时一并写入作品**: choosing `hatsune_miku` from autocomplete (comma-separated tag boxes, not Prompt Lab insert mode) also writes `vocaloid` when that copyright is known and not already in the field. The dropdown shows the series before you accept.
   - 在逗号分隔的标签框里选中 `hatsune_miku` 时，若词表知道作品且栏里还没有，会一并写入 `vocaloid`。下拉里会先看到作品名。Prompt Lab 插入模式只补全当前词，不会加逗号。
 
+### Fixed / 修复
+- **Product claims match the shipped app / 对外说法对齐现货**: artist identification is no longer labelled experimental or backed by a hardcoded sample list; a failed Kaloscope load is retryable instead of locking a placeholder. README / Why Choose Us stop claiming to be the only AI-art manager, stop marking Allusion as having no SD metadata, and cite Eagle and Billfish. First use of a feature downloads that model with a progress overlay (about 1 GB asks first) instead of a frozen or permanently disabled button. Agent docs drop glassmorphism and the wrong database path.
+  - 画师识别不再标成实验功能、也不再靠一份写死的样本名单；Kaloscope 加载失败可以重试，不会锁成 placeholder。README / 为什么选我们 不再自称「唯一」，不再把 Allusion 写成没有 SD 元数据，并点名 Eagle 与 Billfish。第一次用某个功能会下载对应模型并显示进度（约 1 GB 先确认），按钮不再永久禁用。代理文档去掉 glassmorphism 与错误的数据库路径。
+
 ## [3.5.0-beta.4] - 2026-08-04
 
 Beta 4 introduces durable, isolated multi-library workspaces and restores the Gallery comfort features that previously looked present but silently did nothing. Long-distance virtual scrolling now stays aligned across all desktop Gallery modes and UI scales, while NovelAI V4/V4.5 WebP files retain their positive and negative prompts without weakening corrupt-EXIF validation. Similarity setup, Auto-Separate destinations, and VLM concurrency guidance are also clearer.

@@ -1736,6 +1736,7 @@ def test_model_manager_sam3_setup_copy_matches_lazy_prepare_policy():
     assert "First launch installs SAM3 Python runtime packages" not in model_service
     assert "Click Prepare / Download to install SAM3 Python runtime packages if they are missing." in model_service
     assert "Restart SD Image Sorter if the Prepare result says Python packages were installed." in model_service
+    assert "sam3.pt / model.safetensors" not in model_service
 
 
 def _load_lazy_release_qa_module(name: str):

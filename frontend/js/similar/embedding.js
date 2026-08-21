@@ -204,6 +204,14 @@ Object.assign(window.SimilarImages, {
         if (this.isEmbedding) return;
 
         const { showToast } = window.App;
+        if (typeof window.ensureFeatureModel === 'function') {
+            const ensured = await window.ensureFeatureModel('clip', {
+                label: this._t('similar.clipModelName', 'CLIP similarity'),
+                sizeHint: '~580 MB',
+                confirmBytes: 0,
+            });
+            if (!ensured.ok) return;
+        }
         this.isEmbedding = true;
         this.dismissFirstUseCard();
         this.embedProgressTracker = window.App.createProgressTracker();

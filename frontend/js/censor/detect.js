@@ -43,6 +43,9 @@ function getQuickAutoCensorFallbackConfig() {
             fallbackModelType = 'nudenet';
         } else if (privacyPath) {
             fallbackModelType = 'legacy';
+        } else {
+            // NudeNet is the first-use download path when nothing is on disk yet.
+            fallbackModelType = 'nudenet';
         }
     }
 
@@ -132,7 +135,7 @@ function maybeWarnNudenetColdStart(modelType) {
         censorT(
             'censor.nudenetFirstUseDownload',
             null,
-            'First NudeNet run downloads its model (~2 min). It may look stuck — please wait.'
+            'First NudeNet run downloads its model (~12 MB) and shows install progress.'
         ),
         'info'
     );
@@ -202,6 +205,26 @@ async function resolveQuickAutoCensorExecutionPlan(options = {}) {
             ok: false,
             message: censorT('censor.quickTargetRequired', null, 'Select at least one quick privacy target first.'),
         };
+    }
+
+    if ((modelType === 'nudenet' || modelType === 'both') && typeof window.ensureFeatureModel === 'function') {
+        const ensured = await window.ensureFeatureModel('censor-nudenet', {
+            label: 'NudeNet',
+            sizeHint: '~12 MB',
+            confirmBytes: 0,
+        });
+        if (!ensured.ok) {
+            return {
+                ok: false,
+                message: censorT(
+                    'censor.nudenetInstallFailed',
+                    null,
+                    'NudeNet could not be installed. Open Setup / Download, or try Detect again.'
+                ),
+            };
+        }
+        CensorState.backendModelStatus = null;
+        await loadCensorModelStatus();
     }
 
     return {

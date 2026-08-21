@@ -304,8 +304,8 @@ async def compare_images(
     summary="Nearest images to one image",
     description="""
 Return the top-K most similar images to a given image (highest cosine first, no
-threshold), ANN-accelerated. Useful for a one-click "find this image's
-near-duplicates / closest matches" action.
+threshold). Uses the optional hnswlib ANN index when it is installed and
+`SD_SIMILARITY_DISABLE_ANN` is not set; otherwise ranks exactly.
     """,
 )
 async def near_images(

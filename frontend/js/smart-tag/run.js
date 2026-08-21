@@ -255,6 +255,44 @@
             }
         }
 
+        if (typeof window.ensureFeatureModel === 'function') {
+            const specs = [];
+            if (form.enable_wd14) {
+                const names = form.taggers
+                    ? form.taggers.map((item) => item.model)
+                    : (form.tagger_model ? [form.tagger_model] : ['wd-swinv2-tagger-v3']);
+                for (const name of names) {
+                    if (typeof window.prepareSpecForTagger === 'function') {
+                        specs.push(window.prepareSpecForTagger(name));
+                    }
+                }
+            }
+            if (form.enable_vlm && form.natural_language_mode === 'florence2') {
+                specs.push({
+                    modelId: 'florence2',
+                    label: 'Florence-2 Base',
+                    sizeHint: '~465 MB',
+                    confirmBytes: 0,
+                });
+            }
+            if (form.enable_vlm && form.natural_language_mode === 'toriigate') {
+                specs.push({
+                    modelId: 'toriigate',
+                    label: 'ToriiGate 0.5',
+                    sizeHint: '~9.6 GB',
+                    confirmBytes: 9.6 * 1024 * 1024 * 1024,
+                });
+            }
+            const seen = new Set();
+            for (const spec of specs) {
+                const key = `${spec.modelId}:${spec.variant || ''}`;
+                if (seen.has(key)) continue;
+                seen.add(key);
+                const ensured = await window.ensureFeatureModel(spec.modelId, spec);
+                if (!ensured.ok) return;
+            }
+        }
+
         showProgress(true);
         setProgressUI({ percent: 0, text: 'Starting...', preview: '' });
         try {

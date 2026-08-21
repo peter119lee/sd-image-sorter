@@ -66,7 +66,7 @@ const OnboardingTour = (function() {
                     <li>CLIP for similar image search</li>
                     <li>NudeNet / YOLO for censor detection</li>
                 </ul>
-                <p>Models download on first use. Some need a restart after install.</p>`,
+                <p>Open Model Center and Prepare the models you need. Some installs require a restart.</p>`,
             target: '#btn-open-model-manager',
             position: 'bottom'
         },
@@ -75,7 +75,7 @@ const OnboardingTour = (function() {
             title: 'You\'re All Set!',
             content: `<p>The fastest way to start:</p>
                 <p><button type="button" class="btn btn-primary" data-onboarding-action="quickstart"><svg class="icon" aria-hidden="true"><use href="#i-zap"/></svg> Quick Start — choose a folder to scan</button></p>
-                <p class="helper-text">This opens the import dialog. After scanning, click <strong><svg class="icon" aria-hidden="true"><use href="#i-tag"/></svg> Tag</strong> to auto-tag with <strong>wd-swinv2</strong> — the balanced, recommended model, already selected for you.</p>
+                <p class="helper-text">This opens the import dialog. After scanning, open Model Center and Prepare WD14, then click <strong><svg class="icon" aria-hidden="true"><use href="#i-tag"/></svg> Tag</strong> to auto-tag with <strong>wd-swinv2</strong> — the balanced, recommended model.</p>
                 <p>Or click anywhere outside this dialog to explore on your own.</p>`,
             target: null,
             position: 'center'
@@ -109,7 +109,7 @@ const OnboardingTour = (function() {
                     <li><strong>找相似</strong> - CLIP 视觉相似 &amp; 查重</li>
                     <li><strong>数据集</strong> - 制作 LoRA 训练集（caption + 导出）</li>
                 </ul>
-                <p>更多工具（提示词助手、画风识别）在 <strong>更多 ▾</strong> 菜单里。</p>`,
+                <p>提示词助手和画风识别在空间足够时直接显示，窄屏时收进 <strong>更多 ▾</strong>。</p>`,
             target: '.nav-tabs',
             position: 'bottom'
         },
@@ -134,7 +134,7 @@ const OnboardingTour = (function() {
                     <li>CLIP 相似图搜索模型</li>
                     <li>NudeNet / YOLO 打码检测模型</li>
                 </ul>
-                <p>模型首次使用时下载。部分功能安装后需要重启。</p>`,
+                <p>到模型中心准备你需要的模型。部分功能安装后需要重启。</p>`,
             target: '#btn-open-model-manager',
             position: 'bottom'
         },
@@ -143,7 +143,7 @@ const OnboardingTour = (function() {
             title: '准备就绪！',
             content: `<p>最快的上手方式：</p>
                 <p><button type="button" class="btn btn-primary" data-onboarding-action="quickstart"><svg class="icon" aria-hidden="true"><use href="#i-zap"/></svg> 快速开始 — 选择要扫描的文件夹</button></p>
-                <p class="helper-text">这会打开导入对话框。扫描完后点 <strong><svg class="icon" aria-hidden="true"><use href="#i-tag"/></svg> 打标</strong>，即可用 <strong>wd-swinv2</strong>（已为你选好的均衡推荐模型）自动打标。</p>
+                <p class="helper-text">这会打开导入对话框。扫描完后先到模型中心准备 WD14，再点 <strong><svg class="icon" aria-hidden="true"><use href="#i-tag"/></svg> 打标</strong>，即可用 <strong>wd-swinv2</strong>（已为你选好的均衡推荐模型）自动打标。</p>
                 <p>或点击对话框外任意位置，自行探索。</p>`,
             target: null,
             position: 'center'

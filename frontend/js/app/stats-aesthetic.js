@@ -180,12 +180,12 @@ function renderAestheticUi(state) {
         cancelButton.disabled = !state.running;
     }
 
-    if (!_aestheticStatus.available) {
-        const unavailableTitle = _aestheticStatus.message || t('gallery.aestheticUnavailable', 'Aesthetic scoring is unavailable');
+    if (!_aestheticStatus.available && !busy) {
+        const installTitle = t('gallery.aestheticInstallOnUse', 'First use downloads aesthetic scoring (about 1.7 GB) and shows progress.');
         for (const startButton of startButtons) {
-            startButton.disabled = true;
-            startButton.title = unavailableTitle;
-            startButton.setAttribute('aria-label', unavailableTitle);
+            startButton.disabled = false;
+            startButton.title = installTitle;
+            startButton.setAttribute('aria-label', installTitle);
         }
         for (const cancelButton of cancelButtons) {
             cancelButton.style.display = 'none';
@@ -194,8 +194,8 @@ function renderAestheticUi(state) {
         if (chip) {
             chip.style.display = 'inline-flex';
             chip.className = 'tagger-aesthetic-status is-warning';
-            chip.textContent = t('gallery.aestheticUnavailableShort', 'Aesthetic unavailable');
-            chip.title = unavailableTitle;
+            chip.textContent = t('gallery.aestheticInstallShort', 'Downloads on first use');
+            chip.title = installTitle;
         }
         return;
     }
@@ -388,6 +388,15 @@ async function pollAestheticProgress() {
 
 async function startAestheticScoring(force = false) {
     if (_aestheticStartRequestPending) return;
+    if (typeof window.ensureFeatureModel === 'function') {
+        const ensured = await window.ensureFeatureModel('aesthetic', {
+            label: appT('gallery.aestheticModelName', 'Aesthetic scoring'),
+            sizeHint: '~1.7 GB',
+            confirmBytes: 1.7 * 1024 * 1024 * 1024,
+        });
+        if (!ensured.ok) return;
+        await refreshAestheticStatus();
+    }
     if (!_aestheticStatus.available) {
         updateAestheticUi({ running: false, starting: false, completed: 0, total: 0 });
         showToast(_aestheticStatus.message || appT('gallery.aestheticUnavailable', 'Aesthetic scoring is unavailable'), 'warning');

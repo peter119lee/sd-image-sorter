@@ -44,8 +44,11 @@ def _build_inventory(health: Dict[str, Any]) -> List[Dict[str, Any]]:
     florence2 = health.get("florence2", {})
     cl_tagger_v2 = health.get("cl_tagger_v2", {})
     installed_wd14 = [item["name"] for item in health["wd14"]["installed_models"] if item["available"]]
+    wd14_default_ready = bool(health["wd14"].get("available"))
     wd14_primary_path = None
-    if installed_wd14:
+    if wd14_default_ready and health["wd14"].get("model_path"):
+        wd14_primary_path = health["wd14"]["model_path"]
+    elif installed_wd14:
         first_variant = installed_wd14[0]
         wd14_primary_path = str(
             (Path(_svc().get_wd14_model_dir()) / first_variant / _svc().TAGGER_MODELS[first_variant]["model_file"]).resolve()
@@ -85,7 +88,8 @@ def _build_inventory(health: Dict[str, Any]) -> List[Dict[str, Any]]:
     elif aesthetic_head_exists:
         aesthetic_message = (
             "Aesthetic linear head is present, but the CLIP backbone or runtime is missing. "
-            "Run Prepare / Download; first scoring will not download silently."
+            "Run Prepare / Download (~1.7 GB CLIP ViT-L/14 + head). "
+            "Scoring may still fetch missing files from Hugging Face."
         )
 
     def with_status(*, is_ready: bool, is_downloaded: bool) -> Dict[str, str]:
@@ -94,13 +98,13 @@ def _build_inventory(health: Dict[str, Any]) -> List[Dict[str, Any]]:
         return {"status": "missing", "status_label": "Missing"}
 
     # -- WD14 --
-    if installed_wd14:
+    if wd14_default_ready:
         wd14_message_key = "models.wd14.readyCount"
         wd14_message = f"{len(installed_wd14)} WD14 variant(s) are ready."
         wd14_message_params = {"count": len(installed_wd14)}
     else:
         wd14_message_key = "models.wd14.missing"
-        wd14_message = "WD14 model files are missing and can be downloaded on demand."
+        wd14_message = "Default WD14 files (wd-swinv2-tagger-v3) are missing. Run Prepare / Download."
         wd14_message_params = {}
 
     # -- ToriiGate --
@@ -243,8 +247,8 @@ def _build_inventory(health: Dict[str, Any]) -> List[Dict[str, Any]]:
             "name": "WD14 Tagger",
             "group": "Tagging",
             "group_key": "models.group.tagging",
-            "available": bool(installed_wd14),
-            **with_status(is_ready=bool(installed_wd14), is_downloaded=bool(installed_wd14)),
+            "available": wd14_default_ready,
+            **with_status(is_ready=wd14_default_ready, is_downloaded=bool(installed_wd14) or wd14_default_ready),
             "message": wd14_message,
             "message_key": wd14_message_key,
             "message_params": wd14_message_params,
@@ -268,28 +272,28 @@ def _build_inventory(health: Dict[str, Any]) -> List[Dict[str, Any]]:
         {
             "id": "toriigate",
             "name": "ToriiGate 0.5",
-            "group": "Tagging",
-            "group_key": "models.group.tagging",
+            "group": "Captioning",
+            "group_key": "models.group.captioning",
             "available": toriigate_available,
             **with_status(
                 is_ready=toriigate_available,
                 is_downloaded=bool(Path(toriigate_dir).joinpath("config.json").exists()),
             ),
-            "message": toriigate.get("message") or "ToriiGate files are not downloaded yet. The first run will need a large model download.",
+            "message": toriigate.get("message") or "ToriiGate captioner files are not downloaded yet. Run Prepare / Download (~9.6 GB BF16).",
             "message_key": "models.toriigate.ready" if toriigate_available else "models.toriigate.missing",
             "path": toriigate_dir,
             "download_supported": True,
             "setup_steps": [
                 "Click Prepare / Download to install the PyTorch/Transformers runtime if missing.",
                 "Restart SD Image Sorter if the Prepare result says Python packages were installed.",
-                "Click Prepare / Download again to download the ToriiGate model files (~5 GB) if they are not present.",
+                "Click Prepare / Download again to download the ToriiGate captioner files (~9.6 GB BF16) if they are not present.",
             ],
         },
         {
             "id": "florence2",
             "name": "Florence-2 Base",
-            "group": "Tagging",
-            "group_key": "models.group.tagging",
+            "group": "Captioning",
+            "group_key": "models.group.captioning",
             "available": bool(florence2.get("available")),
             **with_status(
                 is_ready=bool(florence2.get("available")),

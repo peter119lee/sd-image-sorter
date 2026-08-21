@@ -4,6 +4,8 @@ import importlib.util
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 
 def _load_security_check():
     script_path = Path(__file__).resolve().parents[2] / "scripts" / "security_check.py"
@@ -98,3 +100,42 @@ def test_create_pip_audit_venv_falls_back_to_without_pip_system_site_packages(mo
         "--system-site-packages",
         str(tmp_path / "venv"),
     ]]
+
+
+def test_main_runs_secret_scan_and_skips_pip_audit_on_a_leak(monkeypatch):
+    security_check = _load_security_check()
+    monkeypatch.setattr(
+        security_check,
+        "find_live_secrets",
+        lambda _root: ["tests/e2e/round2_real_api.spec.js"],
+    )
+    monkeypatch.setattr(
+        security_check,
+        "ensure_pip_audit_runner",
+        lambda: (_ for _ in ()).throw(AssertionError("must not install pip-audit after a leak")),
+    )
+    monkeypatch.setattr(
+        security_check,
+        "run_pip_audit",
+        lambda *_args: (_ for _ in ()).throw(AssertionError("must not audit after a leak")),
+    )
+
+    with pytest.raises(SystemExit) as exited:
+        security_check.main()
+    assert exited.value.code == 1
+
+
+def test_find_live_secrets_flags_github_and_hf_tokens(tmp_path: Path, monkeypatch):
+    security_check = _load_security_check()
+    planted = tmp_path / "leaked.env"
+    github_token = "ghp_" + ("a" * 36)
+    hf_token = "hf_" + ("b" * 24)
+    planted.write_text(
+        f"GITHUB_TOKEN={github_token}\nHF_TOKEN={hf_token}\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(security_check, "_tracked_text_files", lambda _root: [planted])
+
+    leaks = security_check.find_live_secrets(tmp_path)
+    assert any("ghp_" in item for item in leaks)
+    assert any("hf_" in item for item in leaks)

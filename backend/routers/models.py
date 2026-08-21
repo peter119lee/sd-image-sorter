@@ -99,11 +99,13 @@ async def get_models_status(service: ModelService = Depends(get_model_service)):
     return service.get_status()
 
 
-# Models exposed by the selectable bulk-download flow.  The eight recommended
-# entries provide at least one prepared model for every core feature; optional
-# alternatives remain available on their individual cards.  ``cl-tagger-v2``
-# is selectable but not preselected because Hugging Face terms/token access are
-# user-specific.  Estimates are compressed/download sizes, not VRAM usage.
+# Models exposed by the selectable bulk-download flow.  The seven recommended
+# entries provide at least one prepared model for tagging, similarity, scoring,
+# artist ID, captions, training masks, and NudeNet; optional alternatives
+# (including SAM3 refinement) remain available on their individual cards.
+# ``cl-tagger-v2`` is selectable but not preselected because Hugging Face
+# terms/token access are user-specific.  Estimates are compressed/download
+# sizes, not VRAM usage.
 BULK_MODEL_BUNDLE: list[dict[str, object]] = [
     {
         "id": "wd14",
@@ -127,7 +129,7 @@ BULK_MODEL_BUNDLE: list[dict[str, object]] = [
     {
         "id": "clip",
         "size_bytes": 600 * 1024 * 1024,
-        "label": "CLIP ViT-B/32 vision + text (similarity search)",
+        "label": "CLIP ViT-B/32 vision + text (similarity search, ~580 MB pair)",
         "feature_key": "similarity",
         "recommended": True,
         "default_selected": True,
@@ -154,10 +156,10 @@ BULK_MODEL_BUNDLE: list[dict[str, object]] = [
     {
         "id": "sam3",
         "size_bytes": int(3.3 * 1024 * 1024 * 1024),
-        "label": "SAM 3 (text-guided segmentation)",
+        "label": "SAM 3 (optional mask refinement)",
         "feature_key": "segmentation",
-        "recommended": True,
-        "default_selected": True,
+        "recommended": False,
+        "default_selected": False,
         "restart_after_install": True,
     },
     {
@@ -254,7 +256,7 @@ async def get_bulk_bundle(service: ModelService = Depends(get_model_service)):
         ),
         "excluded": [
             {"id": "censor-legacy", "reason": "Privacy YOLO (Wenaka2004) is opt-in for content-safety reasons."},
-            {"id": "toriigate", "reason": "ToriiGate VLM is a ~5 GB alternative tagger; the default WD14 already covers tagging."},
+            {"id": "toriigate", "reason": "ToriiGate is a ~9.6 GB BF16 captioner, not a gallery tagger; Florence-2 already covers local captions."},
             {"id": "oppai-oracle", "reason": "OppaiOracle V1.1 is a ~947 MB alternative tagger; the default WD14 already covers tagging."},
         ],
     }

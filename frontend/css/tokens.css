@@ -1,10 +1,11 @@
 /* ==========================================================================
-   "Graphite" Design Tokens — the single source of truth for the whole app.
+   "Graphite" Design Tokens — cascade override loaded LAST.
 
-   This file is loaded LAST in index.html. Every other sheet (styles.css,
-   ui-refresh.css, and the per-feature sheets) consumes the legacy token names
-   remapped at the bottom of this :root block, so the entire application
-   reskins from here. Do not add a competing palette anywhere else.
+   This file is loaded LAST in index.html so its :root values win. It is an
+   override layer, not a cleaned source of truth: styles.css and
+   ui-refresh.css still hold hardcoded colors, radii, and line-heights.
+   Deleting those rules because "tokens.css is authoritative" will break the
+   design. Do not add a competing palette anywhere else.
 
    Design register: a professional local desktop utility, not a web landing
    page. The rules that define it:

@@ -2521,14 +2521,41 @@ def test_artist_copy_no_longer_tells_users_to_lower_the_threshold():
     assert "Lower the threshold" not in family
 
     for pack_name, source in packs.items():
-        for key in ("artist.startStep2Title", "artist.startStep2Text"):
+        for key in (
+            "artist.startStep2Title",
+            "artist.startStep2Text",
+            "guide.artistNote",
+            "guide.artistStep1Text",
+        ):
             match = re.search(
                 rf"^\s*'{re.escape(key)}'\s*:\s*'(?P<value>[^']*)'", source, re.MULTILINE
             )
             assert match is not None, f"{pack_name} is missing {key}"
-            assert "0.02" not in match.group("value"), (
+            value = match.group("value")
+            assert "0.02" not in value, (
                 f"{pack_name}:{key} still recommends the obsolete low-threshold band"
             )
+            assert "0.03" not in value, (
+                f"{pack_name}:{key} still recommends starting at 0.03"
+            )
+            lowered = value.lower()
+            assert "lower the threshold" not in lowered
+            assert "降低阈值" not in value
+
+    extra_sources = {
+        "guide-translations.js": (
+            repo_root / "frontend" / "js" / "guide-translations.js"
+        ).read_text(encoding="utf-8"),
+        "guide/copy.js": (repo_root / "frontend" / "js" / "guide" / "copy.js").read_text(
+            encoding="utf-8"
+        ),
+    }
+    for name, source in extra_sources.items():
+        lowered = source.lower()
+        assert "lower the threshold" not in lowered, name
+        assert "降低阈值" not in source, name
+        assert "0.02-0.08" not in source, name
+        assert "entry.multiLibrarySoon" not in source
 
 
 # Every job whose cancel publishes a non-terminal ``cancelling`` state that only
@@ -2840,7 +2867,7 @@ def test_autocomplete_accept_inserts_character_copyright():
     ).read_text(encoding="utf-8")
     assert "function tokensToInsert" in autocomplete
     assert "tokensToInsert," in autocomplete
-    assert "suggestion.copyright" in autocomplete
+    assert "suggestion && suggestion.copyright" in autocomplete or "suggestion.copyright" in autocomplete
     dataset = (
         repo_root / "frontend" / "js" / "dataset" / "tag-autocomplete.js"
     ).read_text(encoding="utf-8")

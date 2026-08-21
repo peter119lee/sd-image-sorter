@@ -16,7 +16,7 @@ Focus areas (per the decomposition campaign):
                             stay one level under ``backend/``).
   * download safety caps  — zip entry count / uncompressed bytes / traversal /
                             URL scheme / pinned SHA-256 digests.
-  * error paths           — placeholder mode, honest-refusal, threshold gating,
+  * error paths           — leftover placeholder sentinel, honest-refusal, threshold gating,
                             CSV validation.
 
 No existing file is modified by this task.
@@ -308,7 +308,8 @@ class TestSingletonLifecycle:
         assert identifiers[0] is identifiers[1]
         assert counts == {"constructed": 1}
 
-    def test_placeholder_singleton_is_rebuilt_for_retry(self, monkeypatch):
+    def test_leftover_placeholder_sentinel_reuses_the_singleton(self, monkeypatch):
+        """Production load() no longer writes this sentinel; leftover state retries on the same instance."""
         failed = ai.ArtistIdentifier(
             model_source="huggingface",
             threshold=0.03,
@@ -325,8 +326,8 @@ class TestSingletonLifecycle:
             use_gpu=False,
         )
 
-        assert retry is not failed
-        assert retry._model is None
+        assert retry is failed
+        assert retry._model == "placeholder"
 
     def test_concurrent_config_switch_returns_each_selected_identifier(self, monkeypatch):
         class ConfiguredIdentifier:
@@ -419,20 +420,31 @@ class TestSingletonLifecycle:
 # 6. identify() error / refusal / threshold paths (no real model)
 # --------------------------------------------------------------------------- #
 class TestIdentifyPaths:
-    def test_placeholder_mode_returns_error_without_loading(self, tmp_path):
+    def test_leftover_placeholder_sentinel_refuses_without_inventing_a_name(self, tmp_path, monkeypatch):
         img = _tiny_png(tmp_path / "a.png")
         ident = ai.ArtistIdentifier()
-        ident._model = "placeholder"  # load() no-ops because _model is not None
+        ident._model = "placeholder"  # leftover sentinel; production load() no longer writes this
+        monkeypatch.setattr(
+            ident,
+            "_load_from_huggingface",
+            lambda: ident._mark_load_failed("still missing"),
+        )
         result = ident.identify(img)
+        assert ident._model is None
         assert result["artist"] == "undefined"
         assert result["model_loaded"] is False
         assert "error" in result
 
-    def test_placeholder_mode_surfaces_load_error_message(self, tmp_path):
+    def test_leftover_placeholder_sentinel_surfaces_stored_load_error(self, tmp_path, monkeypatch):
         img = _tiny_png(tmp_path / "a.png")
         ident = ai.ArtistIdentifier()
         ident._model = "placeholder"
         ident._load_error = "boom detail"
+        monkeypatch.setattr(
+            ident,
+            "_load_from_huggingface",
+            lambda: ident._mark_load_failed("boom detail"),
+        )
         assert ident.identify(img)["error"] == "boom detail"
 
     def test_honest_refusal_when_no_class_mapping(self, tmp_path):

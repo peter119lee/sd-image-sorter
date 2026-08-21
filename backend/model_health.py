@@ -457,7 +457,10 @@ def get_model_health() -> Dict[str, Any]:
         artist_missing.append("timm")
     artist_triton_available = _module_installed("triton")
     artist_hf_available = _module_installed("huggingface_hub")
-    artist_ms_available = _module_installed("modelscope")
+    # Kaloscope ModelScope files are fetched over HTTPS + SHA-256. The
+    # modelscope SDK is not required, so hiding that source when the SDK
+    # is absent would claim a real download path does not exist.
+    artist_ms_available = True
     artist_has_any_source = True
 
     yolo_files = _list_yolo_model_files(Path(get_yolo_model_dir()))
@@ -494,6 +497,7 @@ def get_model_health() -> Dict[str, Any]:
                     "available": not missing_files,
                 }
                 for model_name, config in TAGGER_MODELS.items()
+                if str(config.get("writer_family") or "").strip().lower() == "wd14"
                 for missing_files in (
                     missing_model_artifacts(
                         _tagger_model_root(config) / model_name,
@@ -667,7 +671,7 @@ def get_model_health() -> Dict[str, Any]:
                     "NudeNet runtime is ready."
                     if _module_installed("nudenet") and not nudenet_missing
                     else (
-                        "NudeNet runtime is installed. The detector can still prepare/download its model on first use."
+                        "NudeNet runtime is installed, but 320n.onnx is missing. Run Prepare / Download."
                         if _module_installed("nudenet")
                         else "NudeNet runtime is not installed yet."
                     )
@@ -721,12 +725,12 @@ def get_model_health() -> Dict[str, Any]:
                     "class_scope": "open-text",
                     "class_scope_label": "Prompt-guided segmentation",
                     "input_mode_label": "Text prompt or box prompt",
-                    "output_mode_label": "Pixel-accurate masks",
+                    "output_mode_label": "Optional mask refinement",
                     "supports_text_prompt": True,
                     "supports_mask_output": True,
                     "recommended_user_level": "pro",
-                    "best_for": "Precise mask refinement and advanced text-guided segmentation",
-                    "plain_english": "This is the precise tool for pro users. It can refine a box or follow a text prompt, but the current runtime is GPU-only.",
+                    "best_for": "Optional box/text mask refinement after NudeNet or YOLO",
+                    "plain_english": "Optional CUDA refinement. Recall is weaker than NudeNet/YOLO; do not treat it as the main detector.",
                 },
             },
         },
@@ -803,8 +807,9 @@ def format_model_health_report(health: Optional[Dict[str, Any]] = None) -> str:
         )
 
     nudenet = health["censor"]["nudenet"]
+    nudenet_ok = bool(nudenet.get("available") and nudenet.get("model_downloaded"))
     lines.append(
-        f"[{'OK' if nudenet['available'] else 'WARN'}] NudeNet: {nudenet['message']}"
+        f"[{'OK' if nudenet_ok else 'WARN'}] NudeNet: {nudenet['message']}"
     )
 
     sam3 = health["censor"]["sam3"]
@@ -890,11 +895,11 @@ def get_startup_readiness(
             "detail": "The default WD14 files are not ready yet.",
         }
 
-    if clip["available"]:
+    if clip.get("feature_ready"):
         similarity_status = {
             "level": "ready",
             "headline": "Similar search: ready",
-            "detail": "Local CLIP model and runtime are available.",
+            "detail": "Local CLIP vision and text models are available.",
         }
     else:
         similarity_status = {
@@ -903,11 +908,12 @@ def get_startup_readiness(
             "detail": clip["message"],
         }
 
-    if legacy["available"] or nudenet["available"]:
+    nudenet_ready = bool(nudenet.get("available") and nudenet.get("model_downloaded"))
+    if legacy["available"] or nudenet_ready:
         detail_parts = []
         if legacy["available"]:
             detail_parts.append("Privacy YOLO ready")
-        if nudenet["available"]:
+        if nudenet_ready:
             detail_parts.append("NudeNet ready")
         censor_status = {
             "level": "ready",

@@ -148,7 +148,6 @@ def test_recommended_model_ids_is_frozenset_with_exact_members():
             "clip",
             "aesthetic",
             "artist",
-            "sam3",
             "florence2",
             "lucida",
         }
@@ -685,6 +684,26 @@ def test_inventory_wd14_surfaces_default_variant_from_health(monkeypatch):
     wd14 = next(item for item in inventory if item["id"] == "wd14")
 
     assert wd14["default_variant"] == "wd-swinv2-tagger-v3"
+
+
+def test_inventory_wd14_ready_requires_default_swinv2(monkeypatch):
+    health = _base_health()
+    health["wd14"] = {
+        "available": False,
+        "model_path": None,
+        "default_model": "wd-swinv2-tagger-v3",
+        "installed_models": [
+            {"name": "wd-eva02-large-tagger-v3", "available": True},
+        ],
+    }
+    monkeypatch.setattr(model_service, "get_model_health", lambda: health)
+
+    inventory = model_service.ModelService().build_model_inventory()
+    wd14 = next(item for item in inventory if item["id"] == "wd14")
+
+    assert wd14["available"] is False
+    assert wd14["status"] == "missing"
+    assert wd14["installed_variants"] == ["wd-eva02-large-tagger-v3"]
 
 
 def test_inventory_includes_oppai_oracle_as_non_recommended(monkeypatch):

@@ -14,8 +14,7 @@ Object.assign(window.ArtistIdent, {
         if (!identifySelectedBtn) return;
 
         const hasSelection = this._getExplicitGallerySelectionIds().length > 0;
-        const isAvailable = this.diagnostics ? this.diagnostics.available !== false : true;
-        const disabled = this.isIdentifying || !hasSelection || !isAvailable;
+        const disabled = this.isIdentifying || !hasSelection;
 
         identifySelectedBtn.disabled = disabled;
         identifySelectedBtn.setAttribute('aria-disabled', String(disabled));
@@ -25,12 +24,6 @@ Object.assign(window.ArtistIdent, {
             identifySelectedBtn.title = this.tText(
                 'Artist identification is already running',
                 '画师识别已经在运行中'
-            );
-        } else if (!isAvailable) {
-            identifySelectedBtn.dataset.dynamicTitle = 'true';
-            identifySelectedBtn.title = this.tText(
-                'Finish the setup in the status card above before identifying images.',
-                '请先按上方状态卡完成准备，再开始识别。'
             );
         } else if (!hasSelection) {
             identifySelectedBtn.dataset.dynamicTitle = 'true';
@@ -45,24 +38,17 @@ Object.assign(window.ArtistIdent, {
     },
 
     refreshAvailabilityState() {
-        const isAvailable = this.diagnostics ? this.diagnostics.available !== false : true;
         const identifyAllBtn = document.getElementById('btn-identify-all');
         const clearDataBtn = document.getElementById('btn-clear-artist-data');
         const controls = document.querySelector('#view-artist .artist-controls');
 
-        controls?.classList.toggle('is-disabled', !isAvailable);
+        controls?.classList.remove('is-disabled');
 
         if (identifyAllBtn) {
-            const disabled = this.isIdentifying || !isAvailable;
+            const disabled = this.isIdentifying;
             identifyAllBtn.disabled = disabled;
             identifyAllBtn.setAttribute('aria-disabled', String(disabled));
-            if (!isAvailable) {
-                identifyAllBtn.dataset.dynamicTitle = 'true';
-                identifyAllBtn.title = this.tText(
-                    'Finish the setup in the status card above before identifying images.',
-                    '请先按上方状态卡完成准备，再开始识别。'
-                );
-            } else if (!this.isIdentifying) {
+            if (!this.isIdentifying) {
                 delete identifyAllBtn.dataset.dynamicTitle;
                 identifyAllBtn.removeAttribute('title');
             }
@@ -101,15 +87,15 @@ Object.assign(window.ArtistIdent, {
 
             const title = result.available
                 ? this.tText('Style Finder is ready', '画师识别已就绪')
-                : this.tText('Style Finder needs setup first', '画师识别还需要先完成准备');
+                : this.tText('Style Finder downloads on first use', '第一次识别时会下载画师模型');
             const summary = result.available
                 ? this.tText(
                     'You can start identification now, then review the strongest matches in the center panel.',
                     '现在可以开始识别，然后在中间结果区查看最强匹配。'
                 )
                 : this.tText(
-                    'Finish the missing runtime or model setup first. Do not start a full library run before it is ready.',
-                    '先补齐缺少的运行环境或模型，再回来开始识别。不要在没准备好时直接跑整库。'
+                    'Click Identify to download Kaloscope (about 2.8 GB) with a progress overlay. You can also open Setup / Download.',
+                    '点「识别」会下载 Kaloscope（约 2.8 GB）并显示安装进度。也可以打开设置 / 下载。'
                 );
             const detailItems = [];
             if (result.message) detailItems.push(this.localizeDiagnosticsMessage(result.message));
@@ -145,7 +131,7 @@ Object.assign(window.ArtistIdent, {
             banner.className = 'model-health-banner is-visible model-health-banner-warning';
             banner.innerHTML = `
                 <div class="model-health-copy">
-                    <span class="model-health-title">${this._escapeHtml(this.tText('Style Finder needs setup first', '画师识别还需要先完成准备'))}</span>
+                    <span class="model-health-title">${this._escapeHtml(this.tText('Style Finder downloads on first use', '第一次识别时会下载画师模型'))}</span>
                     <span>${this._escapeHtml(this.tText('Artist runtime status could not be loaded.', '画师识别运行状态无法加载。'))}</span>
                     <button type="button" class="btn btn-secondary btn-small model-health-setup-btn" data-action="open-model-guidance">
                         <svg class="icon" aria-hidden="true"><use href="#i-settings"/></svg> ${this._escapeHtml(this.tText('Open Setup / Download', '打开设置 / 下载模型'))}

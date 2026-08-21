@@ -2,8 +2,12 @@
 """
 Security check script for SD Image Sorter.
 
-Runs dependency vulnerability scanning using pip-audit so the check works
-without an external Safety login session.
+Runs two blocking gates:
+
+1. A working-tree secret scan of git-tracked text files. This does not walk
+   git history, because a revoked key can still live in old commits and we
+   do not rewrite public history for that.
+2. pip-audit over the fully resolved dependency tree.
 
 Usage:
     python scripts/security_check.py
@@ -16,6 +20,7 @@ Exit codes:
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -63,6 +68,63 @@ IGNORED_VULN_IDS: tuple[str, ...] = (
     # Remove when a fixed torch version compatible with the CUDA runtime ships.
     "CVE-2025-3000",
 )
+
+# Working-tree only. 20+ chars after the prefix ignores documented fixtures
+# such as sk-should-not-appear and sk-abcdefgh-secret.
+LIVE_SECRET_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
+    ("sk-", re.compile(r"sk-[A-Za-z0-9]{20,}")),
+    ("ghp_", re.compile(r"ghp_[A-Za-z0-9]{20,}")),
+    ("github_pat_", re.compile(r"github_pat_[A-Za-z0-9_]{20,}")),
+    ("hf_", re.compile(r"hf_[A-Za-z0-9]{20,}")),
+    ("AIza", re.compile(r"AIza[0-9A-Za-z_-]{20,}")),
+)
+_SECRET_SKIP_SUFFIXES = {
+    ".gif",
+    ".jpeg",
+    ".jpg",
+    ".onnx",
+    ".png",
+    ".pt",
+    ".safetensors",
+    ".webp",
+    ".woff",
+    ".woff2",
+}
+
+
+def _tracked_text_files(repo_root: Path) -> list[Path]:
+    """Return git-tracked files that are worth scanning as text."""
+    result = subprocess.run(
+        ["git", "ls-files"],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"git ls-files failed: {result.stderr.strip()}")
+    files: list[Path] = []
+    for relative in result.stdout.splitlines():
+        path = repo_root / relative
+        if path.suffix.lower() in _SECRET_SKIP_SUFFIXES or not path.is_file():
+            continue
+        files.append(path)
+    return files
+
+
+def find_live_secrets(repo_root: Path) -> list[str]:
+    """Return 'path: prefix' hits for live-looking tokens in tracked text."""
+    leaks: list[str] = []
+    for path in _tracked_text_files(repo_root):
+        try:
+            text = path.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            continue
+        relative = path.relative_to(repo_root).as_posix()
+        for prefix, pattern in LIVE_SECRET_PATTERNS:
+            if pattern.search(text):
+                leaks.append(f"{relative}: {prefix}")
+    return leaks
 
 
 def _python_has_pip_audit(python_executable: str) -> bool:
@@ -184,6 +246,17 @@ def main() -> None:
     if not os.path.exists(requirements_path):
         print(f"ERROR: Requirements file not found: {requirements_path}")
         sys.exit(1)
+
+    print("=" * 60)
+    print("SD Image Sorter - Secret scan (tracked files, not git history)")
+    print("=" * 60)
+    leaks = find_live_secrets(Path(project_root))
+    if leaks:
+        print("ERROR: tracked files embed a live-looking secret. Use an env var.")
+        for leak in leaks:
+            print(f"  {leak}")
+        sys.exit(1)
+    print("SUCCESS: no live-looking secrets in tracked text files")
 
     audit_python = ensure_pip_audit_runner()
     if audit_python is None:

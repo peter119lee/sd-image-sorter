@@ -414,7 +414,7 @@ async function mockTaggerCatalog(page: Page) {
           },
           {
             name: 'toriigate-0.5',
-            description: 'Large multimodal tagger for harder anime images.',
+            description: 'Large multimodal captioner for natural-language descriptions of anime images.',
             best_for: 'Harder anime images',
             speed: 1,
             memory: 5,

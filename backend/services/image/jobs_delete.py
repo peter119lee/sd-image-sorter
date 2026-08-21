@@ -74,12 +74,9 @@ class DeleteJobsMixin:
 
 
     # ------------------------------------------------------------------
-    # v3.3.2 Phase-1: background "delete selected" job. Cloned 1:1 from the
-    # sorting-service move job (start_move_job / get_move_progress /
-    # cancel_move / reset_move_progress / _set_move_progress_if_current /
-    # _update_move_progress_if_current). Delete-ONLY for now; it is the concrete
-    # template for backgrounding remove/export in a later slice (no generic job
-    # abstraction yet, by design).
+    # v3.3.2 Phase-1: background "delete selected" job. Cloned from the
+    # sorting-service move job. Gallery remove/export now use BulkJobService;
+    # this path remains delete-to-trash only.
     # ------------------------------------------------------------------
     def get_delete_progress(self) -> Dict[str, Any]:
         """Get the current gallery delete-to-trash job progress."""

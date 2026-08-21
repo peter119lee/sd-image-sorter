@@ -15,16 +15,15 @@ PATH_MAX_LENGTH = 4096
 FOLDER_KEY_MAX_LENGTH = 100
 SEARCH_MAX_LENGTH = 1000
 VALID_SORT_ACTIONS = ["move", "skip", "undo", "redo", "collect"]
-# v3.3.2 Sort & Cull Workbench: the manual-sort session is becoming mode-aware.
-# "slot" is the original WASD slot-sort and stays the default, so every existing
-# caller and persisted session keeps identical behavior. New modes (e.g. the A/B
-# "bracket" King-of-Hill) are added in later slices and registered here.
+# Manual-sort session modes. "slot" is the original WASD slot-sort and stays
+# the default so existing callers and persisted sessions keep identical behavior.
+# Bracket (A/B King-of-Hill) and cull (keep/reject) ship in the same workbench.
 SORT_MODE_SLOT = "slot"
 # v3.3.2 WB-S2: A/B "King-of-Hill" bracket mode. A champion stays on screen and
 # each remaining candidate challenges it; after N-1 comparisons a single winner
-# remains. Pure in-memory pointer logic -- no file moves (winner handling is a
-# later slice). Reuses the session's current_index as the challenger pointer and
-# adds champion_index.
+# remains. Pure in-memory pointer logic -- no file moves. The UI can save the
+# bracket winner to a collection; it does not move files. Reuses the session's
+# current_index as the challenger pointer and adds champion_index.
 SORT_MODE_BRACKET = "bracket"
 # v3.3.2 FF-1: 留/汰 Keep-Reject rapid cull. One image at a time; keep or reject
 # (or skip), with undo/redo. Non-destructive -- decisions are recorded in the

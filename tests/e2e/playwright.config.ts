@@ -296,8 +296,8 @@ export default defineConfig({
       // Keep full UI/API/database tagging coverage deterministic in CI without
       // downloading or loading 500MB+ WD14 ONNX files. Production never sets this.
       SD_IMAGE_SORTER_E2E_FAKE_TAGGER: '1',
-      // Keep artist identification UI/API/persistence coverage deterministic
-      // without loading the experimental Kaloscope runtime during Playwright.
+      // CI has no Kaloscope weights; keep UI/API/persistence deterministic.
+      // Production never sets this.
       SD_IMAGE_SORTER_E2E_FAKE_ARTIST: '1',
     },
     reuseExistingServer: process.env.PW_REUSE_SERVER === '1',
