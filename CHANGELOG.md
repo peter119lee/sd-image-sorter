@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - 在逗号分隔的标签框里选中 `hatsune_miku` 时，若词表知道作品且栏里还没有，会一并写入 `vocaloid`。下拉里会先看到作品名。Prompt Lab 插入模式只补全当前词，不会加逗号。
 
 ### Fixed / 修复
+- **Nav status chips stay icon-sized / 顶栏状态不再撑开按钮**: the AI-busy and color-analysis chips no longer expand to a 220px label that shoves Import/Tag every 1.5s. Elapsed time and percent sit on the icon; the full sentence stays in the tooltip. Filter Apply and Scan Cancel keep a reserved width so “Apply · ~1,234 images” / “Stopping...” do not resize the footer.
+  - AI 忙碌与色彩分析芯片不再拉成 220px 把「导入/打标」挤走。耗时和百分比叠在图标上，完整句子放 tooltip。筛选「应用」和扫描「取消」预留宽度，文案变长不会改按钮尺寸。
 - **Gallery chrome no longer jumps while you use it / 图库工具条不再边用边跳**: generator tab counts stay visible on every pill (instead of appearing only on the selected one). Scan/metadata status sits under the toolbar, not between the buttons. Sort stays a fixed width. Buttons no longer shrink on press, and hover on Grid/Large/Waterfall no longer looks like the selected view.
   - 生成器分页的数字一直显示，不再只在选中时冒出来把 pill 撑宽。扫描/读元数据状态改到工具条下方，不再插在按钮中间。排序下拉固定宽度。按钮按下不再缩小；网格/大图/瀑布的 hover 不再长得像已选中。
 - **Mode switches keep their size when selected / 模式开关选中不再跳位**: segmented controls no longer bold or lift the chosen option. Manual Sort Slot / Showdown / Cull, Auto-Separate vs Manual Sort, Original / Censored, caption-type (booru / both / nl), Sync zoom, and radio segmented pills keep the same font-weight and position; only color and fill change.

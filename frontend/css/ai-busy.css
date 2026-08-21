@@ -2,32 +2,38 @@
    Lives in the nav's status group next to the colour-analysis chip and follows
    the same rule: present only while there is something to report. */
 
-/* Reuses the icon-only nav button as a base, like the colour-analysis chip
-   next to it. That base is capped at 42px wide, which is why the cap has to be
-   lifted here: the job name and its elapsed time are the whole message, and a
-   clipped "WD14 tagg…" would report less than nothing. The ceiling below keeps
-   a long job label from pushing the nav's real buttons around at 1366px. */
+/* Stay the same 42px box as every other nav icon. The job name lives in
+   title/aria; only a compact elapsed badge is painted on the icon so the
+   Scan/Tag buttons do not shuffle while the timer ticks. */
 .nav-bar .nav-actions .nav-ai-busy-chip,
 .nav-actions .nav-ai-busy-chip,
 .nav-ai-busy-chip {
-    min-width: auto;
-    max-width: 220px;
-    padding-right: 10px;
-    gap: 5px;
+    position: relative;
+    min-width: 38px;
+    max-width: 42px;
+    width: 42px;
+    flex: 0 0 42px;
+    padding: 7px 10px;
+    overflow: visible;
     cursor: pointer;
 }
 
 .nav-ai-busy-chip[hidden] { display: none !important; }
 
 .nav-ai-busy-chip .nav-ai-busy-label {
-    font-size: 0.72rem;
-    font-weight: 600;
+    position: absolute;
+    left: 50%;
+    bottom: 2px;
+    transform: translateX(-50%);
+    min-width: 3ch;
+    font-size: 0.58rem;
+    font-weight: 700;
+    line-height: 1;
     color: var(--accent, #C8873C);
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    pointer-events: none;
+    text-align: center;
 }
 
 .nav-ai-busy-chip .icon {

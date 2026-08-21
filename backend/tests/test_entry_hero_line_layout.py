@@ -147,3 +147,28 @@ def test_gallery_sort_dropdown_keeps_a_fixed_width():
     joined = "\n".join(bodies)
     assert "width: 12.75rem" in joined
     assert "min-width: 100px" not in joined
+
+
+def test_nav_status_chips_stay_icon_sized():
+    busy = (ROOT / "frontend" / "css" / "ai-busy.css").read_text(encoding="utf-8")
+    color = (ROOT / "frontend" / "css" / "color-backfill.css").read_text(
+        encoding="utf-8"
+    )
+    js = (ROOT / "frontend" / "js" / "modules" / "ai-busy.js").read_text(
+        encoding="utf-8"
+    )
+    assert "max-width: 220px" not in busy
+    assert "max-width: 42px" in busy
+    assert "position: absolute" in busy
+    assert "max-width: 42px" in color
+    assert "position: absolute" in color
+    assert "label.textContent = elapsed" in js
+    assert "max-width: 220px" not in color
+
+
+def test_live_action_labels_keep_a_reserved_width():
+    css = (ROOT / "frontend" / "css" / "ui-refresh.css").read_text(encoding="utf-8")
+    apply_bodies = _rule_bodies(css, "#btn-apply-modal-filters")
+    cancel_bodies = _rule_bodies(css, "#btn-cancel-scan")
+    assert apply_bodies and "min-width: 17.5rem" in "\n".join(apply_bodies)
+    assert cancel_bodies and "min-width: 9rem" in "\n".join(cancel_bodies)

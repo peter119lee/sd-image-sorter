@@ -5526,6 +5526,16 @@ textarea:focus,
     min-width: 150px;
 }
 
+#btn-apply-modal-filters {
+    min-width: 17.5rem;
+    justify-content: center;
+}
+
+#btn-cancel-scan {
+    min-width: 9rem;
+    justify-content: center;
+}
+
 .tags-library-shell {
     display: flex;
     flex-direction: column;

@@ -123,19 +123,32 @@
 /* ---- Nav chip --------------------------------------------------------- */
 
 .nav-color-chip {
-    /* Hijack the existing icon-only button base; widen slightly to make room for the % label. */
-    min-width: auto;
-    padding-right: 10px;
-    gap: 4px;
+    position: relative;
+    min-width: 38px;
+    max-width: 42px;
+    width: 42px;
+    flex: 0 0 42px;
+    padding: 7px 10px;
+    overflow: visible;
 }
 
 .nav-color-chip[hidden] { display: none !important; }
 
 .nav-color-chip-label {
-    font-size: 0.72rem;
+    position: absolute;
+    left: 50%;
+    bottom: 2px;
+    transform: translateX(-50%);
+    min-width: 3ch;
+    font-size: 0.58rem;
     font-weight: 700;
+    line-height: 1;
     color: var(--accent-secondary);
     letter-spacing: 0;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    pointer-events: none;
+    text-align: center;
 }
 
 .nav-color-chip:hover .nav-color-chip-label {

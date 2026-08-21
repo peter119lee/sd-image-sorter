@@ -74,26 +74,13 @@
         // likely to be the one in the user's way.
         const lead = jobs[0];
         const elapsed = seconds(lead.elapsed_seconds);
-        const others = jobs.length - 1;
         const label = document.getElementById('nav-ai-busy-label');
         const stuck = jobs.some((job) => job.stuck === true);
-
-        let text;
-        if (stuck) {
-            text = t('aiBusy.chipStuck', '{label} stuck · {elapsed}', {
-                label: lead.label, elapsed: elapsed || '',
-            });
-        } else if (elapsed) {
-            text = t('aiBusy.chipBusy', '{label} busy · {elapsed}', {
-                label: lead.label, elapsed,
-            });
-        } else {
-            text = t('aiBusy.chipBusyNoTime', '{label} busy', { label: lead.label });
+        if (label) {
+            if (stuck) label.textContent = '!';
+            else if (elapsed) label.textContent = elapsed;
+            else label.textContent = '';
         }
-        if (others > 0) {
-            text += t('aiBusy.chipMore', ' (+{count})', { count: others });
-        }
-        if (label) label.textContent = text;
 
         const lines = jobs.map((job) => {
             const each = seconds(job.elapsed_seconds);
