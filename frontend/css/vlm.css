@@ -631,6 +631,7 @@
 }
 .export-preview-captype-seg {
     display: inline-flex;
+    flex-wrap: nowrap;
     border: 1px solid var(--border-color);
     border-radius: var(--radius-sm);
     overflow: hidden;
@@ -642,6 +643,8 @@
     color: var(--text-secondary);
     font: inherit;
     font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
     cursor: pointer;
     transition: var(--transition-fast);
 }
@@ -654,7 +657,6 @@
 .export-preview-captype-btn.is-active {
     background: rgba(var(--accent-secondary-rgb), 0.18);
     color: var(--accent-secondary);
-    font-weight: 600;
 }
 .export-preview-captype-bulk {
     display: inline-flex;

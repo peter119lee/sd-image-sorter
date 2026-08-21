@@ -150,7 +150,9 @@
     background: transparent;
     color: var(--text-secondary);
     font-size: 0.78rem;
+    font-weight: 600;
     padding: 5px 10px;
+    white-space: nowrap;
     cursor: pointer;
 }
 
@@ -161,7 +163,6 @@
 .pub-variant-btn.active {
     background: var(--accent-primary);
     color: var(--accent-contrast, #161616);
-    font-weight: 600;
 }
 
 .pub-variant-btn:disabled {

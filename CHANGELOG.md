@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - 在逗号分隔的标签框里选中 `hatsune_miku` 时，若词表知道作品且栏里还没有，会一并写入 `vocaloid`。下拉里会先看到作品名。Prompt Lab 插入模式只补全当前词，不会加逗号。
 
 ### Fixed / 修复
+- **Mode switches keep their size when selected / 模式开关选中不再跳位**: segmented controls no longer bold or lift the chosen option. Manual Sort Slot / Showdown / Cull, Auto-Separate vs Manual Sort, Original / Censored, caption-type (booru / both / nl), Sync zoom, and radio segmented pills keep the same font-weight and position; only color and fill change.
+  - 分段开关不再靠加粗或上移表示选中。手动排序三模式、自动分类/手动、原图/打码、caption 类型、同步放大、以及单选分段条，选中只改颜色与底，不再把旁边的按钮挤走。
 - **Entry cover-mode buttons stay put / 入口页封面模式按钮不再乱跑**: the status caption, mode switch, and local-run note are separate grid slots. Switching Off / Single / Slideshow / Film no longer shoves the buttons sideways when the caption changes length.
   - 状态文案、模式开关、本地说明分成固定格子。切换无 / 单张 / 轮播 / 胶卷时，文案变长不会把按钮挤走。
 - **Product claims match the shipped app / 对外说法对齐现货**: artist identification is no longer labelled experimental or backed by a hardcoded sample list; a failed Kaloscope load is retryable instead of locking a placeholder. README / Why Choose Us stop claiming to be the only AI-art manager, stop marking Allusion as having no SD metadata, and cite Eagle and Billfish. First use of a feature downloads that model with a progress overlay (about 1 GB asks first) instead of a frozen or permanently disabled button. Agent docs drop glassmorphism and the wrong database path.

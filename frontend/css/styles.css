@@ -1628,7 +1628,7 @@ body::before {
         color: var(--text-secondary);
         background: rgba(255, 255, 255, 0.04);
         border: 1px solid transparent;
-        transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+        transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
     }
 
     .segmented-option:hover span {
@@ -1641,7 +1641,6 @@ body::before {
         background: rgba(var(--accent-rgb), 0.34);
         border-color: rgba(var(--accent-rgb), 0.55);
         box-shadow: 0 8px 22px rgba(0, 0, 0, 0.25);
-        transform: translateY(-1px);
     }
 
     .preview-section {
@@ -7555,10 +7554,11 @@ input[type="radio"] {
 }
 
 /* Selected sub-tab reads as a chosen tab, not a solid-blue primary button —
-   the screen's single blue CTA is reserved for Execute / Start (rule 12). */
+   the screen's single blue CTA is reserved for Execute / Start (rule 12).
+   Keep font-weight identical to .btn so Auto-Separate / Manual Sort do not
+   resize the switch when the selected tab changes. */
 .sorting-sub-tab.active {
     color: var(--text-primary);
-    font-weight: 650;
     background: rgba(var(--accent-primary-rgb), 0.16);
     border: 1px solid rgba(var(--accent-primary-rgb), 0.45);
     box-shadow: none;
@@ -8059,7 +8059,7 @@ input[type="radio"] {
 .sort-mode-switch {
     display: flex;
     align-items: center;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: 8px;
     padding: 8px;
     margin-bottom: 16px;
@@ -8073,10 +8073,13 @@ input[type="radio"] {
     text-transform: uppercase;
     color: var(--text-muted);
     padding: 0 8px 0 12px;
+    flex-shrink: 0;
+    white-space: nowrap;
 }
 .sort-mode-btn {
     font: inherit;
     font-size: 13.5px;
+    font-weight: 600;
     cursor: pointer;
     color: var(--text-secondary);
     padding: 9px 15px;
@@ -8086,6 +8089,8 @@ input[type="radio"] {
     display: inline-flex;
     align-items: center;
     gap: 8px;
+    flex-shrink: 0;
+    white-space: nowrap;
     transition: color 160ms ease, background 160ms ease, box-shadow 160ms ease;
 }
 .sort-mode-btn:hover {
@@ -8095,9 +8100,9 @@ input[type="radio"] {
 .sort-mode-btn.is-active {
     /* Selected segment, not a cross-step action: rule 12 reserves the
        blue→purple gradient for cross-step CTAs, and a mode selector is neither.
-       Use a subtle tinted fill so it reads as "selected tab". */
+       Use a subtle tinted fill so it reads as "selected tab". Font-weight
+       stays 600 so choosing Slot / Showdown / Cull does not shove neighbors. */
     color: var(--text-primary);
-    font-weight: 700;
     background: rgba(var(--accent-primary-rgb), 0.16);
     border-color: rgba(var(--accent-primary-rgb), 0.45);
     box-shadow: none;
@@ -8357,6 +8362,7 @@ input[type="radio"] {
 .bracket-insp-btn {
     font: inherit;
     font-size: 12.5px;
+    font-weight: 600;
     cursor: pointer;
     display: inline-flex;
     align-items: center;
@@ -8366,12 +8372,12 @@ input[type="radio"] {
     color: var(--text-secondary);
     background: rgba(255, 255, 255, 0.05);
     border: 1px solid var(--glass-border);
+    white-space: nowrap;
     transition: color 160ms ease, background 160ms ease, border-color 160ms ease;
 }
 .bracket-insp-btn:hover { color: var(--text-primary); border-color: var(--border-glow); }
 .bracket-insp-btn[aria-pressed="true"] {
     color: #0E0E0E;
-    font-weight: 700;
     background-image: var(--accent-primary);
     border-color: transparent;
 }
