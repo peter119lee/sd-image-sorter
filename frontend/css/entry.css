@@ -996,12 +996,45 @@ body.entry-active {
 }
 
 .entry-identity .identity-hero-line {
-    display: flex;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas:
+        "credit credit"
+        "switch note";
     align-items: center;
-    gap: 12px;
+    column-gap: 12px;
+    row-gap: 6px;
+    width: 100%;
     font-family: var(--font-mono);
     font-size: 10px;
     color: rgba(var(--accent-rgb), 0.45);
+}
+
+.entry-identity .hero-credit-slot {
+    grid-area: credit;
+    display: flex;
+    align-items: center;
+    flex-wrap: nowrap;
+    gap: 8px;
+    min-width: 0;
+}
+
+.entry-identity #entry-hero-credit {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+
+.entry-identity .hero-local-note {
+    grid-area: note;
+    min-width: 0;
+    justify-self: end;
+    text-align: right;
+    line-height: 28px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .entry-identity .hero-link {
@@ -1022,6 +1055,11 @@ body.entry-active {
 .entry-identity .hero-mode-switch {
     display: inline-flex;
     align-items: center;
+    flex-shrink: 0;
+    flex-wrap: nowrap;
+    white-space: nowrap;
+    grid-area: switch;
+    justify-self: start;
     gap: 2px;
     border: 1px solid rgba(255, 255, 255, 0.18);
     border-radius: var(--r-pill);

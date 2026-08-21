@@ -420,13 +420,18 @@
                 </div>
             </div>
             <div class="identity-hero-line">
-                <!-- JS-owned: entry-page.js renderHero()/poolEmptyCredit() set this
-                     for every cover mode and re-render on languageChanged. It must
-                     NOT carry data-i18n or I18n.applyToDOM resets the live caption
-                     back to the empty-state hint (and shows "Rate ★5" on an empty
-                     library, where the real next step is scanning a folder). -->
-                <span id="entry-hero-credit"></span>
-                <button type="button" class="hero-link" id="entry-hero-swap" data-i18n="entry.heroSwap" hidden>Swap ↻</button>
+                <!-- Three stable columns: variable copy may ellipsize, but the
+                     mode switch stays put. Do not put live captions and the
+                     switch in one shrink-wrapped flex row. -->
+                <div class="hero-credit-slot">
+                    <!-- JS-owned: entry-page.js renderHero()/poolEmptyCredit() set this
+                         for every cover mode and re-render on languageChanged. It must
+                         NOT carry data-i18n or I18n.applyToDOM resets the live caption
+                         back to the empty-state hint (and shows "Rate ★5" on an empty
+                         library, where the real next step is scanning a folder). -->
+                    <span id="entry-hero-credit"></span>
+                    <button type="button" class="hero-link" id="entry-hero-swap" data-i18n="entry.heroSwap" hidden>Swap ↻</button>
+                </div>
                 <!-- Owner FB (2026-07-06): 不想展示 was a one-way door — replaced
                      by a four-state display-mode switch (off / single / slideshow
                      / film strips). -->
@@ -437,7 +442,7 @@
                     <button type="button" class="hero-mode-btn" data-mode="slideshow" data-i18n="entry.showModeSlideshow" title="Auto-rotating covers" data-i18n-title="entry.showModeSlideshowTip">Slideshow</button>
                     <button type="button" class="hero-mode-btn" data-mode="film" data-i18n="entry.showModeFilm" title="Rolling film strips" data-i18n-title="entry.showModeFilmTip">Film</button>
                 </span>
-                <span data-i18n="entry.localNote">· Runs locally by default — cloud VLM captioning is opt-in and sends images to the provider you configure</span>
+                <span class="hero-local-note" data-i18n="entry.localNote">· Runs locally by default — cloud VLM captioning is opt-in and sends images to the provider you configure</span>
             </div>
         </footer>
     </section>
