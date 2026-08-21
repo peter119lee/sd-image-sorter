@@ -68,7 +68,8 @@
     max-width: 55%;
 }
 
-.caption-autocomplete-zh {
+.caption-autocomplete-zh,
+.caption-autocomplete-copy {
     font-size: 0.78rem;
     color: var(--text-secondary, #CCCCCC);
     overflow: hidden;

@@ -187,6 +187,13 @@
                 zh.textContent = s.zh;
                 meta.appendChild(zh);
             }
+            if (s.copyright) {
+                const copy = document.createElement('span');
+                copy.className = 'caption-autocomplete-copy';
+                copy.textContent = String(s.copyright).split(',')[0].trim();
+                copy.title = String(s.copyright);
+                meta.appendChild(copy);
+            }
             const count = document.createElement('span');
             count.className = 'caption-autocomplete-count';
             count.textContent = formatCount(s.count);
@@ -232,6 +239,42 @@
         });
     }
 
+    function normalizeTag(raw) {
+        return String(raw || '').trim().toLowerCase().replace(/\s+/g, '_');
+    }
+
+    function tokenizeField(value) {
+        return String(value || '').split(/[,\n]/).map((part) => part.trim()).filter(Boolean);
+    }
+
+    function copyrightTokens(raw) {
+        return String(raw || '').split(',').map((part) => part.trim()).filter(Boolean);
+    }
+
+    /** Tags written when the user accepts a suggestion.
+
+     Comma-mode character hits also insert their series/copyright unless
+     that token is already in the field. Insert-mode (Prompt Lab) only
+     completes the word under the caret. */
+    function tokensToInsert(suggestion, existingValue, insertMode) {
+        const tag = String((suggestion && suggestion.tag) || '').trim();
+        if (!tag) return [];
+        if (insertMode) return [tag];
+        const seen = new Set([normalizeTag(tag)]);
+        for (const token of tokenizeField(existingValue)) {
+            const key = normalizeTag(token);
+            if (key) seen.add(key);
+        }
+        const extras = [];
+        for (const extra of copyrightTokens(suggestion && suggestion.copyright)) {
+            const key = normalizeTag(extra);
+            if (!key || seen.has(key)) continue;
+            seen.add(key);
+            extras.push(key);
+        }
+        return extras.length ? [tag].concat(extras) : [tag];
+    }
+
     function accept(el, suggestionIdx) {
         const s = STATE.lastSuggestions[suggestionIdx];
         if (!s) return;
@@ -239,14 +282,16 @@
         const value = el.value || '';
         const before = value.slice(0, tok.start);
         const after = value.slice(tok.end);
+        const insertMode = el.dataset.capAcMode === 'insert';
+        const inserted = tokensToInsert(s, value, insertMode).join(', ');
         // Comma mode appends ", " for the next entry; insert mode (prompt
         // writing boxes) completes the word in place and stays out of the
         // author's flow.
-        const sep = el.dataset.capAcMode === 'insert' || after.startsWith(',') || after.startsWith('\n')
+        const sep = insertMode || after.startsWith(',') || after.startsWith('\n')
             ? ''
             : ', ';
-        el.value = `${before}${s.tag}${sep}${after}`;
-        const newCursor = (before + s.tag + sep).length;
+        el.value = `${before}${inserted}${sep}${after}`;
+        const newCursor = (before + inserted + sep).length;
         el.setSelectionRange(newCursor, newCursor);
         el.dispatchEvent(new Event('input', { bubbles: true }));
         hideDropdown();
@@ -633,6 +678,7 @@
         isOpen,
         showTagInfo,
         hideTagInfo,
+        tokensToInsert,
         refreshVocab: async () => {},
     };
 })();

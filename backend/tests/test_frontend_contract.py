@@ -2832,6 +2832,21 @@ def test_the_tag_popover_reads_every_field_tag_info_returns():
         )
 
 
+def test_autocomplete_accept_inserts_character_copyright():
+    """Accepting a character suggestion must write the series, not just show it."""
+    repo_root = Path(__file__).resolve().parents[2]
+    autocomplete = (
+        repo_root / "frontend" / "js" / "caption-autocomplete.js"
+    ).read_text(encoding="utf-8")
+    assert "function tokensToInsert" in autocomplete
+    assert "tokensToInsert," in autocomplete
+    assert "suggestion.copyright" in autocomplete
+    dataset = (
+        repo_root / "frontend" / "js" / "dataset" / "tag-autocomplete.js"
+    ).read_text(encoding="utf-8")
+    assert "acceptTag(tag, copyright)" in dataset
+
+
 def test_the_tag_popover_says_whose_facts_its_counts_are():
     """A booru post count next to a tag input invites exactly one wrong reading.
 

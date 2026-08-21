@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added / 新增
 - **Bundled MIT Chinese/Japanese tag aliases + character catalog / 内置 MIT 中日文标签别名与角色目录**: tag autocomplete now resolves CJK queries out of the box (长发 → `long_hair`, 初音未来-style aliases → the canonical character tag) using [StoryAura/Danbooru-Dataset-csv](https://huggingface.co/datasets/StoryAura/Danbooru-Dataset-csv) (MIT). Tag details show series/copyright and parent tags; export implication-dedup uses the catalog's parent_tag graph on top of the curated core table; Dataset Maker can color popular character tags before any WD14 model is downloaded. A personal `data/danbooru_zh.csv` still overrides the bundled table.
   - 标签补全开箱即可用中日文别名（输入「长发」会提示 `long_hair`）。标签资料显示作品 copyright 与父标签；导出蕴含去重叠上 StoryAura 的 parent_tag 图；即使尚未下载 WD14，热门角色标签也能正确着色。`data/danbooru_zh.csv` 仍可覆盖内置表。
+- **Accepting a character tag also inserts its series / 接受角色标签时一并写入作品**: choosing `hatsune_miku` from autocomplete (comma-separated tag boxes, not Prompt Lab insert mode) also writes `vocaloid` when that copyright is known and not already in the field. The dropdown shows the series before you accept.
+  - 在逗号分隔的标签框里选中 `hatsune_miku` 时，若词表知道作品且栏里还没有，会一并写入 `vocaloid`。下拉里会先看到作品名。Prompt Lab 插入模式只补全当前词，不会加逗号。
 
 ## [3.5.0-beta.4] - 2026-08-04
 

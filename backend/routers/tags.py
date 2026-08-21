@@ -197,7 +197,7 @@ it.
                 "application/json": {
                     "example": {
                         "suggestions": [
-                            {"tag": "long_hair", "count": 1523, "source": "library", "category": "body", "zh": None},
+                            {"tag": "long_hair", "count": 1523, "source": "library", "category": "body", "zh": None, "copyright": None},
                             {"tag": "long_sleeves", "count": 2102140, "source": "danbooru", "category": "outfit", "zh": None},
                         ],
                         "danbooru_loaded": True,

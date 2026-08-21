@@ -57,25 +57,38 @@
             dropdown.innerHTML = '';
             activeIdx = -1;
             if (matches.length === 0) { dropdown.hidden = true; return; }
-            for (const tag of matches.slice(0, 8)) {
+            for (const item of matches.slice(0, 8)) {
+                const tag = typeof item === 'string' ? item : item.tag;
+                if (!tag) continue;
+                const copyright = typeof item === 'string' ? '' : (item.copyright || '');
                 const div = document.createElement('div');
                 div.className = 'tag-suggestion';
-                div.textContent = tag;
+                div.dataset.tag = tag;
+                if (copyright) div.dataset.copyright = copyright;
+                div.textContent = copyright ? `${tag} · ${String(copyright).split(',')[0].trim()}` : tag;
                 div.addEventListener('mousedown', (e) => {
                     e.preventDefault();
-                    acceptTag(tag);
+                    acceptTag(tag, copyright);
                 });
                 dropdown.appendChild(div);
             }
             dropdown.hidden = false;
         }
 
-        function acceptTag(tag) {
+        function acceptTag(tag, copyright) {
             const ta = document.getElementById('dataset-editor-textarea');
             if (!ta || DM.activeId == null) return;
             const current = ta.value.trim();
             const tags = current ? current.split(',').map(s => s.trim()).filter(Boolean) : [];
-            if (!tags.includes(tag)) tags.push(tag);
+            const seen = new Set(tags.map((part) => part.toLowerCase().replace(/\s+/g, '_')));
+            const add = (value) => {
+                const key = String(value || '').trim().toLowerCase().replace(/\s+/g, '_');
+                if (!key || seen.has(key)) return;
+                seen.add(key);
+                tags.push(key);
+            };
+            add(tag);
+            String(copyright || '').split(',').forEach((part) => add(part));
             ta.value = tags.join(', ');
             DM.captionEdits.set(DM.activeId, ta.value);
             DM._refreshQueueItem(DM.activeId);
@@ -98,14 +111,16 @@
                     const r = await (window.apiFetch || fetch)(`/api/tags/suggest?q=${encodeURIComponent(q)}&limit=8`);
                     if (r.ok) {
                         const data = await r.json();
-                        matches = (data.suggestions || []).map(s => s.tag).filter(Boolean);
+                        matches = (data.suggestions || []).filter(s => s && s.tag);
                     }
                 } catch { /* fall through to dataset vocab */ }
                 if (matches.length < 8) {
                     const vocab = await getVocab();
                     for (const t of vocab) {
                         if (matches.length >= 8) break;
-                        if (t.toLowerCase().includes(q) && !matches.includes(t)) matches.push(t);
+                        if (t.toLowerCase().includes(q) && !matches.some((item) => (item.tag || item) === t)) {
+                            matches.push({ tag: t });
+                        }
                     }
                 }
                 showSuggestions(matches);
@@ -125,7 +140,7 @@
             } else if (e.key === 'Enter') {
                 e.preventDefault();
                 if (activeIdx >= 0 && items[activeIdx]) {
-                    acceptTag(items[activeIdx].textContent);
+                    acceptTag(items[activeIdx].dataset.tag, items[activeIdx].dataset.copyright);
                 } else if (input.value.trim()) {
                     acceptTag(input.value.trim());
                 }

@@ -273,6 +273,19 @@ def _category_for(tag: str, code: int = 0) -> str:
         return "unknown"
 
 
+def _copyright_for(tag: str) -> Optional[str]:
+    try:
+        from danbooru_catalog import get_character
+
+        character = get_character(tag)
+    except Exception:
+        character = None
+    if not character:
+        return None
+    copyright_ = str(character.get("copyright") or "").strip()
+    return copyright_ or None
+
+
 def _entry(tag: str, count: int, source: str, code: int = 0) -> Dict[str, Any]:
     zh = (_ZH_DISPLAY or {}).get(tag)
     return {
@@ -281,6 +294,7 @@ def _entry(tag: str, count: int, source: str, code: int = 0) -> Dict[str, Any]:
         "source": source,
         "category": _category_for(tag, code),
         "zh": zh,
+        "copyright": _copyright_for(tag),
     }
 
 

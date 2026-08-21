@@ -33,6 +33,16 @@ def test_bundled_cjk_query_resolves_long_hair():
     assert "长" in hit["zh"]
 
 
+def test_character_suggest_includes_copyright():
+    tag_suggest_service.reset_cache()
+    result = tag_suggest_service.suggest(q="初音未来")
+    hit = next(row for row in result["suggestions"] if row["tag"] == "hatsune_miku")
+    assert hit["copyright"] == "vocaloid"
+    hair = tag_suggest_service.suggest(q="long_hair")
+    long_hair = next(row for row in hair["suggestions"] if row["tag"] == "long_hair")
+    assert long_hair.get("copyright") in (None, "")
+
+
 def test_character_info_includes_copyright_and_cjk_alias():
     tag_suggest_service.reset_cache()
     info = tag_suggest_service.get_tag_info("hatsune_miku")
