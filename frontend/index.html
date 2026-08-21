@@ -1071,7 +1071,6 @@
                             <button id="btn-reconnect-missing" class="btn btn-ghost btn-small btn-icon-only" title="Re-link images that were moved or renamed outside the app" aria-label="Find moved image files" data-i18n-title="reconnect.openTitle" data-i18n-aria="reconnect.openTitle">
                                 <span aria-hidden="true"><svg class="icon" aria-hidden="true"><use href="#i-search"/></svg></span>
                             </button>
-                            <span class="header-status-chip is-info metadata-status-chip" id="metadata-status-chip" aria-live="polite" style="display:none"></span>
                             <div class="divider-v" aria-hidden="true"></div>
                             <div class="generator-tabs" id="generator-tabs" role="tablist" aria-label="Filter by generator">
                                 <div class="generator-tabs-pinned">
@@ -1217,6 +1216,7 @@
                             </button>
                         </div>
                     </div>
+                    <div class="gallery-live-status" id="metadata-status-chip" hidden role="status" aria-live="polite"></div>
                     <!-- Search v2: live "understood as" chips — what the query parsed
                          into, plus ⚠ chips for known keys with bad values. -->
                     <div class="gallery-search-preview" id="gallery-search-preview" hidden aria-live="polite"></div>

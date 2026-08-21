@@ -235,7 +235,6 @@
 .zoom-btn:hover {
     background: rgba(var(--censor-accent-rgb), 0.2);
     color: #fff;
-    transform: scale(1.05);
 }
 
 .zoom-level {

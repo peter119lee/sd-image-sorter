@@ -664,10 +664,9 @@ summary:focus-visible {
     white-space: nowrap;
 }
 
-/* Active/pressed feedback for all buttons */
+/* Pressed feedback is color only — scaling the control makes the chrome jump. */
 .btn:active:not(:disabled),
 .btn-help:active:not(:disabled) {
-    transform: scale(0.97);
     opacity: 0.92;
 }
 
@@ -1735,10 +1734,6 @@ textarea:focus,
         display: none;
     }
 
-    .gen-tab:not(.active) .gen-count {
-        display: none;
-    }
-
     .gallery-scope-btn {
         padding: 5px 8px;
         font-size: 11.5px;
@@ -1758,7 +1753,9 @@ textarea:focus,
     }
 
     .sort-dropdown {
-        min-width: 100px;
+        width: 12.75rem;
+        min-width: 12.75rem;
+        max-width: 12.75rem;
     }
 
     .nav-actions .btn:not(.btn-icon-only):not(#btn-scan):not(#btn-tag) span:last-child {
@@ -1815,12 +1812,12 @@ textarea:focus,
 
 .generator-tabs-scroll {
     display: flex;
+    align-items: center;
     min-width: 0;
     gap: 6px;
     overflow-x: auto;
     overscroll-behavior-inline: contain;
-    scrollbar-width: thin;
-    scrollbar-color: rgba(166, 166, 166, 0.35) transparent;
+    scrollbar-width: none;
     padding-right: 18px;
 }
 
@@ -1831,7 +1828,8 @@ textarea:focus,
 }
 
 .generator-tabs-scroll::-webkit-scrollbar {
-    height: 6px;
+    height: 0;
+    display: none;
 }
 
 .generator-tabs-scroll::-webkit-scrollbar-track {
@@ -1868,9 +1866,21 @@ textarea:focus,
     white-space: nowrap;
 }
 
+.view-btn:hover {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: var(--border-color);
+    color: var(--text-primary);
+}
+
 .gen-tab.active,
 .view-btn[aria-pressed="true"] {
     background: rgba(var(--accent-primary-rgb), 0.34);
+    border-color: rgba(var(--accent-secondary-rgb), 0.34);
+    color: var(--text-primary);
+}
+
+.view-btn[aria-pressed="true"]:hover {
+    background: rgba(var(--accent-primary-rgb), 0.42);
     border-color: rgba(var(--accent-secondary-rgb), 0.34);
     color: var(--text-primary);
 }
@@ -1926,6 +1936,14 @@ textarea:focus,
     background: rgba(var(--accent-primary-rgb), 0.92);
     color: #2B2B2B;
     border-color: transparent;
+}
+
+.sort-dropdown {
+    width: 12.75rem;
+    min-width: 12.75rem;
+    max-width: 12.75rem;
+    flex: 0 0 auto;
+    box-sizing: border-box;
 }
 
 .sort-reverse-btn {
@@ -4855,11 +4873,6 @@ textarea:focus,
     border-color: rgba(var(--accent-secondary-rgb), 0.45);
     color: #fff;
     box-shadow: 0 14px 28px rgba(0, 0, 0, 0.28);
-}
-
-#btn-toggle-select.selection-active span:first-child,
-#btn-toggle-select[aria-pressed="true"] span:first-child {
-    transform: translateY(-1px) scale(1.06);
 }
 
 .selection-fab .btn:disabled {
@@ -8459,8 +8472,7 @@ html.lang-zh #view-censor .queue-action-btn span {
     margin: 0;
 }
 
-.autosep-action-settings-badge,
-.metadata-status-chip {
+.autosep-action-settings-badge {
     display: inline-flex;
     align-items: center;
     gap: 6px;
@@ -8492,11 +8504,26 @@ html.lang-zh #view-censor .queue-action-btn span {
     margin: 0;
 }
 
-.metadata-status-chip {
-    color: #E9CFB2;
-    background: rgba(var(--accent-primary-rgb), 0.14);
+.gallery-live-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 10px;
+    padding: 6px 12px;
+    border-radius: 10px;
     border: 1px solid rgba(var(--accent-primary-rgb), 0.26);
+    background: rgba(var(--accent-primary-rgb), 0.10);
+    color: #E9CFB2;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.gallery-live-status[hidden] {
+    display: none !important;
 }
 
 @media (max-width: 720px) {
@@ -9024,16 +9051,7 @@ html.lang-zh #view-censor .queue-action-btn span {
 }
 
 
-/* === v3.2.2: Global button click responsiveness ===
-   Prevent double-click issues by briefly disabling pointer events after
-   a button is clicked. This is a CSS-only guard that works without JS
-   changes — the button visually responds immediately (no delay) but
-   ignores rapid duplicate clicks within 300ms. */
-.btn:active {
-    transform: scale(0.97);
-    transition: transform 60ms ease;
-}
-
+/* Busy buttons ignore further clicks so a double-submit cannot fire. */
 .btn.is-busy {
     pointer-events: none;
     opacity: 0.7;

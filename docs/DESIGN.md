@@ -332,8 +332,8 @@ The gallery toolbar (`.gallery-header`) and generator tabs (`.generator-tabs`) M
 Implementation:
 - `.gallery-header { flex-wrap: nowrap; }`
 - `.generator-tabs { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }`
-- Below 1500px, secondary actions (Random, Reconnect) and inactive tab counts are hidden via `@media (max-width: 1500px)`.
-- Below 1600px, the "X images" count is hidden (the active tab badge already shows the count).
+- Below 1500px, secondary actions (Random, Reconnect) are hidden via `@media (max-width: 1500px)`.
+- Below 1600px, the "X images" count is hidden. Generator tab counts stay on every tab so switching All / NovelAI / ComfyUI does not resize the pills; extra tabs scroll.
 
 Do NOT:
 - Use `flex-wrap: wrap` on these containers; users have explicitly rejected line breaks here.

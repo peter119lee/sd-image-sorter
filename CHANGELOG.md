@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - 在逗号分隔的标签框里选中 `hatsune_miku` 时，若词表知道作品且栏里还没有，会一并写入 `vocaloid`。下拉里会先看到作品名。Prompt Lab 插入模式只补全当前词，不会加逗号。
 
 ### Fixed / 修复
+- **Gallery chrome no longer jumps while you use it / 图库工具条不再边用边跳**: generator tab counts stay visible on every pill (instead of appearing only on the selected one). Scan/metadata status sits under the toolbar, not between the buttons. Sort stays a fixed width. Buttons no longer shrink on press, and hover on Grid/Large/Waterfall no longer looks like the selected view.
+  - 生成器分页的数字一直显示，不再只在选中时冒出来把 pill 撑宽。扫描/读元数据状态改到工具条下方，不再插在按钮中间。排序下拉固定宽度。按钮按下不再缩小；网格/大图/瀑布的 hover 不再长得像已选中。
 - **Mode switches keep their size when selected / 模式开关选中不再跳位**: segmented controls no longer bold or lift the chosen option. Manual Sort Slot / Showdown / Cull, Auto-Separate vs Manual Sort, Original / Censored, caption-type (booru / both / nl), Sync zoom, and radio segmented pills keep the same font-weight and position; only color and fill change.
   - 分段开关不再靠加粗或上移表示选中。手动排序三模式、自动分类/手动、原图/打码、caption 类型、同步放大、以及单选分段条，选中只改颜色与底，不再把旁边的按钮挤走。
 - **Entry cover-mode buttons stay put / 入口页封面模式按钮不再乱跑**: the status caption, mode switch, and local-run note are separate grid slots. Switching Off / Single / Slideshow / Film no longer shoves the buttons sideways when the caption changes length.

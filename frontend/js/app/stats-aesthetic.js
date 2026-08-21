@@ -90,11 +90,11 @@ async function loadStats() {
                         .replace('{count}', String(metadataPending))
                     : appT('gallery.scanResolving', 'Scanning library: generator counts are not final yet');
                 metadataChip.title = appT('gallery.metadataResolvingTitle', 'Generator counts are still resolving while metadata is being read or scan import is still running.');
-                metadataChip.style.display = 'inline-flex';
+                metadataChip.hidden = false;
             } else {
                 metadataChip.textContent = '';
                 metadataChip.title = '';
-                metadataChip.style.display = 'none';
+                metadataChip.hidden = true;
             }
         }
 

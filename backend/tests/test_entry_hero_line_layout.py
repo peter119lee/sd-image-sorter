@@ -25,6 +25,8 @@ _STABLE_SELECTED = (
     ".censor-tab.is-active",
     ".sepcon-view-tab.is-active",
     ".segmented-option input:checked + span",
+    ".gen-tab.active",
+    '.view-btn[aria-pressed="true"]',
 )
 
 _RULE_RE = re.compile(r"([^{}]+)\{([^{}]+)\}", re.S)
@@ -104,3 +106,44 @@ def test_mode_switch_idle_weight_is_constant():
             assert f"font-weight: {weight}" in joined, selector
         if selector.endswith("-switch"):
             assert "flex-wrap: nowrap" in joined, selector
+
+
+def test_inactive_generator_tabs_keep_their_counts():
+    """Hiding counts on unselected generator pills resizes them when clicked."""
+    css = (ROOT / "frontend" / "css" / "ui-refresh.css").read_text(encoding="utf-8")
+    assert ".gen-tab:not(.active) .gen-count" not in css
+
+
+def test_metadata_status_is_not_in_the_gallery_button_row():
+    html = (ROOT / "frontend" / "index.html").read_text(encoding="utf-8")
+    left_at = html.find('class="gallery-header-left"')
+    tabs_at = html.find('id="generator-tabs"')
+    chip_at = html.find('id="metadata-status-chip"')
+    search_at = html.find('id="gallery-search-preview"')
+    assert left_at != -1 and tabs_at != -1 and chip_at != -1
+    assert "metadata-status-chip" not in html[left_at:tabs_at]
+    assert tabs_at < chip_at < search_at
+    assert "hidden" in html[chip_at - 80 : chip_at + 120]
+
+    js = (ROOT / "frontend" / "js" / "app" / "stats-aesthetic.js").read_text(
+        encoding="utf-8"
+    )
+    assert "metadataChip.hidden" in js
+    assert "metadataChip.style.display" not in js
+
+
+def test_global_buttons_do_not_squash_on_press():
+    ui = (ROOT / "frontend" / "css" / "ui-refresh.css").read_text(encoding="utf-8")
+    assert "scale(0.97)" not in ui
+    assert "scale(1.06)" not in ui
+    zoom = (ROOT / "frontend" / "css" / "censor-v2.css").read_text(encoding="utf-8")
+    zoom_hover = zoom[zoom.find(".zoom-btn:hover") : zoom.find(".zoom-btn:hover") + 220]
+    assert "scale(" not in zoom_hover
+
+
+def test_gallery_sort_dropdown_keeps_a_fixed_width():
+    css = _all_css()
+    bodies = _rule_bodies(css, ".sort-dropdown")
+    joined = "\n".join(bodies)
+    assert "width: 12.75rem" in joined
+    assert "min-width: 100px" not in joined
