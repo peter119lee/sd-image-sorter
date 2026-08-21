@@ -186,8 +186,9 @@ def get_tags_library(
     description="""
 Unified tag suggestions for autocomplete inputs. Merges the user's own
 library tags (frequency-ranked) with the bundled danbooru vocabulary
-(popularity-ranked, alias-aware). CJK queries match the optional
-user-supplied Chinese translation file when present.
+(popularity-ranked, alias-aware). CJK queries match the bundled MIT
+Chinese/Japanese alias table (StoryAura), or a user drop-in that overrides
+it.
     """,
     responses={
         200: {
@@ -200,7 +201,7 @@ user-supplied Chinese translation file when present.
                             {"tag": "long_sleeves", "count": 2102140, "source": "danbooru", "category": "outfit", "zh": None},
                         ],
                         "danbooru_loaded": True,
-                        "zh_loaded": False,
+                        "zh_loaded": True,
                     }
                 }
             }
@@ -268,7 +269,8 @@ def tag_info(
 ):
     """Learn-while-tagging popover data: category, danbooru popularity,
     aliases (alias input resolves to its canonical tag), zh display,
-    implication edges both ways, and the live library count."""
+    character copyright/parent when known, implication edges both ways,
+    and the live library count."""
     from services import tag_suggest_service
 
     return tag_suggest_service.get_tag_info(tag)

@@ -2798,7 +2798,7 @@ def test_tipo_card_states_keep_the_lists_the_backend_passes():
 
 
 def test_the_tag_popover_reads_every_field_tag_info_returns():
-    """``/api/tags/info`` gathers eight facts; a popover is the reason it exists.
+    """``/api/tags/info`` gathers the facts a popover exists to show.
 
     ``get_tag_info``'s docstring names this surface, and each field costs the
     backend real work - an alias scan over the vocabulary blob, both directions
@@ -2821,6 +2821,8 @@ def test_the_tag_popover_reads_every_field_tag_info_returns():
         "danbooru_count",
         "aliases",
         "zh",
+        "copyright",
+        "parent_tag",
         "implies",
         "implied_by",
         "library_count",

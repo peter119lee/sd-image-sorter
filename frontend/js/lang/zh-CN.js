@@ -4894,6 +4894,8 @@ window.I18nLang_zhCN = {
     'tagInfo.notInVocab': '不在内置 Danbooru 词表中——程序没有它的热度或别名数据。',
     'tagInfo.category': '类别',
     'tagInfo.danbooruPosts': 'Danbooru 图片数',
+    'tagInfo.copyright': '作品 / copyright',
+    'tagInfo.parent': '父标签',
     'tagInfo.libraryCount': '你的图库中',
     'tagInfo.libraryImages': '{count} 张',
     'tagInfo.aliases': '其他写法',

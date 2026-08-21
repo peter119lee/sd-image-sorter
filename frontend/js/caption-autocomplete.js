@@ -10,8 +10,8 @@
  *
  * Source: GET /api/tags/suggest — the user's own library tags merged with
  * the bundled danbooru vocabulary (alias-aware; CJK queries match the
- * optional Chinese translation drop-in). Falls back to a tiny local list
- * when the endpoint is unreachable.
+ * bundled MIT Chinese/Japanese alias table). Falls back to a tiny local
+ * list when the endpoint is unreachable.
  *
  * Behaviour rules (unchanged from v3.2.2):
  *   - Suggestion-style only — never blocks free typing. Any keystroke
@@ -402,6 +402,18 @@
             );
             posts.querySelector('.cap-ac-info-value').title = exact.toLocaleString();
             body.appendChild(posts);
+            if (info.copyright) {
+                body.appendChild(infoRow(
+                    t('tagInfo.copyright', 'Series / copyright', {}),
+                    String(info.copyright)
+                ));
+            }
+            if (info.parent_tag) {
+                body.appendChild(infoRow(
+                    t('tagInfo.parent', 'Parent tag', {}),
+                    String(info.parent_tag)
+                ));
+            }
         } else {
             const miss = document.createElement('p');
             miss.className = 'cap-ac-info-lead';

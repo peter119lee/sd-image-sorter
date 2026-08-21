@@ -4905,6 +4905,8 @@ window.I18nLang_en = {
     'tagInfo.notInVocab': 'Not in the bundled Danbooru vocabulary — the app has no popularity or alias data for it.',
     'tagInfo.category': 'Category',
     'tagInfo.danbooruPosts': 'Danbooru posts',
+    'tagInfo.copyright': 'Series / copyright',
+    'tagInfo.parent': 'Parent tag',
     'tagInfo.libraryCount': 'In your library',
     'tagInfo.libraryImages': '{count} images',
     'tagInfo.aliases': 'Also written',

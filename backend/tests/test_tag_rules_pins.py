@@ -10,10 +10,11 @@ branches. These pins lock that behavior so the planned `tag_rules/` package spli
 cannot silently regress it.
 
 Machine-state isolation (the commit-0edbb81 pattern): `categorize_tag` consults
-two lazy caches loaded from whatever WD14/booru `selected_tags.csv` files THIS
-machine happens to have. Tests that assert categorize verdicts monkeypatch those
-two module globals to controlled containers so the result depends only on the
-hardcoded rules and can't flip between the owner's box and a fresh checkout.
+lazy caches loaded from WD14/booru `selected_tags.csv` files THIS machine
+happens to have, plus the bundled StoryAura character-name list. Tests that
+assert categorize verdicts monkeypatch those module globals to controlled
+containers so the result depends only on the hardcoded rules and can't flip
+between the owner's box and a fresh checkout.
 
 No existing file is modified; this file adds only tests.
 """
@@ -70,6 +71,7 @@ def isolated_caches(monkeypatch):
     """
     monkeypatch.setattr(tag_rules, "_wd14_character_tags", set())
     monkeypatch.setattr(tag_rules, "_booru_tag_categories", {})
+    monkeypatch.setattr(tag_rules, "_storyaura_character_tags", set())
 
 
 # ---------------------------------------------------------------------------

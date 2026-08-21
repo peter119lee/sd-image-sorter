@@ -13,19 +13,19 @@ Merges up to three sources per query:
    ~140k tags sorted by post count, with danbooru category codes and
    alias lists. Aliases participate in matching (typing "boobs" suggests
    "breasts").
-3. **Optional Chinese translations** — NOT bundled (upstream data files
-   are GPL-3.0; we only support a user-supplied drop-in). First match of:
-   ``<DATA_DIR>/danbooru_zh.csv`` then ``backend/assets/danbooru_zh.csv``.
-   Accepted shape: CSV with header where column 1 is the tag name and
-   column 2 a comma-joined list of Chinese aliases — the ``tags_enhanced``
-   export from the DanbooruSearch HF space works unmodified. When loaded,
-   CJK queries fuzzy-match Chinese aliases and suggestions carry a ``zh``
-   display string.
+3. **Chinese / Japanese aliases** — bundled MIT table derived from
+   StoryAura/Danbooru-Dataset-csv (``backend/assets/danbooru_zh.csv``).
+   A user drop-in at ``<DATA_DIR>/danbooru_zh.csv`` still wins, so
+   upgrades never overwrite a personal translation file. Accepted shape:
+   CSV where column 1 is the tag and column 2 a comma-joined list of CJK
+   aliases (header auto-detected). CJK queries fuzzy-match those aliases
+   and suggestions carry a ``zh`` display string.
 
 The vocabulary loads lazily on first use (~0.5 s for 140k rows) and is
 cached for the process lifetime. Matching is a linear scan over the
 count-sorted rows with early exit, so buckets come out popularity-ranked
-for free.
+for free. Popular character tags missing from the 140k dump are merged
+from the StoryAura character catalog so CJK hits like 初音未来 resolve.
 """
 
 import csv
@@ -47,7 +47,7 @@ _VocabRow = Tuple[str, int, int, str]
 _LOCK = threading.Lock()
 _VOCAB: Optional[List[_VocabRow]] = None
 _ZH_DISPLAY: Optional[Dict[str, str]] = None  # tag -> first zh alias
-_ZH_BLOBS: Optional[List[Tuple[str, int]]] = None  # (zh_aliases_lower, vocab_idx)
+_ZH_BLOBS: Optional[List[Tuple[str, str, int, int]]] = None  # zh_lower, tag, count, code
 _VOCAB_INDEX: Optional[Dict[str, int]] = None  # tag -> vocab list index
 
 _CJK_RE = re.compile(r"[぀-ヿ㐀-䶿一-鿿豈-﫿]")
@@ -127,9 +127,27 @@ def _load_danbooru_vocab() -> List[_VocabRow]:
     return rows
 
 
-def _load_zh_translations(vocab_index: Dict[str, int]) -> Tuple[Dict[str, str], List[Tuple[str, int]]]:
+def _zh_count_and_code(tag: str, vocab: List[_VocabRow], vocab_index: Dict[str, int]) -> Tuple[int, int]:
+    idx = vocab_index.get(tag)
+    if idx is not None:
+        _name, count, code, _blob = vocab[idx]
+        return int(count), int(code)
+    try:
+        from danbooru_catalog import get_character
+
+        character = get_character(tag)
+    except Exception:
+        character = None
+    if character:
+        return int(character.get("post_count") or 0), 4
+    return 0, 0
+
+
+def _load_zh_translations(
+    vocab: List[_VocabRow], vocab_index: Dict[str, int]
+) -> Tuple[Dict[str, str], List[Tuple[str, str, int, int]]]:
     display: Dict[str, str] = {}
-    blobs: List[Tuple[str, int]] = []
+    blobs: List[Tuple[str, str, int, int]] = []
     for path in _zh_csv_paths():
         if not path.is_file():
             continue
@@ -150,12 +168,12 @@ def _load_zh_translations(vocab_index: Dict[str, int]) -> Tuple[Dict[str, str], 
                     if not tag or not zh_all:
                         continue
                     display[tag] = zh_all.split(",")[0].strip() or zh_all
-                    idx = vocab_index.get(tag)
-                    if idx is not None:
-                        blobs.append((zh_all.lower(), idx))
+                    count, code = _zh_count_and_code(tag, vocab, vocab_index)
+                    blobs.append((zh_all.lower(), tag, count, code))
         except Exception as exc:
             logger.warning("Failed to load zh tag translations from %s: %s", path, exc)
             continue
+        blobs.sort(key=lambda item: item[2], reverse=True)
         logger.info("Loaded %d zh tag translations from %s", len(display), path)
         break
     return display, blobs
@@ -170,7 +188,22 @@ def _ensure_loaded() -> None:
             return
         vocab = _load_danbooru_vocab()
         index = {row[0]: i for i, row in enumerate(vocab)}
-        display, blobs = _load_zh_translations(index)
+        extras = []
+        if vocab:
+            try:
+                from danbooru_catalog import extra_vocab_rows
+
+                extras = extra_vocab_rows(set(index))
+            except Exception as exc:
+                logger.debug("character catalog extras unavailable: %s", exc)
+                extras = []
+        if extras:
+            vocab = list(vocab)
+            vocab.extend(extras)
+            vocab.sort(key=lambda row: row[1], reverse=True)
+            index = {row[0]: i for i, row in enumerate(vocab)}
+            logger.info("Merged %d extra StoryAura character tags into vocabulary", len(extras))
+        display, blobs = _load_zh_translations(vocab, index)
         # Publish fully-built structures last so readers never see partials.
         _VOCAB_INDEX = index
         _ZH_DISPLAY = display
@@ -278,11 +311,9 @@ def _scan_danbooru(q_norm: str, limit: int, seen: set) -> List[Dict[str, Any]]:
 
 
 def _scan_zh(q_lower: str, limit: int, seen: set) -> List[Dict[str, Any]]:
-    vocab = _VOCAB or []
     out: List[Dict[str, Any]] = []
-    for zh_blob, idx in _ZH_BLOBS or []:
+    for zh_blob, tag, count, code in _ZH_BLOBS or []:
         if q_lower in zh_blob:
-            tag, count, code, _ = vocab[idx]
             if tag in seen:
                 continue
             seen.add(tag)
@@ -296,10 +327,11 @@ def get_tag_info(tag: str) -> Dict[str, Any]:
     """Everything the app knows about ONE tag — the learn-while-tagging
     popover (competitive roadmap #6; Persona C): canonical category,
     danbooru popularity + aliases + zh display from the bundled vocab
-    (alias hits resolve to their canonical tag), implication edges both
-    ways from the bundled/drop-in table, and the live library count.
-    Read-only; unknown tags still return the category heuristic + library
-    count so hand-rolled tags are not a dead end."""
+    (alias hits, including CJK, resolve to their canonical tag),
+    character copyright/parent from the StoryAura catalog, implication
+    edges both ways from the bundled/drop-in table, and the live library
+    count. Read-only; unknown tags still return the category heuristic +
+    library count so hand-rolled tags are not a dead end."""
     _ensure_loaded()
     q_norm = _normalize_tag(tag)
     info: Dict[str, Any] = {
@@ -310,6 +342,8 @@ def get_tag_info(tag: str) -> Dict[str, Any]:
         "danbooru_count": 0,
         "aliases": [],
         "zh": None,
+        "copyright": None,
+        "parent_tag": None,
         "implies": [],
         "implied_by": [],
         "library_count": 0,
@@ -329,6 +363,14 @@ def get_tag_info(tag: str) -> Dict[str, Any]:
                 break
     canonical = q_norm
     code = 0
+    if idx is None:
+        q_lower = q_norm.lower()
+        padded = f",{q_lower},"
+        for zh_blob, zh_tag, _count, _code in _ZH_BLOBS or []:
+            if padded in f",{zh_blob},":
+                idx = index.get(zh_tag)
+                canonical = zh_tag
+                break
     if idx is not None:
         canonical, count, code, blob = vocab[idx]
         info["canonical"] = canonical
@@ -337,7 +379,36 @@ def get_tag_info(tag: str) -> Dict[str, Any]:
         parts = blob.split(",")
         info["aliases"] = [alias for alias in parts[1:] if alias]
         info["zh"] = (_ZH_DISPLAY or {}).get(canonical)
+    elif canonical != q_norm:
+        info["canonical"] = canonical
+        info["found_in_vocab"] = True
+        info["zh"] = (_ZH_DISPLAY or {}).get(canonical)
+        count, code = _zh_count_and_code(canonical, vocab, index)
+        info["danbooru_count"] = int(count)
     info["category"] = _category_for(canonical, code)
+
+    try:
+        from danbooru_catalog import get_character
+
+        character = get_character(canonical)
+    except Exception:
+        character = None
+    if character:
+        copyright_ = str(character.get("copyright") or "").strip()
+        parent = str(character.get("parent_tag") or "").strip()
+        info["copyright"] = copyright_ or None
+        info["parent_tag"] = parent or None
+        if not info["found_in_vocab"]:
+            info["found_in_vocab"] = True
+            info["canonical"] = canonical
+            info["danbooru_count"] = int(character.get("post_count") or 0)
+            info["category"] = "character"
+            info["zh"] = info["zh"] or (_ZH_DISPLAY or {}).get(canonical)
+
+    zh_display = info["zh"] or (_ZH_DISPLAY or {}).get(canonical)
+    info["zh"] = zh_display
+    if zh_display and zh_display not in info["aliases"]:
+        info["aliases"] = list(info["aliases"]) + [zh_display]
 
     try:
         from services.tag_training_filters import _implication_table

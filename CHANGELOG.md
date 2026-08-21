@@ -5,6 +5,12 @@ All notable changes to SD Image Sorter will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added / 新增
+- **Bundled MIT Chinese/Japanese tag aliases + character catalog / 内置 MIT 中日文标签别名与角色目录**: tag autocomplete now resolves CJK queries out of the box (长发 → `long_hair`, 初音未来-style aliases → the canonical character tag) using [StoryAura/Danbooru-Dataset-csv](https://huggingface.co/datasets/StoryAura/Danbooru-Dataset-csv) (MIT). Tag details show series/copyright and parent tags; export implication-dedup uses the catalog's parent_tag graph on top of the curated core table; Dataset Maker can color popular character tags before any WD14 model is downloaded. A personal `data/danbooru_zh.csv` still overrides the bundled table.
+  - 标签补全开箱即可用中日文别名（输入「长发」会提示 `long_hair`）。标签资料显示作品 copyright 与父标签；导出蕴含去重叠上 StoryAura 的 parent_tag 图；即使尚未下载 WD14，热门角色标签也能正确着色。`data/danbooru_zh.csv` 仍可覆盖内置表。
+
 ## [3.5.0-beta.4] - 2026-08-04
 
 Beta 4 introduces durable, isolated multi-library workspaces and restores the Gallery comfort features that previously looked present but silently did nothing. Long-distance virtual scrolling now stays aligned across all desktop Gallery modes and UI scales, while NovelAI V4/V4.5 WebP files retain their positive and negative prompts without weakening corrupt-EXIF validation. Similarity setup, Auto-Separate destinations, and VLM concurrency guidance are also clearer.

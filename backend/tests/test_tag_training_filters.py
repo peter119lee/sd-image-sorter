@@ -92,6 +92,7 @@ class TestPurposeFilterRows:
         monkeypatch.setattr(
             tag_rules, "_booru_tag_categories", {"hatsune_miku": "character"}
         )
+        monkeypatch.setattr(tag_rules, "_storyaura_character_tags", set())
         rows = [_row("hatsune_miku", category=""), _row("silver_hair", category="")]
         result = filters.filter_tag_rows_by_training_purpose(rows, "character", "trig")
         assert [r["tag"] for r in result] == ["silver_hair"]

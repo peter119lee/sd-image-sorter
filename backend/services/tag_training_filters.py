@@ -7,10 +7,11 @@ Closes two v3.5.0 tagger-audit features (owner-approved 2026-07-07):
   exports got no purpose semantics. The row-level filter here is applied by
   ``build_sidecar_content`` so every content mode (including template)
   inherits it, and the preview endpoint stays WYSIWYG with the export.
-- P2-18 — implication dedup. A curated danbooru implication table collapses
-  redundant parents (``cat_ears`` present → drop ``animal_ears``) behind an
-  explicit toggle. ``data/danbooru_implications.csv`` is a drop-in extension
-  point, same convention as ``data/danbooru_zh.csv``.
+- P2-18 — implication dedup. A curated danbooru implication table plus
+  StoryAura parent_tag edges collapse redundant parents (``cat_ears``
+  present → drop ``animal_ears``) behind an explicit toggle.
+  ``data/danbooru_implications.csv`` is a drop-in extension point, same
+  convention as ``data/danbooru_zh.csv``.
 
 Both filters are opt-in — silent tag removal violates the owner's
 no-silent-limits principle.
@@ -123,6 +124,9 @@ def filter_tag_rows_by_training_purpose(
 _BUNDLED_IMPLICATIONS = (
     Path(__file__).resolve().parents[1] / "assets" / "danbooru_implications.csv"
 )
+_BUNDLED_IMPLICATIONS_EXT = (
+    Path(__file__).resolve().parents[1] / "assets" / "danbooru_implications_ext.csv"
+)
 _implication_lock = threading.Lock()
 _implication_cache: Optional[Dict[str, set]] = None
 
@@ -167,11 +171,15 @@ def _implication_table() -> Dict[str, set]:
             return _implication_cache
         table: Dict[str, set] = {}
         bundled = _read_implication_csv(_BUNDLED_IMPLICATIONS, table)
+        bundled_ext = _read_implication_csv(_BUNDLED_IMPLICATIONS_EXT, table)
         dropin = _read_implication_csv(_dropin_implications_path(), table)
         if dropin:
             logger.info("Loaded %d drop-in tag implications from data/", dropin)
         logger.debug(
-            "Implication table ready: %d bundled + %d drop-in", bundled, dropin
+            "Implication table ready: %d bundled + %d ext + %d drop-in",
+            bundled,
+            bundled_ext,
+            dropin,
         )
         _implication_cache = table
         return table

@@ -78,6 +78,7 @@ logger = logging.getLogger(__name__)
 
 _wd14_character_tags: Optional[Set[str]] = None
 _booru_tag_categories: Optional[Dict[str, str]] = None
+_storyaura_character_tags: Optional[Set[str]] = None
 
 _BOORU_CATEGORY_BY_ID = {
     0: "general",
@@ -143,6 +144,26 @@ def _load_wd14_character_tags() -> Set[str]:
 
     logger.info("Loaded %d character tags from WD14 model files", len(tags))
     _wd14_character_tags = tags
+    return tags
+
+
+def _load_storyaura_character_tags() -> Set[str]:
+    """Popular character names from the bundled StoryAura catalog.
+
+    Lets Dataset Maker / export classify character tags before any WD14
+    model is downloaded. Isolated tests patch this cache to an empty set.
+    """
+    global _storyaura_character_tags
+    if _storyaura_character_tags is not None:
+        return _storyaura_character_tags
+    try:
+        from danbooru_catalog import get_character_tag_set
+
+        tags = set(get_character_tag_set())
+    except Exception as exc:
+        logger.debug("StoryAura character names unavailable: %s", exc)
+        tags = set()
+    _storyaura_character_tags = tags
     return tags
 
 
@@ -387,6 +408,10 @@ def categorize_tag(tag: str) -> str:
     # on character names (e.g. "hat" matching "hatsune_miku").
     wd14_chars = _load_wd14_character_tags()
     if wd14_chars and tag_lower in wd14_chars:
+        return "character"
+
+    storyaura_chars = _load_storyaura_character_tags()
+    if storyaura_chars and tag_lower in storyaura_chars:
         return "character"
 
     # Franchise-suffix heuristic: name_(franchise) → character
