@@ -465,22 +465,23 @@ test('ensureBuildSourceOption injects a one-off option for out-of-catalog ids', 
   expect(result.hasZeroOption).toBe(0)
 })
 
-// (8) first-use guide card — refreshFirstUseCard (run during init via
-// showFirstUseGuide) shows the start card only when the localStorage flag is
-// absent; dismissing sets 'promptlab-guide-seen' and hides it. This is the one
-// pin that needs the real init boot (the card.hidden write happens after init's
-// async loads). The suite storageState seeds only 'aurora-entry-skip', so the
-// guide flag is absent and the card shows. prompt-lab.js:84, :90.
-test('first-use guide card shows without the flag and dismiss persists it', async ({ page }) => {
+// (8) first-use guide card is quiet by default; Help unhides it, dismiss persists.
+test('first-use guide card stays hidden until Help, then dismiss persists it', async ({ page }) => {
   await openPromptLab(page)
 
-  // Card visible after init (no 'promptlab-guide-seen' flag yet).
   const before = await page.evaluate(() => ({
     hidden: (document.getElementById('promptlab-start-card') as HTMLElement | null)?.hidden ?? null,
     flag: localStorage.getItem('promptlab-guide-seen'),
   }))
-  expect(before.hidden).toBe(false)
+  expect(before.hidden).toBe(true)
   expect(before.flag).toBeNull()
+
+  await page.locator('#btn-help').click()
+  const guideClose = page.locator('.guide-modal-close')
+  if (await guideClose.count()) {
+    await guideClose.first().click({ force: true })
+  }
+  await expect(page.locator('#promptlab-start-card')).toBeVisible()
 
   await page.locator('#promptlab-start-dismiss').click()
 

@@ -2430,6 +2430,9 @@ window.I18nLang_en = {
     'settings.soundSavedOn': 'Manual sort sounds enabled',
     'settings.soundSavedOff': 'Manual sort sounds muted',
     'settings.appearanceTitle': 'Appearance',
+    'settings.refreshUiTitle': 'Hard refresh UI',
+    'settings.refreshUiBody': 'Clear browser caches and reload. Gallery, database, and settings stay.',
+    'settings.refreshUiAction': 'Reload UI',
     'settings.uiScaleBody': 'UI scale follows your desktop size',
     'settings.uiScaleLabel': 'UI Scale',
     'settings.uiScaleAuto': 'Auto',
@@ -2965,7 +2968,7 @@ window.I18nLang_en = {
     // ========================
     // First-use guides (overlay)
     // ========================
-    'guide.closeLabel': 'Got it!',
+    'guide.closeLabel': 'Got it',
     'guide.tooltip': 'Open the guide for the current tab',
     'guide.openLabel': 'Open Guide',
     'refresh.uiTooltip': 'Hard refresh: clear caches and reload the UI. Gallery / DB / settings are preserved.',

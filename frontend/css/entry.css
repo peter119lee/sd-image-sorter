@@ -731,8 +731,8 @@ body.entry-active {
 }
 
 .entry-library-menu-item.is-current {
-    background: rgba(var(--blue-rgb, 92, 200, 255), 0.14);
-    box-shadow: inset 0 0 0 1px rgba(var(--blue-rgb, 92, 200, 255), 0.28);
+    background: var(--accent-soft);
+    box-shadow: inset 0 0 0 1px var(--accent-line);
 }
 
 .entry-library-menu-row {

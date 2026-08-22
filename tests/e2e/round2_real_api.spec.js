@@ -20,23 +20,19 @@ async function main() {
     await page.waitForLoadState('networkidle').catch(() => {});
     await page.waitForTimeout(800);
 
-    // --- (7) refresh button in navbar next to ❓ ---
-    const navBtnPos = await page.evaluate(() => {
+    // --- (7) refresh button lives in Settings, not the navbar ---
+    const refreshPos = await page.evaluate(() => {
         const btn = document.getElementById('btn-refresh-ui');
-        const help = document.getElementById('btn-help');
-        if (!btn || !help) return null;
-        const r1 = btn.getBoundingClientRect();
-        const r2 = help.getBoundingClientRect();
+        if (!btn) return null;
         return {
-            visible: btn.offsetParent !== null,
-            adjacent: Math.abs(r1.left - r2.right) < 80,
             inNavActions: !!btn.closest('.nav-actions'),
+            inSettings: !!btn.closest('#model-manager-modal, [data-settings-panel="general"]'),
         };
     });
-    if (!navBtnPos || !navBtnPos.visible) throw new Error('btn-refresh-ui not visible in navbar');
-    if (!navBtnPos.inNavActions) throw new Error('btn-refresh-ui not in nav-actions row');
-    if (!navBtnPos.adjacent) throw new Error('btn-refresh-ui not adjacent to btn-help');
-    console.log('[ok] (7) refresh button visible in navbar adjacent to ❓');
+    if (!refreshPos) throw new Error('btn-refresh-ui missing');
+    if (refreshPos.inNavActions) throw new Error('btn-refresh-ui must not sit in the navbar');
+    if (!refreshPos.inSettings) throw new Error('btn-refresh-ui must live in Settings → General');
+    console.log('[ok] (7) refresh button moved to Settings');
 
     // --- (8) refresh button NOT in guide modal ---
     await page.click('#btn-help');

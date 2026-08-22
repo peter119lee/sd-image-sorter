@@ -8,10 +8,10 @@
     right: 20px;
     bottom: 20px;
     z-index: 200;
-    background: var(--bg-card, rgba(25, 25, 25, 0.97));
-    border: 1px solid rgba(var(--accent-rgb), 0.12);
-    border-radius: 16px;
-    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-modal, 6px);
+    box-shadow: var(--shadow-modal);
     flex-direction: column;
     overflow: hidden;
 }
@@ -26,8 +26,8 @@
     align-items: center;
     gap: 8px;
     padding: 8px 16px;
-    background: rgba(20, 20, 20, 0.9);
-    border-bottom: 1px solid rgba(var(--accent-rgb), 0.08);
+    background: var(--surface-1);
+    border-bottom: 1px solid var(--border);
     flex-shrink: 0;
     flex-wrap: wrap;
 }
@@ -574,11 +574,11 @@
     width: min(920px, calc(100% - 48px));
     max-height: calc(100% - 64px);
     overflow: auto;
-    background: rgba(22, 22, 22, 0.98);
-    border: 1px solid rgba(var(--accent-rgb), 0.12);
-    border-radius: 16px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-modal, 6px);
     padding: 18px;
-    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55);
+    box-shadow: var(--shadow-modal);
 }
 
 .qs-profile-header {

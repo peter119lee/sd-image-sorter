@@ -2606,6 +2606,9 @@ window.I18nLang_zhCN = {
     'settings.soundSavedOn': '手动排序音效已开启',
     'settings.soundSavedOff': '手动排序音效已静音',
     'settings.appearanceTitle': '外观',
+    'settings.refreshUiTitle': '强制刷新界面',
+    'settings.refreshUiBody': '清掉浏览器缓存并重新载入。图库、数据库和设置都还在。',
+    'settings.refreshUiAction': '重新载入界面',
     'settings.uiScaleBody': '界面缩放会跟随桌面尺寸',
     'settings.uiScaleLabel': '界面缩放',
     'settings.uiScaleAuto': '自动',
@@ -3132,7 +3135,7 @@ window.I18nLang_zhCN = {
     // ========================
     // First-use guides (overlay)
     // ========================
-    'guide.closeLabel': '知道了！',
+    'guide.closeLabel': '知道了',
     'guide.tooltip': '打开当前页面的使用指南',
     'guide.openLabel': '打开使用指南',
     'refresh.uiTooltip': '强制刷新：清掉浏览器缓存重新载入界面，图库 / 数据库 / 设置都不会丢。',

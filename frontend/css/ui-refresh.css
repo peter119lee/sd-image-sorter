@@ -10040,9 +10040,12 @@ html.lang-zh #view-censor .queue-action-btn span {
     flex-shrink: 0;
 }
 
-/* Wide bar: direct Prompt Helper / Style Finder tabs are visible,
-   so their duplicates inside the More menu stay hidden. */
-.nav-bar:not(.nav-priority-overflow) .nav-tools-mirror {
+/* Hide a More-mirror only while its direct tab is actually in the bar
+   (customized or contextual reveal) AND the overflow ladder has not
+   taken it away. Tucked-by-default tools therefore keep their standing
+   More entrance on every desktop width. */
+.nav-bar:not(.nav-priority-overflow):has(#nav-tab-promptlab:not(.nav-tab-tucked)) #nav-tools-promptlab,
+.nav-bar:not(.nav-priority-overflow):has(#nav-tab-artist:not(.nav-tab-tucked)) #nav-tools-artist {
     display: none !important;
 }
 

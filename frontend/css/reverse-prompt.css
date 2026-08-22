@@ -12,26 +12,9 @@
    reinforces what the label already says.
    ========================================================================== */
 
-/* The nav ladder's newest rung. `.nav-priority-advanced` (Prompt Helper, Style
-   Finder) drops into the More menu only when compacting the labels is not
-   enough; measured at 1920, a ninth direct tab is exactly what tips the bar
-   over, so this one drops ONE RUNG EARLIER rather than costing the two older
-   tools their place. Hidden tabs still respond to a programmatic click, so the
-   More-menu mirror keeps navigating. `!important` beats the ladder's own display
-   rules, matching how `.nav-tab-tucked` is written. */
-.nav-bar.nav-priority-tools-overflow .nav-priority-tool {
-    display: none !important;
-}
-
-/* ...and the mirror is only an ENTRANCE, so it appears only while the rung above
-   has taken the direct tab away. Without this the bar offered Reverse Prompt
-   twice at 1920 and 2560 (direct tab plus menu row); the same rule already
-   exists for the Prompt Helper / Style Finder mirrors two rows below in the same
-   menu (`.nav-bar:not(.nav-priority-overflow) .nav-tools-mirror`), so this
-   follows the convention rather than inventing one. `nav-missions.js` owns the
-   `hidden` attribute on every `[data-mirror-view]`, so this must win on
-   specificity, not only on `!important`. */
-.nav-bar:not(.nav-priority-tools-overflow) #nav-tools-reverse {
+/* Reverse Prompt is tucked by default (nav-missions). Show the More
+   mirror unless the direct tab is actually in the bar. */
+.nav-bar:not(.nav-priority-tools-overflow):has(#nav-tab-reverse:not(.nav-tab-tucked)) #nav-tools-reverse {
     display: none !important;
 }
 

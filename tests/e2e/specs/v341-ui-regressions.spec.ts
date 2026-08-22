@@ -186,28 +186,27 @@ test('clear gallery button should be visible on the gallery page, not buried in 
   await expect(clearButton).toHaveCount(1)
   await expect(clearButton).toBeVisible()
 
-  // It lives inside the gallery header (gallery page chrome)...
-  await expect(page.locator('.gallery-header #btn-clear-db')).toHaveCount(1)
+  // It lives in the gallery sidebar footer (still on the gallery page)...
+  await expect(page.locator('.filter-sidebar-footer #btn-clear-db')).toHaveCount(1)
+  await expect(page.locator('.gallery-header #btn-clear-db')).toHaveCount(0)
   // ...and is gone from the import/scan modal's danger zone.
   await expect(page.locator('#scan-modal #btn-clear-db')).toHaveCount(0)
   await expect(page.locator('#scan-modal .scan-danger-zone')).toHaveCount(0)
 
-  // Dangerous op stays separated from everyday controls: it sits at the
-  // far-right end of the header, AFTER (not inside) the view options group.
+  // Dangerous op stays away from view toggles / sort on the thumbnail row.
   const separation = await page.evaluate(() => {
     const button = document.getElementById('btn-clear-db')
     const viewOptions = document.querySelector('.gallery-header .view-options')
-    if (!button || !viewOptions) return null
-    const buttonBox = button.getBoundingClientRect()
-    const viewOptionsBox = viewOptions.getBoundingClientRect()
+    const sidebar = document.querySelector('.filter-sidebar')
+    if (!button || !viewOptions || !sidebar) return null
     return {
       isInsideViewOptions: viewOptions.contains(button),
-      startsAfterViewOptions: buttonBox.left >= viewOptionsBox.right,
+      isInSidebar: sidebar.contains(button),
     }
   })
   expect(separation).toEqual({
     isInsideViewOptions: false,
-    startsAfterViewOptions: true,
+    isInSidebar: true,
   })
 
   // The existing handler + confirmation flow must still fire from the new

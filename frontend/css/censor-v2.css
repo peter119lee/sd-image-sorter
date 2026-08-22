@@ -1,6 +1,6 @@
-/* ===== Censor Edit V2 Styles (Premium & Stabilized) ===== */
+/* ===== Censor Edit V2 — Graphite workbench ===== */
 
-/* Note: CSS custom properties are defined in styles.css */
+/* Note: CSS custom properties are defined in tokens.css / styles.css */
 
 /* Filter Adjustments */
 .filter-adjustments-grid {
@@ -35,10 +35,10 @@
 .filter-histogram-wrap {
     width: 100%;
     height: 60px;
-    border-radius: 6px;
+    border-radius: var(--r-card, 5px);
     overflow: hidden;
-    background: rgba(0,0,0,0.3);
-    border: 1px solid rgba(255,255,255,0.06);
+    background: var(--stage);
+    border: 1px solid var(--border);
     margin-bottom: 6px;
 }
 .filter-histogram-wrap canvas {
@@ -60,7 +60,7 @@
     overflow: hidden !important;
 }
 
-/* Ambient Background Effects — retired by the Aurora flat stage (Phase 1) */
+/* Ambient blobs — retired; Graphite stage is a flat matte surface. */
 #view-censor .censor-workspace-v2::before {
     display: none;
     content: '';
@@ -91,7 +91,7 @@
     z-index: 0;
 }
 
-/* Sidebars - Premium Glassmorphism + Strict Sizing */
+/* Sidebars — Graphite opaque panels + strict sizing */
 #view-censor .censor-sidebar-v2 {
     width: 236px !important;
     min-width: 236px !important;
@@ -99,22 +99,22 @@
     /* CRITICAL: Prevent crushing */
     display: flex !important;
     flex-direction: column !important;
-    background: rgba(20, 20, 20, 0.65) !important;
-    border-right: 1px solid rgba(var(--censor-accent-rgb), 0.15) !important;
+    background: var(--surface-1) !important;
+    border-right: 1px solid var(--border) !important;
     padding: 10px !important;
     height: var(--censor-workspace-height, var(--ui-viewport-below-nav, calc(100vh - var(--nav-height)))) !important;
     max-height: var(--censor-workspace-height, var(--ui-viewport-below-nav, calc(100vh - var(--nav-height)))) !important;
     z-index: 20;
     overflow-y: auto !important;
-    box-shadow: 5px 0 30px rgba(0, 0, 0, 0.2);
+    box-shadow: none;
 }
 
 #view-censor .censor-sidebar-v2.right {
     width: 328px !important;
     min-width: 328px !important;
     border-right: none !important;
-    border-left: 1px solid rgba(var(--censor-accent-rgb), 0.15) !important;
-    box-shadow: -5px 0 30px rgba(0, 0, 0, 0.2);
+    border-left: 1px solid var(--border) !important;
+    box-shadow: none;
 }
 
 /* Sidebar Headers */
@@ -122,16 +122,15 @@
     font-family: var(--font-display);
     font-size: 14px;
     font-weight: 600;
-    color: var(--censor-accent-text);
-    text-transform: uppercase;
-    letter-spacing: 2px;
+    color: var(--text-2);
+    text-transform: none;
+    letter-spacing: 0.01em;
     margin-bottom: 16px;
     padding-bottom: 12px;
-    border-bottom: 1px solid rgba(var(--censor-accent-rgb), 0.2);
+    border-bottom: 1px solid var(--border);
     display: flex;
     align-items: center;
     gap: 8px;
-    text-shadow: 0 0 10px rgba(var(--censor-accent-rgb), 0.3);
 }
 
 /* Main Area */
@@ -168,12 +167,12 @@
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-    background: rgba(8, 8, 8, 0.3);
+    background: var(--stage);
     overflow: hidden !important;
     margin: 0 20px 20px 20px !important;
-    border-radius: 20px !important;
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    box-shadow: inset 0 0 50px rgba(0, 0, 0, 0.5);
+    border-radius: var(--r-card, 5px) !important;
+    border: 1px solid var(--border);
+    box-shadow: none;
     min-height: 0 !important;
     /* Critical for flex child to shrink properly */
 }
@@ -185,7 +184,7 @@
 /* Canvas Elements */
 .censor-canvas-wrapper-v2 canvas {
     transition: transform 0.1s ease-out, opacity 160ms ease-in-out !important;
-    filter: drop-shadow(0 0 20px rgba(0, 0, 0, 0.5));
+    filter: none;
 }
 
 #censor-canvas-buffer {
@@ -193,28 +192,27 @@
     pointer-events: none;
 }
 
-/* Zoom Controls - Premium Floating Pill */
+/* Zoom Controls — Graphite bar (not a stadium pill) */
 .zoom-controls-bar {
-    box-shadow: none;
     top: 30px;
     left: 50%;
     transform: translateX(-50%);
-    background: rgba(25, 25, 25, 0.6);
+    background: var(--surface-1);
     padding: 6px 8px;
-    border-radius: 100px;
+    border-radius: var(--r-ctl, 4px);
     display: flex;
     gap: 4px;
     align-items: center;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    box-shadow: var(--shadow-float);
+    border: 1px solid var(--border);
+    box-shadow: none;
     z-index: 50;
-    transition: all 160ms ease;
+    transition: background 160ms ease, border-color 160ms ease;
 }
 
 .zoom-controls-bar:hover {
-    background: rgba(32, 32, 32, 0.8);
-    border-color: rgba(var(--censor-accent-rgb), 0.3);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+    background: var(--surface-2);
+    border-color: var(--border);
+    box-shadow: none;
 }
 
 .zoom-btn {
@@ -222,14 +220,14 @@
     height: 32px;
     border: none;
     background: transparent;
-    color: #D6D6D6;
+    color: var(--text-2);
     cursor: pointer;
     font-size: 16px;
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 50%;
-    transition: all 160ms;
+    border-radius: var(--r-ctl, 4px);
+    transition: background 160ms, color 160ms;
 }
 
 .zoom-btn:hover {
@@ -238,13 +236,12 @@
 }
 
 .zoom-level {
-    color: var(--censor-accent);
+    color: var(--accent);
     font-family: var(--font-mono);
     font-size: 13px;
     font-weight: 600;
     min-width: 48px;
     text-align: center;
-    text-shadow: 0 0 10px rgba(var(--censor-accent-rgb), 0.4);
 }
 
 /* Queue Thumbnails - Modern Grid */
@@ -263,10 +260,10 @@
     aspect-ratio: 1;
     width: 100%;
     object-fit: cover;
-    border-radius: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: var(--r-tile, 3px);
+    border: 1px solid var(--border);
     cursor: pointer;
-    transition: all 160ms cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition: border-color 160ms ease, box-shadow 160ms ease;
     background: #000;
 }
 
@@ -289,12 +286,12 @@
     min-height: 18px;
     padding: 2px 5px;
     border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 999px;
-    background: rgba(16, 16, 16, 0.9);
-    color: #E9E9E9;
+    border-radius: var(--r-ctl, 4px);
+    background: var(--surface-2);
+    color: var(--text);
     font: 700 9px/1.2 var(--font-sans);
     white-space: nowrap;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+    box-shadow: none;
     pointer-events: none;
 }
 
@@ -344,15 +341,13 @@ button.censor-batch-outcome-badge:focus-visible {
 }
 
 .queue-thumb-v2:hover {
-    transform: translateY(-2px) scale(1.02);
-    border-color: rgba(var(--censor-accent-rgb), 0.4);
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+    border-color: rgba(var(--accent-rgb), 0.4);
+    box-shadow: none;
 }
 
 .queue-thumb-v2.active {
     border-color: var(--censor-accent);
     box-shadow: none;
-    transform: scale(1.02);
     z-index: 2;
 }
 
@@ -386,8 +381,8 @@ button.censor-batch-outcome-badge:focus-visible {
     padding: 40px 0;
     color: rgba(255, 255, 255, 0.3);
     text-align: center;
-    border: 2px dashed rgba(255, 255, 255, 0.1);
-    border-radius: 16px;
+    border: 2px dashed var(--border);
+    border-radius: var(--r-card, 5px);
     margin-top: 20px;
 }
 
@@ -406,44 +401,44 @@ button.censor-batch-outcome-badge:focus-visible {
     display: block;
     font-size: 12px;
     font-weight: 600;
-    color: #A6A6A6;
+    color: var(--text-2);
     margin-bottom: 8px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+    text-transform: none;
+    letter-spacing: 0.01em;
 }
 
 .censor-input {
     width: 100%;
-    background: rgba(0, 0, 0, 0.3);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    color: #fff;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    color: var(--text);
     padding: 10px 12px;
-    border-radius: 8px;
+    border-radius: var(--r-ctl, 4px);
     font-family: inherit;
     font-size: 13px;
-    transition: all 160ms;
+    transition: border-color 160ms, box-shadow 160ms;
 }
 
 .censor-input:focus {
     outline: none;
-    border-color: var(--censor-accent);
-    background: rgba(0, 0, 0, 0.5);
-    box-shadow: 0 0 0 3px rgba(var(--censor-accent-rgb), 0.1);
+    border-color: var(--accent);
+    background: var(--surface-2);
+    box-shadow: var(--focus-ring);
 }
 
-/* Tools Bar - Floating Bottom */
+/* Tools Bar — Graphite workbench strip */
 .censor-toolbar-v2 {
     display: flex;
     gap: 4px;
     padding: 8px 16px;
-    background: rgba(25, 25, 25, 0.85);
-    border: 1px solid rgba(var(--censor-accent-rgb), 0.2);
-    border-radius: var(--radius-full);
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--r-card, 5px);
     flex-shrink: 0 !important;
     margin: 12px auto;
     position: relative;
     z-index: 50;
-    box-shadow: var(--shadow-float), 0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+    box-shadow: none;
 }
 
 /* Toolbar divider */
@@ -463,32 +458,32 @@ button.censor-batch-outcome-badge:focus-visible {
 }
 
 .toolbar-select {
-    background: rgba(0, 0, 0, 0.3);
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    color: var(--censor-accent-text);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    color: var(--text);
     padding: 6px 10px;
-    border-radius: 8px;
+    border-radius: var(--r-ctl, 4px);
     font-size: 12px;
     font-weight: 500;
     cursor: pointer;
     appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10' fill='none'%3E%3Cpath d='M2 3.5L5 6.5L8 3.5' stroke='%23e9d5ff' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10' fill='none'%3E%3Cpath d='M2 3.5L5 6.5L8 3.5' stroke='%23A6A6AB' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
     background-position: right 8px center;
     padding-right: 24px;
     min-width: 100px;
-    transition: all 160ms;
+    transition: border-color 160ms, background-color 160ms;
 }
 
 .toolbar-select:hover {
-    background-color: rgba(var(--censor-accent-rgb), 0.2);
-    border-color: rgba(var(--censor-accent-rgb), 0.4);
+    background-color: var(--surface-2);
+    border-color: var(--border-strong);
 }
 
 .toolbar-select:focus {
     outline: none;
-    border-color: rgba(var(--censor-accent-rgb), 0.5);
-    box-shadow: 0 0 0 2px rgba(var(--censor-accent-rgb), 0.2);
+    border-color: var(--border-strong);
+    box-shadow: var(--focus-ring);
 }
 
 .toolbar-select option {
@@ -503,31 +498,30 @@ button.censor-batch-outcome-badge:focus-visible {
     justify-content: center;
     gap: 3px;
     padding: 8px 12px;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: var(--radius-lg);
-    color: #A6A6A6;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-ctl, 4px);
+    color: var(--text-2);
     cursor: pointer;
-    transition: all 160ms cubic-bezier(0.4, 0, 0.2, 1);
+    transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
     min-width: 56px;
 }
 
 .tool-btn-v2:hover {
-    background: rgba(var(--censor-accent-rgb), 0.12);
-    border-color: rgba(var(--censor-accent-rgb), 0.25);
-    color: var(--censor-accent-text);
-    transform: translateY(-1px);
+    background: rgba(var(--accent-rgb), 0.12);
+    border-color: rgba(var(--accent-rgb), 0.25);
+    color: var(--text);
 }
 
 .tool-btn-v2.active {
-    background: rgba(var(--censor-accent-rgb), 0.3);
-    border-color: rgba(var(--censor-accent-rgb), 0.5);
-    color: var(--censor-accent-text);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    background: rgba(var(--accent-rgb), 0.3);
+    border-color: rgba(var(--accent-rgb), 0.5);
+    color: var(--text);
+    box-shadow: none;
 }
 
 .tool-btn-v2.active .tool-icon-v2 {
-    filter: drop-shadow(0 0 4px rgba(var(--censor-accent-rgb), 0.6));
+    filter: none;
 }
 
 .tool-icon-v2 {
@@ -536,10 +530,9 @@ button.censor-batch-outcome-badge:focus-visible {
 }
 
 .tool-label {
-    
     font-weight: 600;
-    letter-spacing: 0.3px;
-    text-transform: uppercase;
+    letter-spacing: 0.01em;
+    text-transform: none;
     opacity: 0.9;
 }
 
@@ -548,13 +541,13 @@ button.censor-batch-outcome-badge:focus-visible {
     width: 100%;
     padding: 12px;
     margin-top: 12px;
-    background: rgba(var(--censor-accent-rgb), 0.1);
-    border: 1px solid rgba(var(--censor-accent-rgb), 0.3);
-    border-radius: var(--radius-lg);
-    color: var(--censor-accent-text);
+    background: rgba(var(--accent-rgb), 0.1);
+    border: 1px solid rgba(var(--accent-rgb), 0.3);
+    border-radius: var(--r-ctl, 4px);
+    color: var(--text);
     font-weight: 600;
     cursor: pointer;
-    transition: all 160ms;
+    transition: background 160ms, border-color 160ms;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -562,10 +555,8 @@ button.censor-batch-outcome-badge:focus-visible {
 }
 
 .action-btn-v2:hover {
-    background: rgba(var(--censor-accent-rgb), 0.8);
-    
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.30);
-    transform: translateY(-1px);
+    background: rgba(var(--accent-rgb), 0.8);
+    box-shadow: none;
     border-color: transparent;
 }
 
@@ -577,8 +568,7 @@ button.censor-batch-outcome-badge:focus-visible {
 
 .action-btn-v2.danger:hover {
     background: rgba(var(--danger-rgb), 0.8);
-    
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.30);
+    box-shadow: none;
 }
 
 /* Scrollbars */
@@ -647,8 +637,8 @@ button.censor-batch-outcome-badge:focus-visible {
     justify-content: space-between;
     align-items: center;
     padding: 12px 24px;
-    background: rgba(18, 18, 18, 0.7);
-    border-top: 1px solid rgba(var(--censor-accent-rgb), 0.15);
+    background: var(--surface-1);
+    border-top: 1px solid var(--border);
     gap: 20px;
     z-index: 40;
 }
@@ -686,15 +676,15 @@ button.censor-batch-outcome-badge:focus-visible {
     white-space: nowrap;
 }
 
-/* Zoom Controls V2 - Premium Pill */
+/* Zoom Controls V2 — Graphite bar */
 .zoom-controls-v2 {
     display: flex;
     align-items: center;
     gap: 4px;
-    background: rgba(0, 0, 0, 0.4);
+    background: var(--surface-2);
     padding: 4px;
-    border-radius: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: var(--r-ctl, 4px);
+    border: 1px solid var(--border);
 }
 
 .zoom-btn-v2 {
@@ -705,11 +695,11 @@ button.censor-batch-outcome-badge:focus-visible {
     justify-content: center;
     background: transparent;
     border: none;
-    color: #D6D6D6;
+    color: var(--text-2);
     cursor: pointer;
     font-size: 16px;
-    border-radius: 8px;
-    transition: all 160ms;
+    border-radius: var(--r-ctl, 4px);
+    transition: background 160ms, color 160ms;
 }
 
 .zoom-btn-v2:hover {
@@ -720,10 +710,9 @@ button.censor-batch-outcome-badge:focus-visible {
 .zoom-btn-v2.reset {
     width: auto;
     padding: 0 12px;
-    
     font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+    text-transform: none;
+    letter-spacing: 0.01em;
 }
 
 .zoom-level-v2 {
@@ -748,10 +737,11 @@ button.censor-batch-outcome-badge:focus-visible {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    background: rgba(0, 0, 0, 0.7);
-    color: var(--censor-accent);
+    background: var(--surface-2);
+    color: var(--accent);
     padding: 8px 16px;
-    border-radius: 20px;
+    border: 1px solid var(--border);
+    border-radius: var(--r-ctl, 4px);
     font-family: var(--font-mono);
     font-size: 14px;
     font-weight: 600;
@@ -788,10 +778,10 @@ button.censor-batch-outcome-badge:focus-visible {
 .sidebar-flat-section,
 .censor-side-card {
     padding: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    border-radius: 16px;
-    background: rgba(255, 255, 255, 0.03);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--border);
+    border-radius: var(--r-card, 5px);
+    background: var(--surface-2);
+    box-shadow: none;
     margin-bottom: 10px;
 }
 
@@ -840,9 +830,9 @@ button.censor-batch-outcome-badge:focus-visible {
     gap: 4px;
     margin-bottom: 10px;
     padding: 4px;
-    border-radius: 14px;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: var(--r-card, 5px);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
 }
 .censor-tab {
     flex: 1;
@@ -852,7 +842,7 @@ button.censor-batch-outcome-badge:focus-visible {
     gap: 6px;
     padding: 8px 6px;
     border: 1px solid transparent;
-    border-radius: 10px;
+    border-radius: var(--r-ctl, 4px);
     background: transparent;
     color: var(--text-secondary, #A6A6A6);
     font-size: 13px;
@@ -879,9 +869,9 @@ button.censor-batch-outcome-badge:focus-visible {
 /* Review conveyor pane */
 .censor-review {
     padding: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    border-radius: 16px;
-    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border);
+    border-radius: var(--r-card, 5px);
+    background: var(--surface-2);
 }
 .censor-review-head {
     display: flex;
@@ -895,9 +885,9 @@ button.censor-batch-outcome-badge:focus-visible {
     font-variant-numeric: tabular-nums;
     color: var(--text-secondary, #A6A6A6);
     padding: 2px 8px;
-    border-radius: 999px;
-    background: rgba(var(--blue-rgb), 0.10);
-    border: 1px solid rgba(var(--blue-rgb), 0.22);
+    border-radius: var(--r-ctl, 4px);
+    background: rgba(var(--accent-rgb), 0.10);
+    border: 1px solid rgba(var(--accent-rgb), 0.22);
     white-space: nowrap;
 }
 .censor-review-hint {
@@ -934,9 +924,9 @@ button.censor-batch-outcome-badge:focus-visible {
     align-items: center;
     gap: 8px;
     padding: 6px 8px;
-    border-radius: 8px;
-    border: 1px solid rgba(var(--purple-rgb), 0.28);
-    background: rgba(var(--purple-rgb), 0.06);
+    border-radius: var(--r-ctl, 4px);
+    border: 1px solid var(--border);
+    background: var(--surface-1);
     font-size: 12px;
     cursor: pointer;
     transition: opacity 120ms ease, border-color 120ms ease, background 120ms ease;
@@ -1067,9 +1057,9 @@ button.censor-batch-outcome-badge:focus-visible {
     width: 100%;
     height: 38px;
     padding: 4px;
-    border: 1px solid rgba(255,255,255,0.15);
-    border-radius: 10px;
-    background: rgba(0,0,0,0.24);
+    border: 1px solid var(--border);
+    border-radius: var(--r-ctl, 4px);
+    background: var(--surface-1);
     cursor: pointer;
 }
 
@@ -1110,9 +1100,9 @@ button.censor-batch-outcome-badge:focus-visible {
     flex-direction: column;
     gap: 4px;
     padding: 8px 9px;
-    border-radius: 12px;
-    background: rgba(0, 0, 0, 0.18);
-    border: 1px solid rgba(255, 255, 255, 0.04);
+    border-radius: var(--r-card, 5px);
+    background: var(--surface-1);
+    border: 1px solid var(--border);
 }
 
 .sidebar-filter-item label {
@@ -1142,7 +1132,7 @@ button.censor-batch-outcome-badge:focus-visible {
     display: flex;
     flex-direction: column;
     gap: 10px;
-    background: rgba(20, 20, 20, 0.2);
+    background: var(--surface-1);
 }
 
 .censor-filter-presets {
@@ -1214,9 +1204,8 @@ button.censor-batch-outcome-badge:focus-visible {
     font-family: var(--font-display);
     font-size: 16px;
     font-weight: 700;
-    color: var(--censor-accent-text);
+    color: var(--text);
     margin: 0 0 4px 0;
-    text-shadow: 0 0 15px rgba(var(--censor-accent-rgb), 0.4);
 }
 
 .sidebar-subtitle {
@@ -1228,9 +1217,9 @@ button.censor-batch-outcome-badge:focus-visible {
 /* Property Sections */
 .property-section {
     margin-bottom: 6px;
-    background: rgba(0, 0, 0, 0.2);
-    border-radius: 14px;
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    background: var(--surface-2);
+    border-radius: var(--r-card, 5px);
+    border: 1px solid var(--border);
     overflow: hidden;
 }
 
@@ -1307,19 +1296,19 @@ button.censor-batch-outcome-badge:focus-visible {
 
 .input-v2 {
     width: 100%;
-    background: rgba(0, 0, 0, 0.3);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    color: #fff;
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    color: var(--text);
     padding: 10px 12px;
-    border-radius: var(--radius-md);
+    border-radius: var(--r-ctl, 4px);
     font-size: 13px;
-    transition: all 160ms;
+    transition: border-color 160ms, box-shadow 160ms;
 }
 
 .input-v2:focus {
     outline: none;
-    border-color: rgba(var(--censor-accent-rgb), 0.5);
-    box-shadow: 0 0 0 3px rgba(var(--censor-accent-rgb), 0.1);
+    border-color: var(--border-strong);
+    box-shadow: var(--focus-ring);
 }
 
 .input-row {
@@ -1334,14 +1323,14 @@ button.censor-batch-outcome-badge:focus-visible {
 /* Select V2 */
 .select-v2 {
     width: 100%;
-    background: rgba(0, 0, 0, 0.3);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    color: #fff;
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    color: var(--text);
     padding: 10px 12px;
-    border-radius: 8px;
+    border-radius: var(--r-ctl, 4px);
     font-size: 13px;
     cursor: pointer;
-    transition: all 160ms;
+    transition: border-color 160ms;
     appearance: none;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M3 4.5L6 7.5L9 4.5' stroke='%239ca3af' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
@@ -1376,7 +1365,7 @@ button.censor-batch-outcome-badge:focus-visible {
     background: var(--censor-accent);
     border-radius: 50%;
     cursor: pointer;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.40);
+    box-shadow: none;
     transition: transform 0.15s;
 }
 
@@ -1397,9 +1386,9 @@ button.censor-batch-outcome-badge:focus-visible {
     gap: 10px;
     cursor: pointer;
     padding: 8px 12px;
-    background: rgba(0, 0, 0, 0.2);
-    border-radius: 8px;
-    transition: all 160ms;
+    background: var(--surface-1);
+    border-radius: var(--r-ctl, 4px);
+    transition: background 160ms;
 }
 
 .checkbox-v2:hover {
@@ -1447,21 +1436,20 @@ button.censor-batch-outcome-badge:focus-visible {
     gap: 8px;
     width: 100%;
     padding: 12px 16px;
-    background: rgba(var(--censor-accent-rgb), 0.2);
-    border: 1px solid rgba(var(--censor-accent-rgb), 0.3);
-    border-radius: var(--radius-lg);
-    color: var(--censor-accent-text);
+    background: rgba(var(--accent-rgb), 0.2);
+    border: 1px solid rgba(var(--accent-rgb), 0.3);
+    border-radius: var(--r-ctl, 4px);
+    color: var(--text);
     font-weight: 600;
     font-size: 13px;
     cursor: pointer;
-    transition: all 160ms;
+    transition: background 160ms, border-color 160ms;
 }
 
 .btn-v2:hover {
-    background: rgba(var(--censor-accent-rgb), 0.4);
-    border-color: rgba(var(--censor-accent-rgb), 0.5);
-    transform: translateY(-1px);
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25);
+    background: rgba(var(--accent-rgb), 0.4);
+    border-color: rgba(var(--accent-rgb), 0.5);
+    box-shadow: none;
 }
 
 .btn-v2 .btn-icon {
@@ -1476,7 +1464,7 @@ button.censor-batch-outcome-badge:focus-visible {
 
 .btn-v2.btn-run:hover {
     background: #3C7D54;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.30);
+    box-shadow: none;
 }
 
 .btn-v2.btn-detect {
@@ -1488,7 +1476,7 @@ button.censor-batch-outcome-badge:focus-visible {
 .btn-v2.btn-detect:hover {
     background: rgba(var(--accent-rgb), 0.4);
     border-color: rgba(var(--accent-rgb), 0.5);
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25);
+    box-shadow: none;
 }
 
 .btn-v2.btn-save-all {
@@ -1500,22 +1488,22 @@ button.censor-batch-outcome-badge:focus-visible {
 .btn-v2.btn-save-all:hover {
     background: rgba(var(--success-rgb), 0.4);
     border-color: rgba(var(--success-rgb), 0.5);
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25);
+    box-shadow: none;
 }
 
 .btn-icon-v2 {
     width: 36px;
     height: 36px;
     border: none;
-    background: rgba(255, 255, 255, 0.05);
-    color: rgba(255, 255, 255, 0.6);
-    border-radius: var(--radius-md);
+    background: var(--surface-2);
+    color: var(--text-2);
+    border-radius: var(--r-ctl, 4px);
     cursor: pointer;
     font-size: 16px;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all 160ms;
+    transition: background 160ms, color 160ms;
 }
 
 .btn-icon-v2:hover {
@@ -1531,11 +1519,10 @@ button.censor-batch-outcome-badge:focus-visible {
 }
 
 .status-pill {
-    
     padding: 4px 8px;
-    border-radius: 20px;
-    background: rgba(0, 0, 0, 0.2);
-    color: rgba(255, 255, 255, 0.5);
+    border-radius: var(--r-ctl, 4px);
+    background: var(--surface-1);
+    color: var(--muted);
 }
 
 .status-pill.processed {
@@ -1596,7 +1583,7 @@ button.censor-batch-outcome-badge:focus-visible {
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 8px;
+    border-radius: var(--r-ctl, 4px);
 }
 
 .queue-actions-row {
@@ -1611,8 +1598,8 @@ button.censor-batch-outcome-badge:focus-visible {
 .queue-selection-count {
     min-height: 24px;
     padding: 2px 8px;
-    border-radius: 999px;
-    background: rgba(var(--censor-accent-rgb), 0.14);
+    border-radius: var(--r-ctl, 4px);
+    background: rgba(var(--accent-rgb), 0.14);
     color: #FAF4ED;
 
     font-weight: 600;
@@ -1632,7 +1619,7 @@ button.censor-batch-outcome-badge:focus-visible {
     padding: 3px 5px;
     font-size: 11px;
     flex-shrink: 0;
-    border-radius: 8px;
+    border-radius: var(--r-ctl, 4px);
 }
 
 #btn-queue-select-all,
@@ -1691,9 +1678,9 @@ button.censor-batch-outcome-badge:focus-visible {
 
 .queue-manager-toggle {
     padding: 6px 10px;
-    border-radius: 10px;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: var(--r-ctl, 4px);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
     font-size: 12px;
 }
 
@@ -1704,9 +1691,9 @@ button.censor-batch-outcome-badge:focus-visible {
     gap: 6px;
     flex-wrap: wrap;
     padding: 8px 10px;
-    border-radius: 12px;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(var(--accent-rgb), 0.08);
+    border-radius: var(--r-card, 5px);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
 }
 
 .queue-manager-count {
@@ -1756,18 +1743,17 @@ button.censor-batch-outcome-badge:focus-visible {
 
 .queue-manager-grid-item {
     position: relative;
-    border-radius: 12px;
-    border: 1px solid rgba(var(--accent-rgb), 0.08);
-    background: rgba(16, 16, 16, 0.72);
+    border-radius: var(--r-card, 5px);
+    border: 1px solid var(--border);
+    background: var(--surface-1);
     overflow: hidden;
     cursor: pointer;
-    transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+    transition: border-color 0.15s ease;
 }
 
 .queue-manager-grid-item:hover {
-    transform: translateY(-2px);
-    border-color: rgba(var(--accent-primary-rgb), 0.3);
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+    border-color: rgba(var(--accent-rgb), 0.3);
+    box-shadow: none;
 }
 
 .queue-manager-grid-item.is-selected {
@@ -1862,8 +1848,8 @@ button.censor-batch-outcome-badge:focus-visible {
     align-items: center;
     justify-content: center;
     padding: 20px;
-    border-radius: 14px;
-    border: 1px dashed rgba(var(--accent-rgb), 0.16);
+    border-radius: var(--r-card, 5px);
+    border: 1px dashed var(--border);
     color: var(--text-muted);
     font-size: 13px;
     text-align: center;
@@ -1876,9 +1862,9 @@ button.censor-batch-outcome-badge:focus-visible {
     width: 96px;
     aspect-ratio: 1.15 / 1;
     overflow: hidden;
-    border-radius: 14px;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: var(--r-card, 5px);
+    background: var(--surface-1);
+    border: 1px solid var(--border);
 }
 
 .queue-manager-thumb {
@@ -1922,8 +1908,8 @@ button.censor-batch-outcome-badge:focus-visible {
     display: inline-flex;
     align-items: center;
     padding: 4px 8px;
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.05);
+    border-radius: var(--r-ctl, 4px);
+    background: var(--surface-2);
     color: var(--text-secondary);
     
     font-weight: 600;
@@ -1967,10 +1953,9 @@ button.censor-batch-outcome-badge:focus-visible {
     justify-content: center;
     gap: 8px;
     padding: 8px;
-    background: rgba(0, 0, 0, 0.2);
-    
-    color: rgba(255, 255, 255, 0.5);
-    border-radius: 8px;
+    background: var(--surface-2);
+    color: var(--muted);
+    border-radius: var(--r-ctl, 4px);
 }
 
 .censor-status-bar.sidebar-status {
@@ -2010,9 +1995,9 @@ button.censor-batch-outcome-badge:focus-visible {
     display: flex;
     align-items: center;
     gap: 4px;
-    background: rgba(0, 0, 0, 0.3);
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    border-radius: 12px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-ctl, 4px);
     padding: 6px;
     margin-top: 4px;
 }
@@ -2024,21 +2009,20 @@ button.censor-batch-outcome-badge:focus-visible {
     justify-content: center;
     gap: 10px;
     padding: 12px 16px;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: var(--radius-xl);
-    color: #D6D6D6;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-ctl, 4px);
+    color: var(--text-2);
     font-size: 13px;
     font-weight: 500;
     cursor: pointer;
-    transition: all 160ms cubic-bezier(0.4, 0, 0.2, 1);
+    transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
 }
 
 .btn-side-v2:hover {
-    background: rgba(var(--censor-accent-rgb), 0.1);
-    border-color: rgba(var(--censor-accent-rgb), 0.3);
-    color: var(--censor-accent-text);
-    transform: translateY(-1px);
+    background: rgba(var(--accent-rgb), 0.1);
+    border-color: rgba(var(--accent-rgb), 0.3);
+    color: var(--text);
 }
 
 .btn-side-v2.primary {
@@ -2049,9 +2033,9 @@ button.censor-batch-outcome-badge:focus-visible {
 }
 
 .btn-side-v2.primary:hover {
-    background: rgba(var(--censor-accent-rgb), 0.4);
-    border-color: rgba(var(--censor-accent-rgb), 0.6);
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25);
+    background: rgba(var(--accent-rgb), 0.4);
+    border-color: rgba(var(--accent-rgb), 0.6);
+    box-shadow: none;
 }
 
 .btn-side-v2.danger {
@@ -2378,9 +2362,9 @@ button.censor-batch-outcome-badge:focus-visible {
 .censor-detect-section {
     margin-top: 16px;
     padding: 14px;
-    border-radius: 16px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    background: rgba(21, 21, 21, 0.52);
+    border-radius: var(--r-card, 5px);
+    border: 1px solid var(--border);
+    background: var(--surface-2);
 }
 
 .censor-detect-section-header {
@@ -2405,7 +2389,7 @@ button.censor-batch-outcome-badge:focus-visible {
 
 .censor-detect-section-pro {
     border-color: rgba(var(--accent-rgb), 0.28);
-    background: rgba(22, 22, 22, 0.72);
+    background: var(--surface-2);
 }
 
 .censor-detect-actions {
@@ -2415,15 +2399,15 @@ button.censor-batch-outcome-badge:focus-visible {
 }
 
 .censor-capability-card {
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 14px;
+    border: 1px solid var(--border);
+    border-radius: var(--r-card, 5px);
     padding: 12px;
-    background: rgba(26, 26, 26, 0.48);
+    background: var(--surface-1);
 }
 
 .censor-capability-card.is-recommended {
     border-color: rgba(var(--accent-rgb), 0.45);
-    box-shadow: 0 0 0 1px rgba(var(--accent-rgb), 0.15) inset;
+    box-shadow: none;
 }
 
 .censor-capability-title {
@@ -2440,10 +2424,9 @@ button.censor-batch-outcome-badge:focus-visible {
     align-items: center;
     gap: 6px;
     padding: 4px 8px;
-    border-radius: 999px;
-    
-    background: rgba(255, 255, 255, 0.08);
-    color: rgba(255, 255, 255, 0.9);
+    border-radius: var(--r-ctl, 4px);
+    background: var(--surface-2);
+    color: var(--text);
 }
 
 .censor-capability-lines {
@@ -2536,4 +2519,67 @@ button.censor-batch-outcome-badge:focus-visible {
     .queue-manager-position-row {
         flex-direction: column;
     }
+}
+
+/* Graphite chrome pins. ui-refresh.css / tokens.css load later and still
+   force glass fills, 22–24px stadium radii, and hover glow on these nodes.
+   Specificity is raised only for surface/radius/shadow — layout stays above. */
+#view-censor .censor-workspace-v2 .censor-canvas-wrapper-v2 {
+    background: var(--stage) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: var(--r-card, 5px) !important;
+    box-shadow: none !important;
+}
+
+#view-censor .censor-workspace-v2 .censor-canvas-wrapper-v2 canvas {
+    filter: none !important;
+}
+
+#view-censor .censor-workspace-v2 .censor-toolbar-v2 {
+    background: var(--surface-1) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: var(--r-card, 5px) !important;
+    box-shadow: none !important;
+}
+
+#view-censor .censor-workspace-v2 .censor-footer-bars {
+    background: var(--surface-1) !important;
+    border-top: 1px solid var(--border) !important;
+}
+
+#view-censor .censor-workspace-v2 .zoom-controls-bar,
+#view-censor .censor-workspace-v2 .zoom-controls-v2 {
+    background: var(--surface-1) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: var(--r-ctl, 4px) !important;
+    box-shadow: none !important;
+}
+
+#view-censor .censor-workspace-v2 .zoom-controls-bar:hover {
+    background: var(--surface-2) !important;
+    border-color: var(--border) !important;
+    box-shadow: none !important;
+}
+
+#view-censor .censor-workspace-v2 .zoom-level {
+    text-shadow: none !important;
+}
+
+#view-censor .censor-workspace-v2 .censor-toolbar-v2 .tool-btn-v2:hover {
+    transform: none !important;
+}
+
+#view-censor .censor-workspace-v2 .censor-toolbar-v2 .tool-btn-v2.active {
+    box-shadow: none !important;
+}
+
+#view-censor .censor-workspace-v2 .censor-toolbar-v2 .tool-btn-v2.active .tool-icon-v2 {
+    filter: none !important;
+}
+
+#view-censor .censor-workspace-v2 .censor-section-title {
+    color: var(--text-2);
+    text-transform: none;
+    letter-spacing: 0.01em;
+    text-shadow: none;
 }

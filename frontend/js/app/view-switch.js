@@ -46,6 +46,8 @@ function switchView(viewName) {
     }
 
     AppState.currentView = viewName;
+    const navBar = document.querySelector('.nav-bar');
+    if (navBar) navBar.setAttribute('data-view', viewName);
 
     // Update nav tabs
     $$('.nav-tab').forEach(tab => {

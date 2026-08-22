@@ -20,10 +20,14 @@
 
     function readCollapsed(id) {
         try {
-            return localStorage.getItem(storageKey(id)) === '1';
+            const raw = localStorage.getItem(storageKey(id));
+            if (raw === '1') return true;
+            if (raw === '0') return false;
         } catch (error) {
-            return false;
+            /* private mode — fall through to the default */
         }
+        // Default: collapse the All/None filter summary so Folders is first.
+        return id === 'filters';
     }
 
     function writeCollapsed(id, collapsed) {

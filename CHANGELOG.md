@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Accepting a character tag also inserts its series / 接受角色标签时一并写入作品**: choosing `hatsune_miku` from autocomplete (comma-separated tag boxes, not Prompt Lab insert mode) also writes `vocaloid` when that copyright is known and not already in the field. The dropdown shows the series before you accept.
   - 在逗号分隔的标签框里选中 `hatsune_miku` 时，若词表知道作品且栏里还没有，会一并写入 `vocaloid`。下拉里会先看到作品名。Prompt Lab 插入模式只补全当前词，不会加逗号。
 
+### Changed / 变更
+- **Desktop chrome is a gallery workbench / 顶栏按图库工作台收**：Import and AI Tag stay on Gallery only. Reverse Prompt, Prompt Helper, and Style Finder default into More (catalog and entry tiles still reach them). Prompt Lab / Style Finder no longer open a Start-here lecture; Help unhides it. Hard refresh moved to Settings. Update buttons use the SVG sprite.
+  - 「导入 / AI 打标」只留在图库。反推、提示词助手、画风识别默认进「更多」。进阶房间不再一进门上课。强制刷新进设置。
+
 ### Fixed / 修复
 - **Nav status chips stay icon-sized / 顶栏状态不再撑开按钮**: the AI-busy and color-analysis chips no longer expand to a 220px label that shoves Import/Tag every 1.5s. Elapsed time and percent sit on the icon; the full sentence stays in the tooltip. Filter Apply and Scan Cancel keep a reserved width so “Apply · ~1,234 images” / “Stopping...” do not resize the footer.
   - AI 忙碌与色彩分析芯片不再拉成 220px 把「导入/打标」挤走。耗时和百分比叠在图标上，完整句子放 tooltip。筛选「应用」和扫描「取消」预留宽度，文案变长不会改按钮尺寸。
@@ -20,6 +24,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - 生成器分页的数字一直显示，不再只在选中时冒出来把 pill 撑宽。扫描/读元数据状态改到工具条下方，不再插在按钮中间。排序下拉固定宽度。按钮按下不再缩小；网格/大图/瀑布的 hover 不再长得像已选中。
 - **Mode switches keep their size when selected / 模式开关选中不再跳位**: segmented controls no longer bold or lift the chosen option. Manual Sort Slot / Showdown / Cull, Auto-Separate vs Manual Sort, Original / Censored, caption-type (booru / both / nl), Sync zoom, and radio segmented pills keep the same font-weight and position; only color and fill change.
   - 分段开关不再靠加粗或上移表示选中。手动排序三模式、自动分类/手动、原图/打码、caption 类型、同步放大、以及单选分段条，选中只改颜色与底，不再把旁边的按钮挤走。
+- **Gallery gives vertical space back to images / 图库把垂直空间还给图**：the missing-files banner is one compact row; the All/None filter summary starts collapsed so Folders is first; Clear library sits in the sidebar footer instead of the thumbnail toolbar. Nav chrome is 56px.
+  - 缺档横幅收成一行；筛选摘要默认折叠，文件夹树在前；「清空图库」放到侧栏底部，不再跟缩图列抢。顶栏高度 56px。
+- **Censor workspace matches Graphite / 打码工作台去玻璃**：pill toolbars, glow, and hover-lift are gone; panels use the same 4–6px hairlines as Gallery.
+  - 去掉胶囊工具条、光晕和 hover 上移，侧栏和画布跟图库同一套石墨发丝线。
+- **Folder browser no longer punches a blue-glass hole / 文件夹浏览不再漏出蓝玻璃**：the post-tokens inline palette (orange + cyan blur) moved into Graphite tokens.
+  - 写在 tokens.css 之后的 inline 橙/青玻璃已收回 Graphite token。
 - **Entry cover-mode buttons stay put / 入口页封面模式按钮不再乱跑**: the status caption, mode switch, and local-run note are separate grid slots. Switching Off / Single / Slideshow / Film no longer shoves the buttons sideways when the caption changes length.
   - 状态文案、模式开关、本地说明分成固定格子。切换无 / 单张 / 轮播 / 胶卷时，文案变长不会把按钮挤走。
 - **Product claims match the shipped app / 对外说法对齐现货**: artist identification is no longer labelled experimental or backed by a hardcoded sample list; a failed Kaloscope load is retryable instead of locking a placeholder. README / Why Choose Us stop claiming to be the only AI-art manager, stop marking Allusion as having no SD metadata, and cite Eagle and Billfish. First use of a feature downloads that model with a progress overlay (about 1 GB asks first) instead of a frozen or permanently disabled button. Agent docs drop glassmorphism and the wrong database path.

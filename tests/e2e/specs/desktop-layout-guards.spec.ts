@@ -214,13 +214,9 @@ const ARTIST_RUN_ACTIONS = ['#btn-identify-all', '#btn-identify-selected'] as co
 const ARTIST_COLUMN_CONTROLS = ['#btn-identify-all', '#btn-identify-selected', '#btn-clear-artist-data'] as const
 
 /**
- * The first-use card is un-hidden from localStorage during the view's `init`,
- * a tick after the view switch, so "click it if it is visible" races it and
- * leaves the measurement to run while the layout is still moving. Drive it
- * from its own source of truth instead, and wait for the resulting state.
- *
- * The card is worth testing in both states: shown, it is the tallest the
- * column's surroundings ever get, which is the case that broke.
+ * The first-use card is quiet by default (Help unhides it). Layout still
+ * has to survive the tallest case, so 'shown' forces the card open without
+ * the Help overlay covering the column.
  */
 async function openArtistView(page: Page, guide: 'shown' | 'dismissed'): Promise<void> {
   await page.evaluate((seen) => {
@@ -228,6 +224,8 @@ async function openArtistView(page: Page, guide: 'shown' | 'dismissed'): Promise
     const app = (window as any).App
     app.switchView('artist')
     ;(window as any).ArtistIdent?.refreshFirstUseCard?.()
+    const card = document.getElementById('artist-start-card') as HTMLElement | null
+    if (card) card.hidden = seen === 'true'
   }, guide === 'dismissed' ? 'true' : 'false')
 
   await page.waitForFunction((wantShown) => {

@@ -12,7 +12,10 @@
  * 2. Base set (persisted, customizable): a checklist under More decides which
  *    core views stay in the bar. The Library is always shown. Dataset is out
  *    of the default set (owner 2026-07-07) — reached via the LoRA mission,
- *    its More mirror, or the function catalog.
+ *    its More mirror, or the function catalog. Reverse Prompt / Prompt Helper
+ *    / Style Finder also stay out of the default bar (More + catalog +
+ *    entry tiles) so Gallery remains the only home. Users who already saved
+ *    a custom set keep it.
  * 3. Contextual reveal: the active view's tab is always shown, so an open
  *    view never lacks its highlighted tab.
  *
@@ -20,9 +23,6 @@
  * Mirrors carry data-mirror-view, NOT data-view — Playwright page objects
  * click plain [data-view=...] locators and a second match would violate
  * strict mode (the pre-existing promptlab/artist mirrors are grandfathered).
- *
- * Prompt Helper / Style Finder keep their own width-degradation ladder
- * behavior (nav-priority-advanced) and are not part of the checklist.
  */
 (function () {
     'use strict';
@@ -30,8 +30,8 @@
     const TABS_KEY = 'aurora-nav-tabs';
     const MISSION_KEY = 'aurora-nav-mission';
 
-    const ALL_VIEWS = ['gallery', 'reader', 'sorting', 'censor', 'similar', 'dataset', 'promptlab', 'artist'];
-    const DEFAULT_TABS = ['gallery', 'reader', 'sorting', 'censor', 'similar', 'promptlab', 'artist'];
+    const ALL_VIEWS = ['gallery', 'reader', 'sorting', 'censor', 'similar', 'dataset', 'promptlab', 'artist', 'reverse'];
+    const DEFAULT_TABS = ['gallery', 'reader', 'sorting', 'censor', 'similar'];
     const LOCKED_TABS = ['gallery'];
     const CUSTOM_VIEWS = ['reader', 'sorting', 'censor', 'similar', 'dataset'];
 

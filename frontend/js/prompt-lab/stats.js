@@ -244,18 +244,14 @@ Object.assign(window.PromptLab, {
         const numberEl = document.getElementById('pl-avg-caption-len');
         const noteEl = document.getElementById('pl-avg-caption-note');
         if (!numberEl || !noteEl) return;
+        const card = numberEl.closest('.promptlab-stat-card');
         const sample = Number(caption?.sample || 0);
-        if (caption?.available === true && sample > 0) {
-            numberEl.textContent = String(caption.avg ?? 0);
-            noteEl.textContent = this._t('promptlab.captionFromSidecars',
-                'from {sample} images with a .txt sidecar', { sample });
-            return;
-        }
-        numberEl.textContent = '—';
-        noteEl.textContent = caption?.available === true
-            ? this._t('promptlab.captionNoneYet',
-                'No captions recorded yet. A rescan reads the .txt files sitting next to your images.')
-            : this._t('promptlab.captionNotTracked', 'This library has not recorded captions yet.');
+        const hasValue = caption?.available === true && sample > 0;
+        if (card) card.hidden = !hasValue;
+        if (!hasValue) return;
+        numberEl.textContent = String(caption.avg ?? 0);
+        noteEl.textContent = this._t('promptlab.captionFromSidecars',
+            'from {sample} images with a .txt sidecar', { sample });
     },
 
     _syncStatsLoadMore(buttonId, totalCount, visibleCount) {

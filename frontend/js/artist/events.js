@@ -26,7 +26,17 @@ Object.assign(window.ArtistIdent, {
             dismissBtn.addEventListener('click', () => this.dismissFirstUseCard());
             dismissBtn.dataset.bound = 'true';
         }
-        card.hidden = localStorage.getItem('artist-guide-seen') === 'true';
+        // Quiet by default — Help on this view unhides the card.
+        card.hidden = true;
+        const help = document.getElementById('btn-help');
+        if (help && help.dataset.artistGuideBound !== 'true') {
+            help.dataset.artistGuideBound = 'true';
+            help.addEventListener('click', () => {
+                if (window.App?.AppState?.currentView === 'artist') {
+                    card.hidden = false;
+                }
+            });
+        }
     },
 
     init() {

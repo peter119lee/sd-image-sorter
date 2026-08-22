@@ -50,7 +50,16 @@ Object.assign(window.PromptLab, {
             dismissBtn.addEventListener('click', () => this.dismissFirstUseCard());
             dismissBtn.dataset.bound = 'true';
         }
-        card.hidden = localStorage.getItem('promptlab-guide-seen') === 'true';
+        // Quiet by default — Help on this view unhides the card.
+        card.hidden = true;
+        if (document.getElementById('btn-help') && !document.getElementById('btn-help').dataset.promptlabGuideBound) {
+            document.getElementById('btn-help').dataset.promptlabGuideBound = 'true';
+            document.getElementById('btn-help').addEventListener('click', () => {
+                if (window.App?.AppState?.currentView === 'promptlab') {
+                    card.hidden = false;
+                }
+            });
+        }
     },
 
     activateMode(mode) {

@@ -84,14 +84,16 @@ like a temporary viewer or two peer "session vs permanent" galleries.
     language button clicks `#btn-language-toggle`). Never fork the behavior
     per entrance.
 
-### Visual-language layer (Aurora contract, v3.5.0 + de-AI craft)
+### Visual-language layer (Graphite contract + de-AI craft)
 
-12. **Color is semantics, not decoration — and only when needed.**
-    Blue = next action, pink = user decision, purple = AI output.
-    **One solid primary per screen. No brand gradients** (no blue→purple
-    fills on buttons, progress, or export CTAs). In browse/idle chrome,
-    prefer neutral surfaces; pink/purple appear at the interaction surface
-    (selection, tags, scores), not as ambient marketing color.
+12. **One accent. Color is not a category system.**
+    Graphite surfaces are true-neutral (R=G=B). Exactly one accent
+    (`--accent`, restrained amber) marks the primary action and the
+    selected state. Status colours (success / warning / danger) are data
+    and always sit next to a glyph. Historical names `--blue` / `--pink` /
+    `--purple` in older CSS remap onto this: blue and pink are the accent,
+    purple is a neutral grey. Do not reintroduce a three-accent semantics.
+    **One solid primary per screen. No brand gradients.**
     `frontend/css/tokens.css` is the single palette owner (see §css-ownership).
 13. **Bilingual completeness.** en/zh key parity is audited; user-facing errors
     must have a Chinese variant. No zh-TW in the zh-CN pack.
@@ -401,9 +403,10 @@ Do NOT:
 The frontend still uses plain CSS with multiple layered stylesheets. Keep the ownership boundary explicit so broad UI refresh work does not become override-only churn.
 
 Ownership:
-- `tokens.css`: THE palette owner (Aurora canonical tokens + legacy variable
+- `tokens.css`: THE palette owner (Graphite canonical tokens + legacy variable
   remap + prefers-contrast re-assertion). Loaded LAST in `index.html` — it must
-  stay last or the high-contrast a11y re-assertion breaks (v3.5.0 Aurora Phase 1).
+  stay last or the high-contrast a11y re-assertion breaks. Do not put palette
+  literals in `index.html` `<style>` after this file.
 - `styles.css`: legacy/base layout foundation and broad compatibility rules.
 - `ui-refresh.css`: current theme/chrome, shared controls, and cross-view refresh overrides (its color literals defer to `tokens.css` vars).
 - Feature stylesheets (`censor-v2.css`, `dataset-maker.css`, `vlm.css`, etc.): feature-local layout and controls only.

@@ -5791,7 +5791,14 @@ test.describe('Smoke Tests', () => {
     await page.goto('/')
     await page.waitForLoadState('networkidle')
     await openView(page, 'artist')
+    await expect(page.locator('#artist-start-card')).toBeHidden()
+
+    await page.locator('#btn-help').click()
     await expect(page.locator('#artist-start-card')).toBeVisible()
+    const guideClose = page.locator('.guide-modal-close')
+    if (await guideClose.count()) {
+      await guideClose.first().click({ force: true })
+    }
 
     await page.locator('#artist-start-dismiss').click()
     await expect(page.locator('#artist-start-card')).toBeHidden()
@@ -5802,7 +5809,7 @@ test.describe('Smoke Tests', () => {
       window.ArtistIdent?.showFirstUseGuide?.()
     })
 
-    await expect(page.locator('#artist-start-card')).toBeVisible()
+    await expect(page.locator('#artist-start-card')).toBeHidden()
   })
 
   test('manual sort discard should require confirmation before deleting the saved session', async ({ page }) => {
@@ -7699,17 +7706,11 @@ test.describe('Smoke Tests', () => {
       expect(fit.clientWidth).toBeGreaterThan(0)
       expect(fit.scrollWidth).toBeGreaterThanOrEqual(fit.clientWidth)
 
-      // v3.5.0 audit: the More ▾ toggle is ALWAYS visible now (Dup Cleaner /
-      // Publish Set live only there). Direct Prompt/Artist tabs hide only
-      // when the priority ladder is actually in overflow mode.
+      // More ▾ is always visible (Dup Cleaner / tucked tools live there).
+      // Prompt Helper and Style Finder are tucked by default.
       expect(fit.moreVisible).toBeTruthy()
-      if (fit.classes.includes('nav-priority-overflow')) {
-        expect(fit.promptVisible).toBeFalsy()
-        expect(fit.artistVisible).toBeFalsy()
-      } else {
-        expect(fit.promptVisible).toBeTruthy()
-        expect(fit.artistVisible).toBeTruthy()
-      }
+      expect(fit.promptVisible).toBeFalsy()
+      expect(fit.artistVisible).toBeFalsy()
 
       await page.evaluate(() => {
         const scroller = document.getElementById('generator-tabs-scroll')
