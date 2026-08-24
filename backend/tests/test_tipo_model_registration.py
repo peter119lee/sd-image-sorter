@@ -151,7 +151,7 @@ def test_get_model_health_exposes_the_tipo_probe(tipo_dir, monkeypatch):
 
     assert health["tipo"]["weight_state"] == "ready"
     assert health["tipo"]["installed_variants"] == ["200m-ft"]
-    assert health["tipo"]["default_variant"] == "200m-ft"
+    assert health["tipo"]["default_variant"] == "v2.1"
 
 
 # ---------------------------------------------------------------------------
@@ -227,11 +227,11 @@ def test_inventory_registers_a_tipo_card_the_owner_can_find(monkeypatch):
         {
             "available": True,
             "weight_state": "ready",
-            "installed_variants": ["200m-ft"],
+            "installed_variants": ["v2.1"],
             "broken_variants": [],
             "missing_dependencies": [],
             "model_dir": "/m/tipo",
-            "default_variant": "200m-ft",
+            "default_variant": "v2.1",
             "message": "TIPO is ready.",
         },
         monkeypatch,
@@ -242,8 +242,9 @@ def test_inventory_registers_a_tipo_card_the_owner_can_find(monkeypatch):
     assert card["available"] is True
     assert card["path"] == "/m/tipo"
     assert card["message_key"] == "models.tipo.ready"
-    assert card["installed_variants"] == ["200m-ft"]
-    assert card["default_variant"] == "200m-ft"
+    assert card["installed_variants"] == ["v2.1"]
+    assert card["default_variant"] == "v2.1"
+    assert card["selectable_variants"] == tipo_service.selectable_tipo_variants()
 
 
 def test_inventory_tipo_card_reports_a_broken_install_distinctly(monkeypatch):
@@ -252,10 +253,10 @@ def test_inventory_tipo_card_reports_a_broken_install_distinctly(monkeypatch):
             "available": False,
             "weight_state": "broken",
             "installed_variants": [],
-            "broken_variants": ["200m-ft"],
+            "broken_variants": ["v2.1"],
             "missing_dependencies": [],
             "model_dir": "/m/tipo",
-            "default_variant": "200m-ft",
+            "default_variant": "v2.1",
             "message": "broken",
         },
         monkeypatch,
@@ -268,7 +269,7 @@ def test_inventory_tipo_card_reports_a_broken_install_distinctly(monkeypatch):
             "broken_variants": [],
             "missing_dependencies": [],
             "model_dir": "/m/tipo",
-            "default_variant": "200m-ft",
+            "default_variant": "v2.1",
             "message": "missing",
         },
         monkeypatch,
@@ -277,7 +278,7 @@ def test_inventory_tipo_card_reports_a_broken_install_distinctly(monkeypatch):
     assert broken["message_key"] == "models.tipo.broken"
     assert missing["message_key"] == "models.tipo.missing"
     assert broken["message_key"] != missing["message_key"]
-    assert broken["message_params"]["variants"] == "200m-ft"
+    assert broken["message_params"]["variants"] == "v2.1"
     assert broken["status"] == "missing"
 
 
@@ -290,7 +291,7 @@ def test_inventory_tipo_card_reports_the_missing_opt_in_runtime(monkeypatch):
             "broken_variants": [],
             "missing_dependencies": ["llama_cpp", "kgen"],
             "model_dir": "/m/tipo",
-            "default_variant": "200m-ft",
+            "default_variant": "v2.1",
             "message": "deps",
         },
         monkeypatch,
@@ -301,7 +302,7 @@ def test_inventory_tipo_card_reports_the_missing_opt_in_runtime(monkeypatch):
     assert tipo_service.PIP_INSTALL_HINT in " ".join(card["setup_steps"])
 
 
-def test_inventory_tipo_card_is_manual_only_and_not_recommended(monkeypatch):
+def test_inventory_tipo_card_offers_prepare_and_is_not_recommended(monkeypatch):
     card = _tipo_card(
         {
             "available": False,
@@ -310,17 +311,36 @@ def test_inventory_tipo_card_is_manual_only_and_not_recommended(monkeypatch):
             "broken_variants": [],
             "missing_dependencies": [],
             "model_dir": "/m/tipo",
-            "default_variant": "200m-ft",
+            "default_variant": "v2.1",
             "message": "missing",
         },
         monkeypatch,
     )
 
-    # No Prepare implementation exists for TIPO, so the card must not offer a
-    # button that would do nothing (routers/models.py prepare has no branch).
-    assert card["download_supported"] is False
+    assert card["download_supported"] is True
     assert card["recommended"] is False
     assert "tipo" not in model_service.RECOMMENDED_MODEL_IDS
+    assert any("Prepare" in step for step in card["setup_steps"])
+    assert "only-binary=llama-cpp-python" in " ".join(card["setup_steps"])
+
+
+def test_prepare_tipo_installs_the_runtime_group_and_does_not_fetch_weights(
+    monkeypatch, tipo_dir
+):
+    recorded = []
+
+    def fake_ensure_group(group):
+        recorded.append(group)
+        return model_service.DependencyInstallResult(installed_packages=())
+
+    monkeypatch.setattr(model_service, "ensure_group", fake_ensure_group)
+    result = model_service.ModelService().prepare_model("tipo")
+
+    assert recorded == ["tipo"]
+    assert result["status"] == "ok"
+    assert result["model_id"] == "tipo"
+    assert "prebuilt" in result["message"].lower()
+    assert not list(tipo_dir.glob("*.gguf"))
 
 
 def test_inventory_survives_a_health_dict_without_a_tipo_key(monkeypatch):
@@ -329,3 +349,63 @@ def test_inventory_survives_a_health_dict_without_a_tipo_key(monkeypatch):
 
     assert card["available"] is False
     assert card["message_key"] == "models.tipo.missing"
+    assert card["default_variant"] == "v2.1"
+    assert tipo_service.WEIGHT_SIZE_HINT in " ".join(card["setup_steps"])
+
+
+def test_v21_revision_is_a_commit_pin():
+    spec = tipo_service.MODEL_SPECS["v2.1"]
+    assert spec.repo == "KBlueLeaf/TIPO-v2.1-1B-A200M"
+    assert spec.hf_filename == "gguf/TIPO-v2.1-1B-A200M-Q8_0.gguf"
+    assert spec.revision == tipo_service.V21_REVISION
+    assert len(spec.revision) == 40
+    int(spec.revision, 16)
+    assert spec.revision == spec.revision.lower()
+    assert tipo_service.DEFAULT_MODEL_KEY == "v2.1"
+    assert tipo_service.selectable_tipo_variants() == [
+        {"id": "v2.1", "size_hint": tipo_service.WEIGHT_SIZE_HINT},
+        {"id": "200m-ft", "size_hint": tipo_service.LIGHT_WEIGHT_SIZE_HINT},
+    ]
+    assert "100m" not in {item["id"] for item in tipo_service.selectable_tipo_variants()}
+
+
+def test_v21_download_requests_the_pinned_commit(tipo_dir, monkeypatch):
+    """A pin nobody passes to the downloader is decoration, not a pin."""
+    calls = []
+
+    def fake_download(**kwargs):
+        calls.append(kwargs)
+        nested = Path(kwargs["local_dir"]) / kwargs["filename"]
+        nested.parent.mkdir(parents=True, exist_ok=True)
+        nested.write_bytes(GGUF_MAGIC + b"\x00" * 16)
+        return str(nested)
+
+    monkeypatch.setattr(tipo_service, "_hf_hub_download", fake_download)
+    spec = tipo_service.MODEL_SPECS["v2.1"]
+    path = tipo_service._download_weight(spec, tipo_dir)
+
+    assert path == tipo_service.tipo_weight_path("v2.1", tipo_dir)
+    assert path.is_file()
+    assert not (tipo_dir / "gguf" / spec.filename).exists()
+    assert calls == [
+        {
+            "repo_id": "KBlueLeaf/TIPO-v2.1-1B-A200M",
+            "filename": "gguf/TIPO-v2.1-1B-A200M-Q8_0.gguf",
+            "repo_type": "model",
+            "local_dir": str(tipo_dir),
+            "revision": tipo_service.V21_REVISION,
+        }
+    ]
+
+
+def test_download_is_skipped_when_the_weight_file_already_exists(tipo_dir, monkeypatch):
+    spec = tipo_service.MODEL_SPECS["v2.1"]
+    target = tipo_service.tipo_weight_path("v2.1", tipo_dir)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(GGUF_MAGIC + b"\x00" * 16)
+
+    def _must_not_run(**_kwargs):
+        raise AssertionError("existing GGUF must not be fetched again")
+
+    monkeypatch.setattr(tipo_service, "_hf_hub_download", _must_not_run)
+    assert tipo_service._download_weight(spec, tipo_dir) == target

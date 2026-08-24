@@ -90,6 +90,18 @@
             document.getElementById('sepcon-next-unseen')?.addEventListener('click', () => this.jumpToUnseen());
             document.getElementById('sepcon-health-run')?.addEventListener('click', () => this.runHealthCheck());
             document.getElementById('sepcon-tipo-suggest')?.addEventListener('click', () => this.suggestUpsample());
+            const tipoModel = document.getElementById('sepcon-tipo-model');
+            if (tipoModel) {
+                try {
+                    const stored = localStorage.getItem('sd-tipo-model-v1');
+                    if (stored === 'v2.1' || stored === '200m-ft') tipoModel.value = stored;
+                } catch (_error) { /* keep the HTML default */ }
+                tipoModel.addEventListener('change', () => {
+                    try { localStorage.setItem('sd-tipo-model-v1', tipoModel.value); } catch (_error) {}
+                    const other = document.getElementById('reverse-tipo-model');
+                    if (other) other.value = tipoModel.value;
+                });
+            }
             const purpose = document.getElementById('sepcon-purpose');
             if (purpose) {
                 try { purpose.value = localStorage.getItem(SEPCON_PURPOSE_KEY) || 'character'; } catch (_) {}

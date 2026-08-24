@@ -37,6 +37,31 @@ def _tipo_pip_hint() -> str:
     return PIP_INSTALL_HINT
 
 
+def _tipo_weight_size() -> str:
+    """User-facing size of the default TIPO GGUF, owned by tipo_service."""
+    from services.tipo_service import WEIGHT_SIZE_HINT
+
+    return WEIGHT_SIZE_HINT
+
+
+def _tipo_light_weight_size() -> str:
+    from services.tipo_service import LIGHT_WEIGHT_SIZE_HINT
+
+    return LIGHT_WEIGHT_SIZE_HINT
+
+
+def _tipo_selectable_variants() -> list:
+    from services.tipo_service import selectable_tipo_variants
+
+    return selectable_tipo_variants()
+
+
+def _tipo_default_variant() -> str:
+    from services.tipo_service import DEFAULT_MODEL_KEY
+
+    return DEFAULT_MODEL_KEY
+
+
 def _build_inventory(health: Dict[str, Any]) -> List[Dict[str, Any]]:
     censor = health["censor"]
     artist = health["artist"]
@@ -414,22 +439,24 @@ def _build_inventory(health: Dict[str, Any]) -> List[Dict[str, Any]]:
                 "variants": ", ".join(tipo_broken_variants),
             },
             "path": tipo.get("model_dir") or "",
-            # No Prepare branch exists in model_service_prepare for TIPO: the
-            # runtime is a manual opt-in pip pair and the GGUF downloads on
-            # first use. Advertising a button that cannot run is the
-            # "returns 200 while doing nothing" defect class.
-            "download_supported": False,
-            "default_variant": tipo.get("default_variant") or "200m-ft",
+            "download_supported": True,
+            "default_variant": tipo.get("default_variant") or _tipo_default_variant(),
             "installed_variants": list(tipo.get("installed_variants") or []),
+            "selectable_variants": _tipo_selectable_variants(),
             "note": (
                 "Expands a danbooru TAG LIST, not natural-language prose. "
-                "Proposals are vocabulary-gated and never auto-applied."
+                "Proposals are vocabulary-gated and never auto-applied. "
+                "v2.1 and the older v2 1B model are the same RAM class (~1–2 GB); "
+                "200m-ft is the lighter CPU option. No dedicated GPU is required."
             ),
             "setup_steps": [
-                f"Install the opt-in CPU runtime into the backend environment: {_tipo_pip_hint()}",
-                "Restart SD Image Sorter after installing the packages.",
-                "Weights (~100-250 MB GGUF) download on first use into the path above; "
-                "nothing is fetched until you press Suggest.",
+                "Click Prepare / Download. The app installs a prebuilt CPU llama.cpp wheel "
+                "(official extra-index, no C compiler) plus tipo-kgen. "
+                f"Manual equivalent: {_tipo_pip_hint()}",
+                "Restart SD Image Sorter if it asks, then click Prepare again.",
+                f"Choose v2.1 (~{_tipo_weight_size()}) or the lighter 200m-ft "
+                f"(~{_tipo_light_weight_size()}) in Reverse Prompt / Dataset Maker; "
+                "the selected GGUF downloads on first Suggest.",
                 "If this card says the files are unreadable, delete them from that path and run it again.",
             ],
             "external_links": [

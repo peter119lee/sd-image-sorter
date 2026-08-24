@@ -3198,9 +3198,19 @@
                             <section class="reverse-tipo-card" id="reverse-tipo">
                                 <h3 class="reverse-card-title" data-i18n="reverse.tipoTitle">Expand the tags (TIPO)</h3>
                                 <p class="reverse-card-help" id="reverse-tipo-note"></p>
-                                <button class="btn btn-secondary btn-small" id="btn-reverse-tipo" type="button" disabled>
-                                    <span data-i18n="reverse.tipoRun">Suggest missed tags</span>
-                                </button>
+                                <div class="reverse-tipo-actions">
+                                    <label class="reverse-tipo-variant">
+                                        <span class="sr-only" data-i18n="reverse.tipoModel">TIPO model</span>
+                                        <select id="reverse-tipo-model" class="input-field" aria-label="TIPO model" data-i18n-aria="reverse.tipoModel">
+                                            <option value="v2.1" data-i18n="reverse.tipoVariantV21">v2.1 (recommended, ~1.1 GB)</option>
+                                            <option value="200m-ft" data-i18n="reverse.tipoVariant200m">200M-ft (lighter, ~210 MB)</option>
+                                        </select>
+                                    </label>
+                                    <button class="btn btn-secondary btn-small" id="btn-reverse-tipo" type="button" disabled>
+                                        <span data-i18n="reverse.tipoRun">Suggest missed tags</span>
+                                    </button>
+                                </div>
+                                <p class="reverse-card-help" id="reverse-tipo-hw" data-i18n="reverse.tipoHardware">v2.1 and the older v2 1B model need the same RAM (about 1–2 GB). No dedicated GPU. 200M-ft is the light option.</p>
                                 <div class="reverse-tipo-results" id="reverse-tipo-results" hidden></div>
                             </section>
                         </div>
@@ -4673,6 +4683,10 @@
                                             <option value="general" data-i18n="dataset.sepconPurposeGeneral">General</option>
                                         </select>
                                         <button type="button" class="btn btn-secondary btn-small" id="sepcon-health-run"><svg class="icon" aria-hidden="true"><use href="#i-activity"/></svg> <span data-i18n="dataset.sepconHealthRun">Health check</span></button>
+                                        <select id="sepcon-tipo-model" class="input-field" aria-label="TIPO model" data-i18n-aria="reverse.tipoModel">
+                                            <option value="v2.1" data-i18n="reverse.tipoVariantV21">v2.1 (recommended, ~1.1 GB)</option>
+                                            <option value="200m-ft" data-i18n="reverse.tipoVariant200m">200M-ft (lighter, ~210 MB)</option>
+                                        </select>
                                         <button type="button" class="btn btn-secondary btn-small" id="sepcon-tipo-suggest"
                                                 title="TIPO proposes tags the taggers never scored (vocabulary blind spots) — review checklist, nothing auto-applies"
                                                 ><svg class="icon" aria-hidden="true"><use href="#i-layers"/></svg> <span data-i18n="dataset.sepconTipoSuggest">Suggest missing tags</span></button>

@@ -91,10 +91,19 @@ OPTIONAL_DEPENDENCY_GROUPS: dict[str, tuple[str, ...]] = {
     ),
     "cl-tagger-v2": ("huggingface-hub>=0.24.0",),
     "translation": ("translators==6.0.4",),
+    # tipo-kgen imports torch/transformers at module load even for GGUF.
+    # llama-cpp-python is installed separately from the official CPU wheel
+    # index (never the PyPI sdist).
+    "tipo": (
+        "torch>=2.0.0",
+        "transformers>=5.6.0",
+        "huggingface-hub>=0.24.0",
+        "tipo-kgen>=0.3.1",
+    ),
 }
 
 TORCH_DEPENDENCY_GROUPS: frozenset[str] = frozenset(
-    {"aesthetic", "artist", "florence2", "lucida", "sam3", "toriigate", "yolo"}
+    {"aesthetic", "artist", "florence2", "lucida", "sam3", "toriigate", "yolo", "tipo"}
 )
 
 
@@ -181,6 +190,7 @@ GROUP_IMPORTS: dict[str, tuple[str, ...]] = {
     ),
     "cl-tagger-v2": ("huggingface_hub",),
     "translation": ("translators",),
+    "tipo": ("torch", "transformers", "huggingface_hub", "kgen"),
 }
 
 IMPORT_TO_PACKAGE_HINT: dict[str, str] = {
@@ -195,6 +205,8 @@ IMPORT_TO_PACKAGE_HINT: dict[str, str] = {
     "cv2": "opencv-python>=4.9.0",
     "triton": _TRITON_PACKAGE,
     "translators": "translators==6.0.4",
+    "kgen": "tipo-kgen>=0.3.1",
+    "llama_cpp": "llama-cpp-python>=0.3.24",
 }
 
 
@@ -716,6 +728,62 @@ def install_packages(packages: Sequence[str]) -> bool:
     return dll_locked or ort_consumer_dll_locked
 
 
+def _ensure_tipo_group() -> DependencyInstallResult:
+    """Install the CPU llama.cpp wheel first, then tipo-kgen from PyPI.
+
+    llama-cpp-python on PyPI is an sdist. Compiling it is refused; the official
+    extra-index CPU wheels cover every platform this app ships. The wheel is
+    installed before torch/tipo-kgen so a missing wheel fails closed without
+    a multi-GB download, and so tipo-kgen cannot pull the sdist as a dep.
+    """
+    from llama_cpp_wheel import (
+        LLAMA_CPP_SPEC,
+        UnsupportedLlamaCppWheelError,
+        install_cpu_wheel,
+        require_cpu_wheel_platform,
+    )
+
+    try:
+        require_cpu_wheel_platform()
+    except UnsupportedLlamaCppWheelError as exc:
+        raise UnsupportedOptionalDependencyError(str(exc)) from exc
+
+    # Wheel first: fail closed before downloading torch, and so a later
+    # tipo-kgen install cannot pull the PyPI llama-cpp-python sdist.
+    llama_packages: list[str] = []
+    if _needs_install("llama_cpp", LLAMA_CPP_SPEC):
+        _assert_safe_install_target((LLAMA_CPP_SPEC,))
+        try:
+            install_cpu_wheel()
+        except subprocess.CalledProcessError as exc:
+            output = "\n".join(
+                value.strip()
+                for value in (exc.stdout or "", exc.stderr or "")
+                if value.strip()
+            )
+            raise OptionalDependencyImportError(
+                "Could not install a prebuilt llama-cpp-python CPU wheel "
+                f"({LLAMA_CPP_SPEC}). pip output: {output or 'no output'}. "
+                "This app does not compile llama.cpp from source."
+            ) from exc
+        llama_packages.append(LLAMA_CPP_SPEC)
+        _import_optional_package("llama-cpp-python", "llama_cpp")
+
+    packages = OPTIONAL_DEPENDENCY_GROUPS["tipo"]
+    imports = GROUP_IMPORTS["tipo"]
+    packages_to_install: list[str] = []
+    for module_name, package in zip(imports, packages):
+        locked_package = _lock_package_spec(package)
+        if _needs_install(module_name, locked_package) and locked_package not in packages_to_install:
+            packages_to_install.append(locked_package)
+    dll_locked = install_packages(packages_to_install)
+
+    return DependencyInstallResult(
+        installed_packages=tuple(llama_packages + packages_to_install),
+        restart_recommended=bool(packages_to_install or llama_packages) or dll_locked,
+    )
+
+
 def ensure_imports(module_names: Iterable[str]) -> DependencyInstallResult:
     packages = []
     for module_name in module_names:
@@ -732,6 +800,8 @@ def ensure_imports(module_names: Iterable[str]) -> DependencyInstallResult:
 
 def ensure_group(group: str) -> DependencyInstallResult:
     _validate_optional_group_platform(group)
+    if group == "tipo":
+        return _ensure_tipo_group()
     packages = OPTIONAL_DEPENDENCY_GROUPS.get(group)
     imports = GROUP_IMPORTS.get(group)
     if not packages or imports is None:

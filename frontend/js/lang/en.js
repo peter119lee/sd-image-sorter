@@ -4877,13 +4877,12 @@ window.I18nLang_en = {
     // TIPO prompt expansion card. The backend already picks which of these four
     // states is true (model_service_inventory.py) and passes the joined lists as
     // {deps} / {variants}; without these keys the card fell back to the raw
-    // English backend string in both languages. The pip command and the restart
-    // step are rendered separately from the card's setup steps, so these say
-    // what the state IS and leave the instructions to those.
+    // English backend string in both languages. missingDeps must send people
+    // to Prepare, not a raw pip command: public installs have no compiler.
     'models.tipo.ready': 'TIPO prompt expansion is ready.',
     'models.tipo.broken': 'TIPO weight files are present but unreadable (not valid GGUF): {variants}. Delete them from the path below and run it again; the next run re-downloads them.',
-    'models.tipo.missingDeps': 'TIPO runtime packages are missing: {deps}. Install them into the backend environment and restart the app.',
-    'models.tipo.missing': 'TIPO weights are not downloaded yet. They download on first use into the path below (about 100-250 MB); nothing is fetched until you run "Suggest missing tags".',
+    'models.tipo.missingDeps': 'TIPO runtime packages are missing: {deps}. Click Prepare / Download (official CPU wheel, no compiler), then restart the app.',
+    'models.tipo.missing': 'TIPO weights are not downloaded yet. v2.1 is about 1.1 GB; the lighter 200M-ft option is about 210 MB. Nothing is fetched until you run "Suggest missing tags".',
 
     // Prompt Lab's empty checkpoint panels. The backend decides WHY a panel is
     // empty and, separately, whether any action can help (prompt_service.py's
@@ -5012,12 +5011,16 @@ window.I18nLang_en = {
     'reverse.draftAria': 'Prompt draft',
     'reverse.tipoTitle': 'Expand the tags (TIPO)',
     'reverse.tipoHelp': 'Suggests Booru tags the taggers never scored. Nothing is applied until you check it.',
+    'reverse.tipoModel': 'TIPO model',
+    'reverse.tipoVariantV21': 'v2.1 (recommended, ~1.1 GB)',
+    'reverse.tipoVariant200m': '200M-ft (lighter, ~210 MB)',
+    'reverse.tipoHardware': 'v2.1 and the older v2 1B model need the same RAM (about 1–2 GB). No dedicated GPU. 200M-ft is the light option.',
     'reverse.tipoRun': 'Suggest missed tags',
     'reverse.tipoRunning': 'Asking TIPO…',
     'reverse.tipoNeedsTags': 'TIPO expands a Booru tag list. Put comma-separated tags in the draft box above to use it.',
     'reverse.tipoDialectBlocked': 'This target is documented to want natural-language prompts, and TIPO expands Booru tag lists, so it is switched off here.',
     'reverse.tipoDownloadTitle': 'Download TIPO?',
-    'reverse.tipoDownloadWarn': 'TIPO is not downloaded yet. The first run fetches 100-250 MB of model files into your data folder, and nothing happens until that finishes. Download it now?',
+    'reverse.tipoDownloadWarn': 'This TIPO model is not downloaded yet. The first run fetches about {size} into your data folder, and nothing happens until that finishes. Download it now?',
     'reverse.tipoProposals': 'TIPO proposes {count} tag(s) the taggers never scored. Check the ones you want.',
     'reverse.tipoApply': 'Add {count} checked to the draft',
     'reverse.tipoApplied': 'Added {count} tag(s) to the draft',

@@ -4872,12 +4872,12 @@ window.I18nLang_zhCN = {
 
     // TIPO 提示词扩写卡片。四种状态由后端判定（model_service_inventory.py），
     // 并把拼好的列表作为 {deps} / {variants} 传来；缺少这几个键时，卡片在两种
-    // 语言下都会退回后端的英文原文。pip 命令和重启步骤由卡片的安装步骤单独
-    // 渲染，所以这里只说明当前状态，不重复那些指引。
+    // 语言下都会退回后端的英文原文。缺依赖必须指向「准备」，不能叫用户自己 pip：
+    // 公开发布包没有编译器。
     'models.tipo.ready': 'TIPO 提示词扩写已就绪。',
     'models.tipo.broken': 'TIPO 权重文件存在但无法读取（不是有效的 GGUF）：{variants}。请到下方路径删除它们后重新运行，下次运行会重新下载。',
-    'models.tipo.missingDeps': '缺少 TIPO 运行时依赖包：{deps}。请将它们安装到后端环境，然后重启程序。',
-    'models.tipo.missing': 'TIPO 权重还没下载。首次使用时会下载到下方路径（约 100-250 MB）；在你点击「建议缺漏标签」之前不会下载任何文件。',
+    'models.tipo.missingDeps': '缺少 TIPO 运行时依赖包：{deps}。请点击「准备 / 下载」安装官方 CPU wheel（不需要编译器），然后重启程序。',
+    'models.tipo.missing': 'TIPO 权重还没下载。v2.1 约 1.1 GB；较轻的 200M-ft 约 210 MB。在你点击「建议缺漏标签」之前不会下载任何文件。',
 
     // Prompt Helper 空面板。为什么空、以及是否真的有办法可做，都由后端分别判定
     //（prompt_service.py 的 *_empty_reason / checkpoint_empty_action）。这里先把
@@ -4997,12 +4997,16 @@ window.I18nLang_zhCN = {
     'reverse.draftAria': '提示词草稿',
     'reverse.tipoTitle': '扩写标签（TIPO）',
     'reverse.tipoHelp': '推荐打标器从未评分的 Booru 标签。除非你勾选，否则不会应用任何内容。',
+    'reverse.tipoModel': 'TIPO 模型',
+    'reverse.tipoVariantV21': 'v2.1（推荐，约 1.1 GB）',
+    'reverse.tipoVariant200m': '200M-ft（更轻，约 210 MB）',
+    'reverse.tipoHardware': 'v2.1 和旧版 v2 1B 需要同样的内存（约 1–2 GB），不必独立显卡。200M-ft 是轻量选项。',
     'reverse.tipoRun': '推荐缺漏标签',
     'reverse.tipoRunning': '正在询问 TIPO…',
     'reverse.tipoNeedsTags': 'TIPO 扩写的是 Booru 标签列表。请先在上面的草稿框里填入以逗号分隔的标签。',
     'reverse.tipoDialectBlocked': '这个目标模型的文档要求自然语言提示词，而 TIPO 扩写的是 Booru 标签列表，所以在这里停用。',
     'reverse.tipoDownloadTitle': '下载 TIPO？',
-    'reverse.tipoDownloadWarn': 'TIPO 还没有下载。首次运行会把 100-250 MB 的模型文件下载到你的数据文件夹，下载完成之前不会有任何结果。现在下载吗？',
+    'reverse.tipoDownloadWarn': '这个 TIPO 模型还没有下载。首次运行会把约 {size} 的文件下载到你的数据文件夹，下载完成之前不会有任何结果。现在下载吗？',
     'reverse.tipoProposals': 'TIPO 推荐了 {count} 个打标器从未评分的标签，请勾选你想要的。',
     'reverse.tipoApply': '把已勾选的 {count} 个加入草稿',
     'reverse.tipoApplied': '已把 {count} 个标签加入草稿',

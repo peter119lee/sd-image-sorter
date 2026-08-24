@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - 在逗号分隔的标签框里选中 `hatsune_miku` 时，若词表知道作品且栏里还没有，会一并写入 `vocaloid`。下拉里会先看到作品名。Prompt Lab 插入模式只补全当前词，不会加逗号。
 
 ### Changed / 变更
+- **TIPO v2.1 plus a lighter 200M-ft choice / TIPO 升级 v2.1，并保留轻量 200M-ft**: Reverse Prompt and Dataset Maker let you pick `v2.1` (TIPO-v2.1-1B-A200M Q8_0, ~1.1 GB, default) or `200M-ft` (~210 MB). Both run on CPU; no dedicated GPU. v2.1 and the older v2 1B checkpoint are the same RAM class (~1–2 GB), so v2 is not offered separately. First use of a missing variant asks before downloading, and Danbooru rating words are mapped for v2.1 (`general` → `safe`).
+  - 反推和数据集可在 v2.1（默认，约 1.1 GB）与较轻的 200M-ft（约 210 MB）之间选择，都走 CPU，不必独显。v2.1 与旧 v2 1B 内存需求相同，所以不再单独提供 v2。缺权重时会先确认再下载；v2.1 会把 Danbooru 分级词映射到它的词表。
+- **TIPO runtime installs a prebuilt CPU wheel / TIPO 运行时改装官方预编译 CPU wheel**: Model Center Prepare is the public-install path. It installs `llama-cpp-python` from the first-party extra-index (`whl/cpu`) with `--only-binary` (py3-none wheels: Windows portable 3.12 and Linux portable 3.13), then `tipo-kgen`. It will not compile from the PyPI sdist, and the card no longer tells users to pip into a backend they do not own. Covered hosts: Windows x86_64, Linux x86_64, Linux aarch64, macOS Apple Silicon. Other hosts fail closed.
+  - 模型中心「准备」是公开发布的安装路径：先装官方 CPU wheel（禁止源码编译；`py3-none` 覆盖 Windows 便携 3.12 与 Linux 便携 3.13），再装 tipo-kgen。缺依赖文案改为点「准备」，不再叫用户自己 pip。支持 Windows x86_64、Linux x86_64 / aarch64、macOS Apple Silicon；其他平台直接拒绝而不是现场编译。
 - **Desktop chrome is a gallery workbench / 顶栏按图库工作台收**：Import and AI Tag stay on Gallery only. Reverse Prompt, Prompt Helper, and Style Finder default into More (catalog and entry tiles still reach them). Prompt Lab / Style Finder no longer open a Start-here lecture; Help unhides it. Hard refresh moved to Settings. Update buttons use the SVG sprite.
   - 「导入 / AI 打标」只留在图库。反推、提示词助手、画风识别默认进「更多」。进阶房间不再一进门上课。强制刷新进设置。
 

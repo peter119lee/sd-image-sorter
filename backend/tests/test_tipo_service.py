@@ -53,7 +53,9 @@ class TestMissingDependency:
         )
         assert response.status_code == 400
         error = response.json()["error"]
-        assert "pip install llama-cpp-python tipo-kgen" in error
+        assert "--only-binary=llama-cpp-python" in error
+        assert "abetlen.github.io/llama-cpp-python/whl/cpu" in error
+        assert "tipo-kgen" in error
         assert "未安装" in error, "message must be bilingual"
 
 
@@ -83,7 +85,7 @@ class TestProposalPostProcessing:
         assert proposed == ["smile", "blue_sky"]
         for entry in body["proposed_tags"]:
             assert entry["category"], "every proposal carries a category"
-        assert body["model"] == "200m-ft"
+        assert body["model"] == "v2.1"
         assert body["input_tags"] == 2
         assert isinstance(body["elapsed_ms"], int) and body["elapsed_ms"] >= 0
 
@@ -130,6 +132,41 @@ class TestProposalPostProcessing:
             }
         ]
         assert response.json()["model"] == "100m"
+
+    def test_v21_maps_danbooru_general_rating_to_safe(
+        self, test_client, stub_generator
+    ):
+        calls = stub_generator(["smile"])
+        response = test_client.post(
+            "/api/tags/suggest-upsample",
+            json={"tags": ["1girl"], "rating": "general"},
+        )
+        assert response.status_code == 200, response.text
+        assert calls[0]["rating"] == "safe"
+        assert calls[0]["model_key"] == "v2.1"
+
+    def test_v21_maps_explicit_rating_to_nsfw_explicit(
+        self, test_client, stub_generator
+    ):
+        calls = stub_generator(["smile"])
+        response = test_client.post(
+            "/api/tags/suggest-upsample",
+            json={"tags": ["1girl"], "rating": "explicit"},
+        )
+        assert response.status_code == 200, response.text
+        assert calls[0]["rating"] == "nsfw, explicit"
+
+    def test_legacy_model_keeps_danbooru_rating_words(
+        self, test_client, stub_generator
+    ):
+        calls = stub_generator(["smile"])
+        response = test_client.post(
+            "/api/tags/suggest-upsample",
+            json={"tags": ["1girl"], "rating": "general", "model": "200m-ft"},
+        )
+        assert response.status_code == 200, response.text
+        assert calls[0]["rating"] == "general"
+        assert calls[0]["model_key"] == "200m-ft"
 
     def test_whitespace_only_tags_400(self, test_client, stub_generator):
         stub_generator(["smile"])

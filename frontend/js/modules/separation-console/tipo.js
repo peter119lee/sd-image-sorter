@@ -21,13 +21,37 @@ Object.assign(SeparationConsole, {
         // land in the export Common tags box (the least destructive landing
         // zone) — v1 never writes DB rows.
         _TIPO_TOP_N: 100,
+        _TIPO_MODEL_KEY: 'sd-tipo-model-v1',
+        _TIPO_VARIANT_SIZES: { 'v2.1': '1.1 GB', '200m-ft': '210 MB' },
+
+        _tipoSelectedModel() {
+            const select = document.getElementById('sepcon-tipo-model');
+            const raw = select ? String(select.value || '') : '';
+            if (raw === 'v2.1' || raw === '200m-ft') return raw;
+            try {
+                const stored = localStorage.getItem(this._TIPO_MODEL_KEY);
+                if (stored === 'v2.1' || stored === '200m-ft') return stored;
+            } catch (_error) { /* keep the default */ }
+            return 'v2.1';
+        },
+
+        async _tipoWeightsInstalled(modelKey) {
+            try {
+                const response = await fetch('/api/models/status');
+                const payload = await response.json();
+                const card = (payload?.models || []).find((item) => item?.id === 'tipo');
+                const installed = card?.installed_variants;
+                return Boolean(Array.isArray(installed) && installed.includes(modelKey));
+            } catch (_error) {
+                return false;
+            }
+        },
 
         async suggestUpsample() {
             const panel = this._gapsPanel();
             panel.hidden = false;
-            panel.textContent = sepconT(
-                'Asking TIPO for missed tags… (first run downloads the model, ~200 MB)',
-                '正在让 TIPO 推荐缺漏标签…（首次运行会下载模型，约 200 MB）');
+            const model = this._tipoSelectedModel();
+            const size = this._TIPO_VARIANT_SIZES[model] || '1.1 GB';
             const { counts } = this.computeStats();
             const tags = [...counts.entries()]
                 .sort((a, b) => b[1].count - a[1].count || a[0].localeCompare(b[0]))
@@ -39,13 +63,33 @@ Object.assign(SeparationConsole, {
                     '队列还没有任何 caption 标签 — 请先载入图片和 caption。');
                 return;
             }
+            if (!(await this._tipoWeightsInstalled(model))) {
+                const message = sepconT(
+                    `This TIPO model is not downloaded yet. The first run fetches about ${size} into your data folder, and nothing happens until that finishes. Download it now?`,
+                    `这个 TIPO 模型还没有下载。首次运行会把约 ${size} 的文件下载到你的数据文件夹，下载完成之前不会有任何结果。现在下载吗？`);
+                const confirmed = await new Promise((resolve) => {
+                    const ask = window.App?.showConfirm;
+                    if (typeof ask === 'function') {
+                        ask(sepconT('Download TIPO?', '下载 TIPO？'), message, () => resolve(true), () => resolve(false));
+                    } else {
+                        resolve(window.confirm(message));
+                    }
+                });
+                if (!confirmed) {
+                    panel.hidden = true;
+                    return;
+                }
+            }
+            panel.textContent = sepconT(
+                `Asking TIPO for missed tags… (first run downloads the model, ~${size})`,
+                `正在让 TIPO 推荐缺漏标签…（首次运行会下载模型，约 ${size}）`);
             const btn = document.getElementById('sepcon-tipo-suggest');
             if (btn) btn.disabled = true;
             try {
                 const response = await fetch('/api/tags/suggest-upsample', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ tags, target: 'short' }),
+                    body: JSON.stringify({ tags, target: 'short', model }),
                 });
                 const body = await response.json().catch(() => ({}));
                 // A 400 carries the actionable bilingual message (e.g. the

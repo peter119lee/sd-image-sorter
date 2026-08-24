@@ -355,7 +355,7 @@ def coverage_gaps(request: CoverageGapsRequest):
 def suggest_upsample_tags(request: TipoSuggestRequest):
     """TIPO tag-upsampling assist (roadmap #8, v1): propose danbooru tags
     the WD14-family taggers have no label for. Opt-in dependency pair
-    (tipo-kgen + llama-cpp-python, CPU GGUF); missing install returns 400
+    (tipo-kgen + prebuilt llama-cpp-python CPU wheel); missing install returns 400
     with the exact pip hint. Read-only — proposals are vocab-gated and the
     frontend applies confirmed picks itself (never auto-applied)."""
     from services import tipo_service

@@ -17,6 +17,9 @@ Object.assign(window.ReversePrompt, {
             this._el('btn-reverse-run')?.addEventListener('click', () => this.run());
             this._el('btn-reverse-cancel')?.addEventListener('click', () => this.cancel());
             this._el('btn-reverse-tipo')?.addEventListener('click', () => this.suggestTipo());
+            this._el('reverse-tipo-model')?.addEventListener('change', () => {
+                this._applyTipoModel(this._tipoSelectedModel());
+            });
             this._el('reverse-draft')?.addEventListener('input', () => this.renderTipo());
             this._el('reverse-target-model')?.addEventListener('change', () => this.renderTipo());
             document.querySelectorAll('input[name="reverse-mode"]').forEach((radio) => {

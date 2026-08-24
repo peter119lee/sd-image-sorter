@@ -16,12 +16,11 @@
  *    is wrong output rather than reduced value. The gate therefore asks
  *    `TargetModel.dialectFor`, which is pinned to `caption_dialect.py` by a
  *    contract test — there is no second copy of that map here.
- * 2. **The download.** First press pulls 100-250 MB of weights. The Model Center
- *    card is deliberately manual-only (`download_supported: false`, no
- *    `prepare_model("tipo")` branch), so a Prepare button here would be a
- *    control that cannot run. Instead the size is stated and confirmed BEFORE
- *    the press that spends it, using the card's own installed-variant list to
- *    decide whether anything needs downloading at all.
+ * 2. **The download.** The picker offers v2.1 (~1.1 GB) and 200M-ft (~210 MB).
+ *    Model Center Prepare installs the CPU llama.cpp wheel (no compiler).
+ *    This page does not POST that prepare URL: the selected GGUF is confirmed
+ *    by size BEFORE the press that spends it. A leftover 200m-ft file must
+ *    not skip the v2.1 warning.
  * 3. **Never auto-apply.** Proposals arrive as a default-unchecked checklist and
  *    the confirmed picks are appended to the draft box, which the user owns.
  */
@@ -29,6 +28,8 @@
 
 Object.assign(window.ReversePrompt, {
     TIPO_MAX_TAGS: 100,
+    TIPO_MODEL_STORAGE_KEY: 'sd-tipo-model-v1',
+    TIPO_VARIANT_SIZES: { 'v2.1': '1.1 GB', '200m-ft': '210 MB' },
 
     /** The text TIPO would work from: the draft box, which the user owns. */
     _draftText() {
@@ -55,11 +56,49 @@ Object.assign(window.ReversePrompt, {
         return window.TargetModel?.dialectFor?.(this.currentTarget()) || null;
     },
 
+    _tipoStoredModel() {
+        try {
+            const stored = localStorage.getItem(this.TIPO_MODEL_STORAGE_KEY);
+            if (stored === 'v2.1' || stored === '200m-ft') return stored;
+        } catch (_error) { /* keep the default */ }
+        return 'v2.1';
+    },
+
+    _tipoSelectedModel() {
+        const select = this._el('reverse-tipo-model') || document.getElementById('sepcon-tipo-model');
+        const raw = select ? String(select.value || '') : '';
+        if (raw === 'v2.1' || raw === '200m-ft') return raw;
+        return this._tipoStoredModel();
+    },
+
+    _tipoSizeHint(modelKey) {
+        return this.TIPO_VARIANT_SIZES[modelKey] || this.TIPO_VARIANT_SIZES['v2.1'];
+    },
+
+    _applyTipoModel(modelKey) {
+        const wanted = modelKey === '200m-ft' ? '200m-ft' : 'v2.1';
+        try {
+            localStorage.setItem(this.TIPO_MODEL_STORAGE_KEY, wanted);
+        } catch (_error) { /* ignore quota / private-mode */ }
+        ['reverse-tipo-model', 'sepcon-tipo-model'].forEach((id) => {
+            const el = document.getElementById(id);
+            if (el && el.value !== wanted) el.value = wanted;
+        });
+    },
+
+    _hydrateTipoModelSelect() {
+        this._applyTipoModel(this._tipoStoredModel());
+    },
+
     renderTipo() {
         const panel = this._el('reverse-tipo');
         const button = this._el('btn-reverse-tipo');
         const note = this._el('reverse-tipo-note');
         if (!panel || !button) return;
+        if (!this._tipoModelHydrated) {
+            this._tipoModelHydrated = true;
+            this._hydrateTipoModelSelect();
+        }
 
         const naturalTarget = this._targetDialect() === 'natural';
         const candidates = this._draftTagCandidates();
@@ -86,12 +125,14 @@ Object.assign(window.ReversePrompt, {
         }
     },
 
-    /** Has the GGUF already been fetched? The Model Center card is the source. */
+    /** Has the selected GGUF already been fetched? The Model Center card is the source. */
     async _tipoWeightsInstalled() {
         try {
             const payload = await window.App.API.get('/api/models/status');
             const card = (payload?.models || []).find((item) => item?.id === 'tipo');
-            return Array.isArray(card?.installed_variants) && card.installed_variants.length > 0;
+            const wanted = this._tipoSelectedModel();
+            const installed = card?.installed_variants;
+            return Boolean(Array.isArray(installed) && installed.includes(wanted));
         } catch (_error) {
             // Unknown is not "installed": warn rather than spend the download.
             return false;
@@ -104,13 +145,16 @@ Object.assign(window.ReversePrompt, {
         const tags = this._draftTagCandidates();
         if (tags.length === 0) return;
 
+        const model = this._tipoSelectedModel();
+        const size = this._tipoSizeHint(model);
         if (!(await this._tipoWeightsInstalled())) {
             const confirmed = await new Promise((resolve) => {
                 const ask = window.App?.showConfirm;
                 const message = this._t(
                     'reverse.tipoDownloadWarn',
-                    'TIPO is not downloaded yet. The first run fetches 100-250 MB of model files into your data folder, and nothing happens until that finishes. Download it now?',
-                    'TIPO 还没有下载。首次运行会把 100-250 MB 的模型文件下载到你的数据文件夹，下载完成之前不会有任何结果。现在下载吗？'
+                    'This TIPO model is not downloaded yet. The first run fetches about {size} into your data folder, and nothing happens until that finishes. Download it now?',
+                    '这个 TIPO 模型还没有下载。首次运行会把约 {size} 的文件下载到你的数据文件夹，下载完成之前不会有任何结果。现在下载吗？',
+                    { size }
                 );
                 const title = this._t('reverse.tipoDownloadTitle', 'Download TIPO?', '下载 TIPO？');
                 if (typeof ask === 'function') {
@@ -128,6 +172,7 @@ Object.assign(window.ReversePrompt, {
             const report = await window.App.API.post('/api/tags/suggest-upsample', {
                 tags,
                 target: 'short',
+                model,
             });
             this._renderTipoProposals(report);
         } catch (error) {

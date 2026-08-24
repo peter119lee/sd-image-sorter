@@ -3577,13 +3577,15 @@ def test_the_tipo_control_is_gated_on_the_pinned_dialect_map_not_a_second_copy()
 
 
 def test_tipo_warns_about_the_download_before_it_happens_and_offers_no_prepare():
-    """First press pulls 100-250 MB with no confirmation today.
+    """First press pulls the selected GGUF with a confirmation first.
 
-    The Model Center card is deliberately manual-only - there is no
-    ``prepare_model("tipo")`` branch - so a Prepare button here would be a
-    control that cannot run. The honest alternative is to say what the first
-    press costs before it costs it, with the size read from the card that owns it.
+    Model Center Prepare installs the CPU llama.cpp wheel. Reverse Prompt
+    must not POST ``/api/models/prepare``: that would mix runtime install
+    with a weight fetch this page already confirms by size. The size copy
+    is owned by tipo_service.
     """
+    from services.tipo_service import LIGHT_WEIGHT_SIZE_HINT, WEIGHT_SIZE_HINT
+
     repo_root = Path(__file__).resolve().parents[2]
     tipo = (repo_root / "frontend" / "js" / "reverse-prompt" / "tipo.js").read_text(
         encoding="utf-8"
@@ -3593,16 +3595,23 @@ def test_tipo_warns_about_the_download_before_it_happens_and_offers_no_prepare()
     ).read_text(encoding="utf-8")
 
     assert "/api/models/prepare" not in tipo, (
-        "TIPO has no prepare branch; a Prepare button would do nothing"
+        "Reverse Prompt must not call Model Center prepare; GGUF is confirmed here"
     )
     assert "reverse.tipoDownloadWarn" in tipo, (
         "nothing warns about the first-run download"
     )
 
-    card_size = re.search(r"Weights \(~(?P<low>\d+)-(?P<high>\d+) MB", inventory)
-    assert card_size is not None, (
-        "the TIPO card no longer states its download size; the warning's numbers "
-        "have to come from somewhere real"
+    assert "default_variant" in tipo or "_tipoSelectedModel" in tipo, (
+        "the download check must look at the selected variant, not 'any GGUF'"
+    )
+    assert "_tipo_weight_size" in inventory, (
+        "the TIPO card no longer reads its download size from tipo_service"
+    )
+    assert WEIGHT_SIZE_HINT in tipo, (
+        "tipo.js fallback copy drifted from the size tipo_service owns"
+    )
+    assert LIGHT_WEIGHT_SIZE_HINT in tipo, (
+        "tipo.js no longer names the lighter 200m-ft download size"
     )
     packs = _locale_pack_sources(repo_root)
     for pack_name, source in packs.items():
@@ -3610,11 +3619,38 @@ def test_tipo_warns_about_the_download_before_it_happens_and_offers_no_prepare()
             r"^\s*'reverse\.tipoDownloadWarn'\s*:\s*'(?P<v>[^']*)'", source, re.MULTILINE
         )
         assert warning is not None, f"{pack_name} is missing reverse.tipoDownloadWarn"
-        for bound in (card_size.group("low"), card_size.group("high")):
-            assert bound in warning.group("v"), (
-                f"{pack_name}'s download warning does not carry the size the "
-                f"Model Center card states ({bound} MB)"
-            )
+        assert "{size}" in warning.group("v"), (
+            f"{pack_name}'s download warning does not take the selected variant's size"
+        )
+        missing = re.search(
+            r"^\s*'models\.tipo\.missing'\s*:\s*'(?P<v>[^']*)'", source, re.MULTILINE
+        )
+        assert missing is not None, f"{pack_name} is missing models.tipo.missing"
+        assert WEIGHT_SIZE_HINT in missing.group("v"), (
+            f"{pack_name}'s missing-weights card does not carry {WEIGHT_SIZE_HINT}"
+        )
+        assert LIGHT_WEIGHT_SIZE_HINT in missing.group("v"), (
+            f"{pack_name}'s missing-weights card does not carry {LIGHT_WEIGHT_SIZE_HINT}"
+        )
+        missing_deps = re.search(
+            r"^\s*'models\.tipo\.missingDeps'\s*:\s*'(?P<v>[^']*)'", source, re.MULTILINE
+        )
+        assert missing_deps is not None, f"{pack_name} is missing models.tipo.missingDeps"
+        deps_copy = missing_deps.group("v")
+        assert "Prepare" in deps_copy or "准备" in deps_copy, (
+            f"{pack_name}'s missing-deps card does not send users to Prepare"
+        )
+        assert "backend environment" not in deps_copy, (
+            f"{pack_name}'s missing-deps card still tells public users to pip by hand"
+        )
+        v21 = re.search(
+            r"^\s*'reverse\.tipoVariantV21'\s*:\s*'(?P<v>[^']*)'", source, re.MULTILINE
+        )
+        light = re.search(
+            r"^\s*'reverse\.tipoVariant200m'\s*:\s*'(?P<v>[^']*)'", source, re.MULTILINE
+        )
+        assert v21 is not None and WEIGHT_SIZE_HINT in v21.group("v")
+        assert light is not None and LIGHT_WEIGHT_SIZE_HINT in light.group("v")
 
 
 def test_every_reverse_prompt_locale_key_the_page_uses_exists_in_both_packs():

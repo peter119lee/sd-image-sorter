@@ -1,10 +1,10 @@
 """TIPO tag-upsampling assist (roadmap #8, v1).
 
 TIPO (Text to Image with text Presampling for Optimal prompting,
-arXiv:2411.08127, KohakuBlueleaf/KGen) is a small LLaMA-architecture model
-trained to EXPAND a danbooru tag list. WD14-family taggers can only score
-labels that exist in their trained label set, so a concept without a label
-is invisible to them — and therefore also invisible to the score-band
+arXiv:2411.08127, KohakuBlueleaf/KGen) is a small language model trained
+to EXPAND a danbooru tag list. WD14-family taggers can only score labels
+that exist in their trained label set, so a concept without a label is
+invisible to them — and therefore also invisible to the score-band
 coverage-gaps flow, which reads stored tagger scores. TIPO proposes tags
 from a different direction (language-model continuation over the danbooru
 vocabulary), surfacing exactly those blind spots.
@@ -22,20 +22,28 @@ v1 guard rails:
 Runtime: ``tipo-kgen`` + ``llama-cpp-python`` (CPU, GGUF) — an OPT-IN
 dependency pair mirroring rembg in ``services/mask_service.py``: a missing
 install raises a clear bilingual error carrying the exact pip command.
-(Note: tipo-kgen 0.2.0 also declares torch/transformers as install deps —
+(Note: tipo-kgen also declares torch/transformers as install deps —
 ``kgen.models`` imports them at module level — but only the llama_cpp GGUF
 path is ever exercised here.)
 
 Model licenses (per decision memo — keep documented):
 
-* ``200m-ft`` (default) — TIPO-200M-ft via the QuantFactory GGUF mirror.
-  License: kohaku-license-1.0 — free for local/personal use (this app is a
-  local tool); redistribution/commercial hosting restricted.
+* ``v2.1`` (default) — TIPO-v2.1-1B-A200M Q8_0 GGUF from
+  ``KBlueLeaf/TIPO-v2.1-1B-A200M``. KohakUwU MoE (~991M total / ~193M
+  active per token), GGUF architecture ``dots1``. License:
+  kohaku-license-1.0 — free for local/personal use (this app is a local
+  tool); redistribution/commercial hosting restricted. ~1.07 GB.
+* ``200m-ft`` — TIPO-200M-ft via the QuantFactory GGUF mirror. License:
+  kohaku-license-1.0 — free for local use. Kept as an optional smaller
+  fallback.
 * ``100m`` — TIPO-100M (KBlueLeaf official F16 GGUF). License: Apache-2.0,
   the license-safest choice.
 
 Weights download on demand into ``DATA_DIR/models/tipo/`` (override with
-``SD_IMAGE_SORTER_TIPO_DIR``) — never into the user profile.
+``SD_IMAGE_SORTER_TIPO_DIR``) — never into the user profile. The default
+variant is fetched with ``huggingface_hub.hf_hub_download`` at a pinned
+commit (kgen's ``download_gguf`` has no revision argument and cannot see
+files under the repo's ``gguf/`` subfolder).
 """
 
 from __future__ import annotations
@@ -43,6 +51,7 @@ from __future__ import annotations
 import importlib.util
 import logging
 import os
+import shutil
 import threading
 import time
 from dataclasses import dataclass
@@ -55,7 +64,11 @@ import config
 
 logger = logging.getLogger(__name__)
 
-PIP_INSTALL_HINT = "pip install llama-cpp-python tipo-kgen"
+PIP_INSTALL_HINT = (
+    "pip install --only-binary=llama-cpp-python "
+    "--extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu "
+    '"llama-cpp-python>=0.3.24" "tipo-kgen>=0.3.1"'
+)
 
 # Import names of the opt-in runtime pair, in install order.
 RUNTIME_MODULES: tuple[str, ...] = ("llama_cpp", "kgen")
@@ -66,12 +79,20 @@ RUNTIME_MODULES: tuple[str, ...] = ("llama_cpp", "kgen")
 # -- and the Model Center must say so instead of reporting "not downloaded".
 GGUF_MAGIC = b"GGUF"
 
+# User-facing sizes of the two selectable GGUFs (Q8_0 file sizes from HF).
+WEIGHT_SIZE_HINT = "1.1 GB"  # TIPO-v2.1-1B-A200M-Q8_0.gguf = 1,072,689,600 bytes
+LIGHT_WEIGHT_SIZE_HINT = "210 MB"  # TIPO-200M-ft.Q8_0.gguf = 216,045,920 bytes
+
+# Pinned commit of KBlueLeaf/TIPO-v2.1-1B-A200M (HF lastModified 2026-08-22).
+V21_REVISION = "f5a318524a4ab30cdbbf51816cf406170f454e65"
+
 MISSING_DEPS_MESSAGE = (
-    "TIPO is not installed. Install it into the backend environment with: "
-    f"{PIP_INSTALL_HINT}  (CPU GGUF runtime; the model, ~100-250 MB, "
-    "downloads on first use into DATA_DIR/models/tipo.) / 未安装 TIPO。"
-    f"请在后端环境执行 {PIP_INSTALL_HINT}"
-    "（CPU GGUF 运行时；首次使用会自动下载模型，约 100-250 MB）。"
+    "TIPO is not installed. Use Model Center → TIPO → Prepare, or run: "
+    f"{PIP_INSTALL_HINT}  (prebuilt CPU wheel, no compiler; default GGUF "
+    f"~{WEIGHT_SIZE_HINT} still downloads on first Suggest.) / 未安装 TIPO。"
+    "请在模型中心对 TIPO 点「准备」，或在后端环境执行 "
+    f"{PIP_INSTALL_HINT}"
+    "（官方 CPU 预编译 wheel，不需要编译器；默认权重仍在首次建议时下载）。"
 )
 
 # Hard ceiling on returned proposals — a review checklist longer than this
@@ -89,19 +110,66 @@ class TipoModelSpec:
     repo: str
     filename: str
     license_note: str
+    hf_filename: str
+    size_hint: str
+    revision: Optional[str] = None
+    selectable: bool = False
 
 
 MODEL_SPECS: Dict[str, TipoModelSpec] = {
+    "v2.1": TipoModelSpec(
+        repo="KBlueLeaf/TIPO-v2.1-1B-A200M",
+        filename="TIPO-v2.1-1B-A200M-Q8_0.gguf",
+        hf_filename="gguf/TIPO-v2.1-1B-A200M-Q8_0.gguf",
+        revision=V21_REVISION,
+        size_hint=WEIGHT_SIZE_HINT,
+        selectable=True,
+        license_note="kohaku-license-1.0 (free for local use)",
+    ),
     "200m-ft": TipoModelSpec(
         repo="QuantFactory/TIPO-200M-ft-GGUF",
         filename="TIPO-200M-ft.Q8_0.gguf",
+        hf_filename="TIPO-200M-ft.Q8_0.gguf",
+        size_hint=LIGHT_WEIGHT_SIZE_HINT,
+        selectable=True,
         license_note="kohaku-license-1.0 (free for local use)",
     ),
     "100m": TipoModelSpec(
         repo="KBlueLeaf/TIPO-100M",
         filename="TIPO-100M-F16.gguf",
+        hf_filename="TIPO-100M-F16.gguf",
+        size_hint="200 MB",
         license_note="Apache-2.0 (license-safest)",
     ),
+}
+
+
+def selectable_tipo_variants() -> List[Dict[str, str]]:
+    """The two variants the UI offers: v2.1 (quality) and 200m-ft (lighter).
+
+    TIPOv2-1B-A200M is intentionally absent. It is the same ~1 GB / ~1–2 GB RAM
+    class as v2.1, and v2.1 is the corrected retrain of that architecture.
+    ``100m`` stays in the API for old clients but is not a picker option.
+    """
+    return [
+        {"id": key, "size_hint": spec.size_hint}
+        for key, spec in MODEL_SPECS.items()
+        if spec.selectable
+    ]
+
+# v2.1 card: Danbooru raw rating words were out of vocabulary in v2.
+# https://huggingface.co/KBlueLeaf/TIPO-v2.1-1B-A200M
+_V21_RATING_MAP = {
+    "general": "safe",
+    "g": "safe",
+    "safe": "safe",
+    "sensitive": "sensitive",
+    "s": "sensitive",
+    "questionable": "nsfw",
+    "q": "nsfw",
+    "nsfw": "nsfw",
+    "explicit": "nsfw, explicit",
+    "e": "nsfw, explicit",
 }
 
 
@@ -115,7 +183,7 @@ class TipoSuggestRequest(BaseModel):
     rating: Optional[str] = Field(default=None, max_length=32)
     aspect_ratio: Optional[float] = Field(default=None, gt=0.0, le=100.0)
     target: Literal["short", "long"] = "short"
-    model: Literal["200m-ft", "100m"] = "200m-ft"
+    model: Literal["v2.1", "200m-ft", "100m"] = "v2.1"
 
 
 # llama.cpp contexts are not thread-safe and FastAPI runs sync endpoints in
@@ -124,7 +192,7 @@ _RUNTIME_LOCK = threading.Lock()
 _loaded_model_key: Optional[str] = None
 
 
-DEFAULT_MODEL_KEY = "200m-ft"
+DEFAULT_MODEL_KEY = "v2.1"
 
 
 def tipo_model_dir_path() -> Path:
@@ -159,6 +227,71 @@ def tipo_weight_path(model_key: str, model_dir: Optional[Path] = None) -> Path:
     spec = MODEL_SPECS[model_key]
     base = model_dir if model_dir is not None else tipo_model_dir_path()
     return base / f"{spec.repo.split('/')[-1]}_{spec.filename}"
+
+
+def _hf_hub_download(**kwargs: Any) -> str:
+    """Thin wrapper so tests can record the Hugging Face call without a network."""
+    from huggingface_hub import hf_hub_download  # noqa: PLC0415 - optional at import
+
+    return hf_hub_download(**kwargs)
+
+
+def _download_weight(spec: TipoModelSpec, dest_dir: Path) -> Path:
+    """Fetch one GGUF into dest_dir and rename it to the kgen on-disk form.
+
+    kgen's ``download_gguf`` writes ``{repo_tail}_{filename}`` and has no
+    revision argument, so this path calls ``huggingface_hub`` directly (already
+    a first-class dependency) and then applies the same rename. Files that
+    live under a subfolder on the hub (v2.1 Q8_0 is under ``gguf/``) cannot
+    be fetched by kgen's helper at all.
+    """
+    target = dest_dir / f"{spec.repo.split('/')[-1]}_{spec.filename}"
+    if target.is_file() and target.stat().st_size > 0:
+        return target
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    kwargs: Dict[str, Any] = {
+        "repo_id": spec.repo,
+        "filename": spec.hf_filename,
+        "repo_type": "model",
+        "local_dir": str(dest_dir),
+    }
+    if spec.revision:
+        kwargs["revision"] = spec.revision
+    try:
+        downloaded = Path(_hf_hub_download(**kwargs))
+    except Exception as exc:
+        raise TipoError(
+            f"TIPO model download failed: {exc} / TIPO 模型下载失败：{exc}"
+        ) from exc
+    if downloaded.resolve() != target.resolve():
+        if target.exists():
+            target.unlink()
+        shutil.move(str(downloaded), str(target))
+        leftover = downloaded.parent
+        if leftover != dest_dir:
+            try:
+                leftover.rmdir()
+            except OSError:
+                pass
+    return target
+
+
+def _rating_for_model(model_key: str, rating: Optional[str]) -> Optional[str]:
+    """Map a caller rating onto the vocabulary the selected checkpoint learned.
+
+    v2.1's card documents that v2 passed Danbooru raw values (``general``,
+    ``questionable``, ``explicit``) which were out of vocabulary. The default
+    checkpoint therefore needs the TIPO words; the v1 GGUFs keep the raw
+    Danbooru spelling they were trained on.
+    """
+    if rating is None:
+        return None
+    folded = str(rating).strip().lower().replace(" ", "_")
+    if not folded:
+        return None
+    if model_key == "v2.1":
+        return _V21_RATING_MAP.get(folded, folded.replace("_", " "))
+    return folded
 
 
 def _missing_runtime_modules() -> List[str]:
@@ -245,12 +378,13 @@ def probe_tipo_installation() -> Dict[str, Any]:
             "TIPO runtime packages are missing: "
             + ", ".join(missing_dependencies)
             + f". Install them with: {PIP_INSTALL_HINT}"
-            " Weights (~100-250 MB) download on first use."
+            f" Default weights (~{WEIGHT_SIZE_HINT}) download on first use."
         )
     else:
         message = (
-            "TIPO weights are not downloaded yet. They download on first use "
-            "into the path below (~100-250 MB)."
+            "TIPO weights are not downloaded yet. v2.1 downloads on first use "
+            f"(~{WEIGHT_SIZE_HINT}); 200m-ft is the lighter option "
+            f"(~{LIGHT_WEIGHT_SIZE_HINT})."
         )
 
     try:
@@ -266,6 +400,7 @@ def probe_tipo_installation() -> Dict[str, Any]:
         "missing_dependencies": missing_dependencies,
         "model_dir": resolved_dir,
         "default_variant": DEFAULT_MODEL_KEY,
+        "selectable_variants": selectable_tipo_variants(),
         "message": message,
     }
 
@@ -278,7 +413,7 @@ def _fold(tag: str) -> str:
 def _import_kgen() -> Dict[str, Any]:
     """Import the opt-in TIPO runtime, or raise the actionable 400 message.
 
-    tipo-kgen 0.2.0 verified API (src/kgen):
+    tipo-kgen 0.2.0+ verified API (src/kgen; 0.3.1 lists v2.1 first):
     * ``models.model_dir`` (module global), ``models.download_gguf(repo,
       filename)``, ``models.load_model(path, gguf=True, device="cpu")``
     * ``formatter.seperate_tags(tags) -> tag_map``
@@ -308,9 +443,9 @@ def _import_kgen() -> Dict[str, Any]:
 def _ensure_model_loaded(model_key: str) -> Dict[str, Any]:
     """Lazy singleton load of the requested GGUF. Caller holds the lock.
 
-    Downloads on first real use only — never at import or startup. kgen's
-    ``download_gguf`` renames the fetched file to ``{repo_tail}_{filename}``
-    inside ``models.model_dir``, so the existence probe mirrors that.
+    Downloads on first real use only — never at import or startup. The
+    on-disk name matches kgen's ``{repo_tail}_{filename}`` scheme so the
+    health probe and the loader stay in agreement.
     """
     global _loaded_model_key
     api = _import_kgen()
@@ -325,11 +460,11 @@ def _ensure_model_loaded(model_key: str) -> Dict[str, Any]:
             logger.info(
                 "TIPO: downloading %s/%s (%s) into %s",
                 spec.repo,
-                spec.filename,
+                spec.hf_filename,
                 spec.license_note,
                 models.model_dir,
             )
-            models.download_gguf(spec.repo, spec.filename)
+            _download_weight(spec, models.model_dir)
         models.load_model(str(target), gguf=True, device="cpu")
     except TipoError:
         raise
@@ -420,7 +555,11 @@ def suggest_upsample(request: TipoSuggestRequest) -> Dict[str, Any]:
 
     started = time.perf_counter()
     raw = _generate_candidates(
-        input_tags, request.rating, aspect_ratio, request.target, request.model
+        input_tags,
+        _rating_for_model(request.model, request.rating),
+        aspect_ratio,
+        request.target,
+        request.model,
     )
     elapsed_ms = int((time.perf_counter() - started) * 1000)
 

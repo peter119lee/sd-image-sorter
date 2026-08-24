@@ -57,7 +57,7 @@ def test_torch_lock_excludes_vulnerable_macos_legacy_pins():
 
 @pytest.mark.parametrize(
     "group",
-    ("aesthetic", "artist", "sam3", "toriigate", "yolo"),
+    ("aesthetic", "artist", "sam3", "toriigate", "yolo", "tipo"),
 )
 def test_torch_group_rejects_intel_macos_before_install(monkeypatch, group):
     monkeypatch.setattr(optional_dependencies.platform, "system", lambda: "Darwin")

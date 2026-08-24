@@ -408,6 +408,25 @@ def _prepare_model(service: Any, model_id: str, *, source: Optional[str] = None,
             return repair_sam3_result(result, refreshed_path)
         return _svc()._with_dependency_result(result, dependency_result)
 
+    if normalized_model_id == "tipo":
+        dependency_result = _svc().ensure_group("tipo")
+        restart_result = _svc()._dependency_restart_result(
+            normalized_model_id, dependency_result
+        )
+        if restart_result:
+            return restart_result
+        return _svc()._with_dependency_result(
+            {
+                "status": "ok",
+                "model_id": normalized_model_id,
+                "message": (
+                    "TIPO CPU runtime is ready (prebuilt llama.cpp wheel + tipo-kgen). "
+                    "Weights still download on first Suggest."
+                ),
+            },
+            dependency_result,
+        )
+
     if normalized_model_id == "aesthetic":
         dependency_result = _svc().ensure_group("aesthetic")
         # If ensure_group() actually installed torch / open_clip, the
