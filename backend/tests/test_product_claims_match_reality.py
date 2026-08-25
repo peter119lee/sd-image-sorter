@@ -135,10 +135,11 @@ def test_marketing_copy_matches_shipped_template_and_vlm_facts():
 def test_first_use_downloads_the_clicked_feature_with_progress():
     html = _read("frontend", "index.html")
     api_at = html.find("js/app/api-features.js")
+    restart_at = html.find("js/app/model-restart.js")
     ensure_at = html.find("js/app/ensure-model.js")
     tagging_at = html.find("js/app/tagging-flow.js")
-    assert api_at != -1 and ensure_at != -1 and tagging_at != -1
-    assert api_at < ensure_at < tagging_at
+    assert api_at != -1 and restart_at != -1 and ensure_at != -1 and tagging_at != -1
+    assert api_at < restart_at < ensure_at < tagging_at
 
     helper = _read("frontend", "js", "app", "ensure-model.js")
     assert "FEATURE_INSTALL_CONFIRM_BYTES" in helper

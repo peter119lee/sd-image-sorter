@@ -415,13 +415,56 @@ def apply_update(manifest_path: Path) -> int:
     return 0
 
 
+def restart_only(manifest_path: Path) -> int:
+    """Relaunch the app without touching a single installed file.
+
+    Same wait-then-relaunch dance as ``apply_update``, minus the patching. The
+    caller (an in-app "Restart now" button) writes the manifest, spawns this
+    worker detached, and then exits; we wait for that PID to disappear so the
+    launcher does not race the old process for the port.
+    """
+    pending = _read_json(manifest_path)
+    launcher_path = Path(pending["launcher_path"]).resolve()
+    current_pid = int(pending.get("current_pid") or 0)
+    log_path = Path(str(pending.get("log_path"))) if pending.get("log_path") else None
+    package_root_raw = pending.get("package_root")
+    if package_root_raw:
+        try:
+            launcher_path.relative_to(Path(str(package_root_raw)).resolve())
+        except (OSError, ValueError):
+            _log(
+                f"Launcher {launcher_path} is outside the package root; refusing restart",
+                log_path=log_path,
+            )
+            return 1
+
+    if current_pid > 0:
+        _log(f"Waiting for process {current_pid} to exit before restart", log_path=log_path)
+        _wait_for_pid_exit(current_pid, timeout_seconds=180, log_path=log_path)
+
+    manifest_path.unlink(missing_ok=True)
+
+    if not launcher_path.is_file():
+        _log(f"Launcher {launcher_path} is gone; cannot restart", log_path=log_path)
+        return 1
+    _relaunch(launcher_path, log_path=log_path)
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Apply a staged SD Image Sorter update")
     parser.add_argument("--manifest", required=True, help="Path to the pending update manifest")
+    parser.add_argument(
+        "--restart-only",
+        action="store_true",
+        help="Relaunch the app without applying any update payload.",
+    )
     args = parser.parse_args()
 
     manifest_path = Path(args.manifest).resolve()
     try:
+        if args.restart_only:
+            return restart_only(manifest_path)
         return apply_update(manifest_path)
     except Exception as exc:
         log_path = None

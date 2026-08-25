@@ -162,6 +162,12 @@ Object.assign(API, {
         });
     },
 
+    async restartApp(options = {}) {
+        return this.post('/api/updates/restart', {
+            reason: options.reason || '',
+        });
+    },
+
     // Drop resolution
     async resolveDrop(folderName, droppedFiles) {
         return this.post('/api/resolve-drop', { folder_name: folderName, files: droppedFiles });

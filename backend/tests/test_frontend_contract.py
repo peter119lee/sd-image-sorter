@@ -1763,6 +1763,112 @@ def test_feature_setup_explains_lightweight_startup_and_cache_limit():
     assert "disk.thumbnailTradeoffHint" in source
     assert "/api/disk/runtime/rebuild-core" in source
     assert "models.restartAfterInstallWithPackages" in source
+    assert "models.restartNowAndContinue" in source
+    assert "/api/updates/restart" in source
+    assert "js/app/model-restart.js" in html
+    restart_src = (repo_root / "frontend" / "js" / "app" / "model-restart.js").read_text(
+        encoding="utf-8"
+    )
+    manager_src = (repo_root / "frontend" / "js" / "app" / "model-manager.js").read_text(
+        encoding="utf-8"
+    )
+    api_src = (repo_root / "frontend" / "js" / "app" / "api-features.js").read_text(
+        encoding="utf-8"
+    )
+    assert "async restartApp(" in api_src
+    assert "this.post('/api/updates/restart'" in api_src
+    assert "sd-image-sorter-prepare-resume-v1" in restart_src
+    assert "maybeResumePrepareQueue({ resumeNow: true })" in manager_src
+    assert "data-action=\"restart-and-continue\"" in restart_src
+    assert "data-action=\"dismiss-restart-queue\"" in restart_src
+
+
+def test_prepare_resume_queue_persists_and_only_auto_starts_on_boot():
+    """Remaining model ids are stored by the shipped helper and only bulk-started on boot.
+
+    Same-session dismiss / a later Model Manager open must not call runBulkDownload.
+    """
+    if shutil.which("node") is None:
+        raise AssertionError("node is required to execute the shipped resume-queue helpers")
+
+    repo_root = Path(__file__).resolve().parents[2]
+    storage_path = repo_root / "frontend" / "js" / "modules" / "core" / "storage-utils.js"
+    restart_path = repo_root / "frontend" / "js" / "app" / "model-restart.js"
+    script = f"""
+const fs = require('fs');
+const store = Object.create(null);
+global.localStorage = {{
+  getItem(key) {{ return Object.prototype.hasOwnProperty.call(store, key) ? store[key] : null; }},
+  setItem(key, value) {{ store[key] = String(value); }},
+  removeItem(key) {{ delete store[key]; }},
+}};
+global.document = {{
+  getElementById() {{ return null; }},
+  createElement() {{
+    return {{
+      id: '',
+      className: '',
+      innerHTML: '',
+      setAttribute() {{}},
+      querySelector() {{ return null; }},
+      scrollIntoView() {{}},
+    }};
+  }},
+}};
+const bulkCalls = [];
+function escapeHtml(value) {{ return String(value); }}
+function runBulkDownload(items) {{
+  bulkCalls.push(JSON.parse(JSON.stringify(items)));
+  return Promise.resolve();
+}}
+const storageSource = fs.readFileSync({json.dumps(str(storage_path))}, 'utf8');
+const restartSource = fs.readFileSync({json.dumps(str(restart_path))}, 'utf8');
+const loadShipped = new Function(
+  'escapeHtml',
+  'runBulkDownload',
+  storageSource + '\\n' + restartSource + '\\n' +
+  'return {{ writePrepareResumeQueue, readPrepareResumeQueue, clearPrepareResumeQueue, maybeResumePrepareQueue }};'
+);
+const api = loadShipped(escapeHtml, runBulkDownload);
+
+const remaining = [
+  {{ id: 'wd14', name: 'WD14', variant: 'wd-swinv2-tagger-v3' }},
+  {{ id: 'clip', name: 'CLIP' }},
+];
+if (!api.writePrepareResumeQueue({{ items: remaining, reason: 'model_dependency_install', autoResume: true }})) {{
+  throw new Error('writePrepareResumeQueue failed');
+}}
+const stored = api.readPrepareResumeQueue();
+if (!stored || stored.items.map((item) => item.id).join(',') !== 'wd14,clip') {{
+  throw new Error('queue did not persist remaining model ids: ' + JSON.stringify(stored));
+}}
+if (stored.items[0].variant !== 'wd-swinv2-tagger-v3') {{
+  throw new Error('queue dropped variant: ' + JSON.stringify(stored));
+}}
+
+api.maybeResumePrepareQueue();
+if (bulkCalls.length !== 0) {{
+  throw new Error('same-session open auto-started bulk: ' + JSON.stringify(bulkCalls));
+}}
+
+api.maybeResumePrepareQueue({{ resumeNow: true }});
+if (bulkCalls.length !== 1 || bulkCalls[0].map((item) => item.id).join(',') !== 'wd14,clip') {{
+  throw new Error('boot did not consume remaining ids: ' + JSON.stringify(bulkCalls));
+}}
+
+api.clearPrepareResumeQueue();
+bulkCalls.length = 0;
+api.writePrepareResumeQueue({{ items: remaining, autoResume: true }});
+api.clearPrepareResumeQueue();
+api.maybeResumePrepareQueue({{ resumeNow: true }});
+if (api.readPrepareResumeQueue() !== null) {{
+  throw new Error('dismiss left a queue behind');
+}}
+if (bulkCalls.length !== 0) {{
+  throw new Error('dismissed queue still auto-started bulk');
+}}
+"""
+    subprocess.run(["node", "-e", script], check=True)
 
 
 def test_scan_stalled_diagnostics_are_visible_and_copyable_from_frontend():

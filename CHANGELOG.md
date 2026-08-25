@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.5.0-beta.5] - 2026-08-25
+
+Most optional package installs continue downloading model weights in the same click. A restart is required only when a loaded module was replaced, a Windows DLL is locked, or import works only in a clean process — and then Model Center offers Restart now and continue. TIPO ships v2.1 with a public CPU wheel; Gallery chrome stops jumping.
+
+多数套件安装后可立刻继续下载模型；只有覆盖已加载模块、DLL 被锁、或干净进程才能 import 时才要重开，并提供「立即重启并继续」。TIPO 升到 v2.1 且走官方 CPU wheel；图库顶栏不再乱跑。
+
 ### Added / 新增
 - **Bundled MIT Chinese/Japanese tag aliases + character catalog / 内置 MIT 中日文标签别名与角色目录**: tag autocomplete now resolves CJK queries out of the box (长发 → `long_hair`, 初音未来-style aliases → the canonical character tag) using [StoryAura/Danbooru-Dataset-csv](https://huggingface.co/datasets/StoryAura/Danbooru-Dataset-csv) (MIT). Tag details show series/copyright and parent tags; export implication-dedup uses the catalog's parent_tag graph on top of the curated core table; Dataset Maker can color popular character tags before any WD14 model is downloaded. A personal `data/danbooru_zh.csv` still overrides the bundled table.
   - 标签补全开箱即可用中日文别名（输入「长发」会提示 `long_hair`）。标签资料显示作品 copyright 与父标签；导出蕴含去重叠上 StoryAura 的 parent_tag 图；即使尚未下载 WD14，热门角色标签也能正确着色。`data/danbooru_zh.csv` 仍可覆盖内置表。
@@ -14,6 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - 在逗号分隔的标签框里选中 `hatsune_miku` 时，若词表知道作品且栏里还没有，会一并写入 `vocaloid`。下拉里会先看到作品名。Prompt Lab 插入模式只补全当前词，不会加逗号。
 
 ### Changed / 变更
+- **Prepare no longer restarts after every pip install / 安装后不再每次都要重开**: optional packages that import in this process continue to model-weight download in the same click. A restart is required only when a loaded module was replaced, Windows locked a DLL, or import works only in a clean interpreter. When that happens, Model Center offers Restart now and continue; remaining downloads resume after relaunch.
+  - 能在当前进程 import 的套件会立刻继续下载模型权重。只有覆盖了已加载模块、Windows DLL 被锁、或只有干净进程能 import 时才要重开。这时模型中心提供「立即重启并继续」，剩下的下载会在重开后自动接上。
 - **TIPO v2.1 plus a lighter 200M-ft choice / TIPO 升级 v2.1，并保留轻量 200M-ft**: Reverse Prompt and Dataset Maker let you pick `v2.1` (TIPO-v2.1-1B-A200M Q8_0, ~1.1 GB, default) or `200M-ft` (~210 MB). Both run on CPU; no dedicated GPU. v2.1 and the older v2 1B checkpoint are the same RAM class (~1–2 GB), so v2 is not offered separately. First use of a missing variant asks before downloading, and Danbooru rating words are mapped for v2.1 (`general` → `safe`).
   - 反推和数据集可在 v2.1（默认，约 1.1 GB）与较轻的 200M-ft（约 210 MB）之间选择，都走 CPU，不必独显。v2.1 与旧 v2 1B 内存需求相同，所以不再单独提供 v2。缺权重时会先确认再下载；v2.1 会把 Danbooru 分级词映射到它的词表。
 - **TIPO runtime installs a prebuilt CPU wheel / TIPO 运行时改装官方预编译 CPU wheel**: Model Center Prepare is the public-install path. It installs `llama-cpp-python` from the first-party extra-index (`whl/cpu`) with `--only-binary` (py3-none wheels: Windows portable 3.12 and Linux portable 3.13), then `tipo-kgen`. It will not compile from the PyPI sdist, and the card no longer tells users to pip into a backend they do not own. Covered hosts: Windows x86_64, Linux x86_64, Linux aarch64, macOS Apple Silicon. Other hosts fail closed.

@@ -414,23 +414,31 @@ class _UpdateDeliveryMixin:
         return archive_path
 
     def _resolve_launcher_path(self) -> Path:
+        package_root = Path(_svc().PACKAGE_ROOT).resolve()
         launcher_name = str(os.environ.get("SD_IMAGE_SORTER_LAUNCHER") or "").strip()
-        candidates = []
-        if launcher_name:
-            candidates.append(_svc().PACKAGE_ROOT / launcher_name)
+        candidates: list[Path] = []
+        # Env must be a basename inside the package. Absolute paths and `..`
+        # would otherwise become the command the detached worker executes.
+        if launcher_name and Path(launcher_name).name == launcher_name:
+            candidates.append(package_root / launcher_name)
         if sys.platform == "win32":
             candidates.extend(
                 [
-                    _svc().PACKAGE_ROOT / "run-portable.bat",
-                    _svc().PACKAGE_ROOT / "run.bat",
+                    package_root / "run-portable.bat",
+                    package_root / "run.bat",
                 ]
             )
         else:
-            candidates.append(_svc().PACKAGE_ROOT / "run.sh")
+            candidates.append(package_root / "run.sh")
 
         for candidate in candidates:
-            if candidate.exists():
-                return candidate
+            try:
+                resolved = candidate.resolve()
+                resolved.relative_to(package_root)
+            except (OSError, ValueError):
+                continue
+            if resolved.is_file():
+                return resolved
 
         raise RuntimeError("Could not locate a launcher script for restarting the app")
 
@@ -463,16 +471,19 @@ class _UpdateDeliveryMixin:
         manifest_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
         return manifest_path
 
-    def _worker_command(self, manifest_path: Path) -> list[str]:
-        return [
+    def _worker_command(self, manifest_path: Path, *, restart_only: bool = False) -> list[str]:
+        command = [
             sys.executable,
             str(_svc().PACKAGE_ROOT / "backend" / "update_worker.py"),
             "--manifest",
             str(manifest_path),
         ]
+        if restart_only:
+            command.append("--restart-only")
+        return command
 
-    def _launch_worker(self, manifest_path: Path) -> None:
-        command = self._worker_command(manifest_path)
+    def _launch_worker(self, manifest_path: Path, *, restart_only: bool = False) -> None:
+        command = self._worker_command(manifest_path, restart_only=restart_only)
         kwargs: dict[str, Any] = {
             "cwd": str(_svc().PACKAGE_ROOT),
             "stdin": subprocess.DEVNULL,
@@ -488,3 +499,45 @@ class _UpdateDeliveryMixin:
         else:
             kwargs["start_new_session"] = True
         subprocess.Popen(command, **kwargs)
+
+    def restart_app(self, *, reason: str = "") -> dict[str, Any]:
+        """Close this process and start it again through its original launcher.
+
+        Feature setup calls this after an install that genuinely needs a fresh
+        interpreter, so the user gets one button instead of "close the window,
+        find the launcher, run it, click Prepare again".
+
+        Returns ``status="unsupported"`` when the app was not started from a
+        launcher script -- a developer running ``python main.py`` directly has
+        nothing to relaunch, and promising a button that silently does nothing
+        would be worse than telling them to restart by hand.
+        """
+        try:
+            launcher_path = self._resolve_launcher_path()
+        except RuntimeError as exc:
+            return {"status": "unsupported", "reason": str(exc)}
+
+        if getattr(self, "_restart_scheduled", False):
+            return {"status": "scheduled", "launcher": launcher_path.name}
+
+        timestamp = int(time.time())
+        manifest_path = self._state_dir() / "pending-restart.json"
+        manifest_path.write_text(
+            json.dumps(
+                {
+                    "created_at": timestamp,
+                    "current_pid": os.getpid(),
+                    "launcher_path": str(launcher_path),
+                    "log_path": str(self._logs_dir() / f"restart-{timestamp}.log"),
+                    "reason": reason,
+                    "package_root": str(Path(_svc().PACKAGE_ROOT).resolve()),
+                },
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
+        self._restart_scheduled = True
+        if os.environ.get("SD_SORTER_TESTING") == "1":
+            return {"status": "scheduled", "launcher": launcher_path.name}
+        self._launch_worker(manifest_path, restart_only=True)
+        return {"status": "scheduled", "launcher": launcher_path.name}

@@ -91,6 +91,10 @@ function _ensureInstallOverlay() {
         + '<div class="feature-model-install-bar" aria-hidden="true">'
         + '<div class="feature-model-install-fill"></div>'
         + '</div>'
+        + '<div class="feature-model-install-actions" hidden>'
+        + '<button type="button" class="btn btn-primary" data-action="restart-and-continue"></button>'
+        + '<button type="button" class="btn btn-ghost" data-action="dismiss-install-overlay"></button>'
+        + '</div>'
         + '</div>'
     );
     document.body.appendChild(overlay);
@@ -111,6 +115,10 @@ function _setInstallOverlay(label, statusText, percent) {
         );
     }
     if (statusEl) statusEl.textContent = statusText || '';
+    const barEl = overlay.querySelector('.feature-model-install-bar');
+    const actionsEl = overlay.querySelector('.feature-model-install-actions');
+    if (barEl) barEl.hidden = false;
+    if (actionsEl) actionsEl.hidden = true;
     if (fillEl) {
         const width = Number.isFinite(percent) ? Math.max(0, Math.min(100, percent)) : 0;
         fillEl.style.width = `${width}%`;
@@ -120,6 +128,93 @@ function _setInstallOverlay(label, statusText, percent) {
 function _hideInstallOverlay() {
     const overlay = document.getElementById('feature-model-install-overlay');
     if (overlay) overlay.hidden = true;
+}
+
+function _showInstallRestartPrompt(spec, result) {
+    const overlay = _ensureInstallOverlay();
+    overlay.hidden = false;
+    const titleEl = overlay.querySelector('.feature-model-install-title');
+    const statusEl = overlay.querySelector('.feature-model-install-status');
+    const barEl = overlay.querySelector('.feature-model-install-bar');
+    const actionsEl = overlay.querySelector('.feature-model-install-actions');
+    const restartBtn = overlay.querySelector('[data-action="restart-and-continue"]');
+    const dismissBtn = overlay.querySelector('[data-action="dismiss-install-overlay"]');
+    const label = spec?.label || spec?.id || spec?.modelId || 'model';
+    const packages = Array.isArray(result?.installed_packages)
+        ? result.installed_packages.join(', ')
+        : '';
+    const reminder = packages
+        ? featureInstallT(
+            'models.restartAfterInstallWithPackages',
+            'Installed Python packages: {packages}. Restart the app before using this feature.',
+            { packages },
+        )
+        : featureInstallT(
+            'models.restartAfterInstall',
+            'Restart the app before using this feature.',
+        );
+    if (titleEl) {
+        titleEl.textContent = featureInstallT('models.bulkNeedsRestart', 'Restart required');
+    }
+    if (statusEl) {
+        statusEl.textContent = reminder;
+    }
+    if (barEl) barEl.hidden = true;
+    if (actionsEl) actionsEl.hidden = false;
+    if (restartBtn) {
+        restartBtn.textContent = featureInstallT(
+            'models.restartNowAndContinue',
+            'Restart now and continue',
+        );
+        restartBtn.disabled = false;
+        restartBtn.onclick = () => {
+            restartBtn.disabled = true;
+            if (dismissBtn) dismissBtn.disabled = true;
+            const resumeItems = [{
+                id: spec?.modelId || spec?.id,
+                name: label,
+                variant: spec?.variant || null,
+            }];
+            requestAppRestartAndContinue({
+                reason: 'model_dependency_install',
+                items: resumeItems,
+            }).then((restartResult) => {
+                if (restartResult?.status === 'scheduled') {
+                    _hideInstallOverlay();
+                    return;
+                }
+                restartBtn.disabled = false;
+                if (dismissBtn) dismissBtn.disabled = false;
+                if (statusEl) {
+                    statusEl.textContent = restartResult?.status === 'error'
+                        ? featureInstallT(
+                            'models.restartFailed',
+                            'Could not restart the app automatically. Close the window and run the launcher again.',
+                        )
+                        : featureInstallT(
+                            'models.restartUnsupported',
+                            'This session was not started from the launcher, so the app cannot restart itself. Close the window and run run.bat / run.sh; remaining downloads will continue afterwards.',
+                        );
+                }
+            });
+        };
+    }
+    if (dismissBtn) {
+        dismissBtn.textContent = featureInstallT('models.restartQueueDismiss', 'Not now');
+        dismissBtn.onclick = () => {
+            if (restartBtn?.disabled) return;
+            if (typeof showPrepareRestartPrompt === 'function') {
+                showPrepareRestartPrompt({
+                    items: [{
+                        id: spec?.modelId || spec?.id,
+                        name: label,
+                        variant: spec?.variant || null,
+                    }],
+                });
+            }
+            _hideInstallOverlay();
+        };
+    }
 }
 
 function _formatProgressStatus(label, progress) {
@@ -257,7 +352,7 @@ async function ensureFeatureModel(modelId, options = {}) {
                 0,
             );
             const attached = await _pollPrepareUntilSettled(modelId, label);
-            return _finishPrepareResult(attached, label, showToast);
+            return _finishPrepareResult(attached, { modelId, label, variant }, showToast);
         }
     } catch (_progressErr) {
         // Continue; prepare itself will report a conflict if needed.
@@ -315,7 +410,7 @@ async function ensureFeatureModel(modelId, options = {}) {
 
     try {
         const result = await _pollPrepareUntilSettled(modelId, label);
-        return _finishPrepareResult(result, label, showToast);
+        return _finishPrepareResult(result, { modelId, label, variant }, showToast);
     } catch (error) {
         _hideInstallOverlay();
         const message = (typeof window.formatUserError === 'function')
@@ -330,11 +425,12 @@ async function ensureFeatureModel(modelId, options = {}) {
     }
 }
 
-function _finishPrepareResult(result, label, showToast) {
-    _hideInstallOverlay();
+function _finishPrepareResult(result, spec, showToast) {
+    const label = (spec && typeof spec === 'object') ? (spec.label || spec.modelId || '') : spec;
     const status = String(result?.status || '');
     const message = result?.message || '';
     if (status === 'error') {
+        _hideInstallOverlay();
         showToast(message || featureInstallT(
             'featureInstall.failed',
             'Could not install {name}',
@@ -342,7 +438,9 @@ function _finishPrepareResult(result, label, showToast) {
         ), 'error');
         return { ok: false, error: message || status };
     }
-    if (result?.restart_recommended) {
+    if (typeof prepareResultNeedsRestart === 'function'
+        ? prepareResultNeedsRestart(result)
+        : Boolean(result?.restart_recommended) || status === 'needs_restart') {
         const packages = Array.isArray(result.installed_packages)
             ? result.installed_packages.join(', ')
             : '';
@@ -357,8 +455,13 @@ function _finishPrepareResult(result, label, showToast) {
                 'Restart the app before using this feature.',
             );
         showToast(message ? `${message} ${reminder}` : reminder, 'warning');
+        _showInstallRestartPrompt(
+            (spec && typeof spec === 'object') ? spec : { label, modelId: label },
+            result,
+        );
         return { ok: false, needsRestart: true };
     }
+    _hideInstallOverlay();
     if (status === 'done' || status === 'ok' || status === 'warning') {
         if (message) showToast(message, status === 'warning' ? 'warning' : 'success');
         return { ok: true, status };

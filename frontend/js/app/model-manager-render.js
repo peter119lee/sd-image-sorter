@@ -270,6 +270,26 @@ function renderModelManager(models = []) {
                     if (pr && !pr.active && pr.model_id === modelId && pr.status) {
                         finished = true;
                         backgroundButton.style.display = 'none';
+                        if (typeof prepareResultNeedsRestart === 'function'
+                            ? prepareResultNeedsRestart(pr)
+                            : (pr.restart_recommended || pr.status === 'needs_restart')) {
+                            showToast(withRestartReminder(pr.message || appT('models.restartAfterInstall', 'Restart the app before using this feature.'), pr), 'warning');
+                            button.disabled = false;
+                            button.textContent = originalLabel;
+                            if (typeof showPrepareRestartPrompt === 'function') {
+                                showPrepareRestartPrompt({
+                                    items: [{ id: modelId, name: modelId, variant }],
+                                });
+                            }
+                            try {
+                                const refreshed = await API.getModelStatus();
+                                renderModelManager(refreshed.models || []);
+                            } catch (_refreshErr) {
+                                // The restart prompt is still usable without a fresh grid.
+                            }
+                            document.dispatchEvent(new CustomEvent('model-status-changed', { detail: { modelId } }));
+                            return;
+                        }
                         if (pr.status === 'done') {
                             showToast(withRestartReminder(pr.message || appT('models.readyToast', '{model} is ready.', { model: modelId }), pr), pr.restart_recommended ? 'warning' : 'success');
                             const refreshed = await API.getModelStatus();

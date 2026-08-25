@@ -153,7 +153,17 @@ def _repair_wd14_onnxruntime_if_possible() -> Dict[str, Any]:
 
 
 def _dependency_restart_result(model_id: str, install_result: DependencyInstallResult) -> Optional[Dict[str, Any]]:
+    """Stop the prepare flow only when a fresh interpreter is genuinely needed.
+
+    Returning ``None`` lets the caller carry on and download the model weights
+    in the same click. optional_dependencies proves whether the freshly
+    installed packages are importable right now, so trust that verdict instead
+    of assuming every install needs a restart -- assuming it is what turned
+    "Prepare" into "Prepare, close the app, reopen it, Prepare again".
+    """
     if not install_result.installed_packages:
+        return None
+    if not install_result.restart_recommended:
         return None
     packages = ", ".join(install_result.installed_packages)
     return {
@@ -165,6 +175,7 @@ def _dependency_restart_result(model_id: str, install_result: DependencyInstallR
         ),
         "installed_packages": list(install_result.installed_packages),
         "restart_recommended": True,
+        "restart_reason": install_result.restart_reason,
     }
 
 

@@ -37,6 +37,7 @@ DORMANT BEHAVIOR PINNED AS-IS:
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
 import pytest
@@ -467,7 +468,19 @@ def test_resolve_launcher_path_honors_env_launcher(monkeypatch, tmp_path: Path):
     monkeypatch.setattr(us, "PACKAGE_ROOT", pkg)
     monkeypatch.setenv("SD_IMAGE_SORTER_LAUNCHER", "my-custom-launch.sh")
     service = UpdateService()
-    assert service._resolve_launcher_path() == pkg / "my-custom-launch.sh"
+    assert service._resolve_launcher_path() == (pkg / "my-custom-launch.sh").resolve()
+
+
+def test_resolve_launcher_path_ignores_traversing_env_launcher(monkeypatch, tmp_path: Path):
+    pkg = tmp_path / "pkg"
+    pkg.mkdir()
+    outside = tmp_path / "outside.bat"
+    outside.write_text("echo hi\n", encoding="utf-8")
+    monkeypatch.setattr(us, "PACKAGE_ROOT", pkg)
+    monkeypatch.setenv("SD_IMAGE_SORTER_LAUNCHER", str(Path("..") / "outside.bat"))
+    service = UpdateService()
+    with pytest.raises(RuntimeError, match="launcher"):
+        service._resolve_launcher_path()
 
 
 def test_resolve_launcher_path_raises_when_none_found(monkeypatch, tmp_path: Path):
@@ -490,6 +503,154 @@ def test_worker_command_targets_update_worker_with_manifest_flag(
     assert command[0] == us.sys.executable
     assert command[1].endswith("update_worker.py")
     assert command[-2:] == ["--manifest", str(manifest_path)]
+    assert "--restart-only" not in command
+
+
+def test_worker_command_adds_restart_only_flag(monkeypatch, tmp_path: Path):
+    monkeypatch.setattr(us, "PACKAGE_ROOT", tmp_path)
+    service = UpdateService()
+    manifest_path = tmp_path / "state" / "pending-restart.json"
+
+    command = service._worker_command(manifest_path, restart_only=True)
+
+    assert command[1].endswith("update_worker.py")
+    assert command[-3:] == ["--manifest", str(manifest_path), "--restart-only"]
+
+
+def test_restart_app_reports_unsupported_when_there_is_no_launcher(
+    monkeypatch, tmp_path: Path
+):
+    # A developer running `python main.py` has nothing to relaunch. The UI must
+    # keep telling them to restart by hand rather than offer a button that
+    # quietly does nothing.
+    monkeypatch.setattr(us, "PACKAGE_ROOT", tmp_path)
+    monkeypatch.delenv("SD_IMAGE_SORTER_LAUNCHER", raising=False)
+    service = UpdateService()
+
+    result = service.restart_app(reason="model_dependency_install")
+
+    assert result["status"] == "unsupported"
+
+
+def test_restart_app_writes_manifest_and_launches_restart_only_worker(
+    monkeypatch, tmp_path: Path
+):
+    import os
+
+    monkeypatch.setattr(us, "PACKAGE_ROOT", tmp_path)
+    monkeypatch.setattr(us, "UPDATE_DIR", tmp_path / "update")
+    monkeypatch.delenv("SD_IMAGE_SORTER_LAUNCHER", raising=False)
+    launcher_name = "run.bat" if us.sys.platform == "win32" else "run.sh"
+    launcher = tmp_path / launcher_name
+    launcher.write_text("echo restart\n", encoding="utf-8")
+    launched: dict = {}
+
+    def _fake_launch(self, manifest_path, *, restart_only=False):
+        launched["manifest_path"] = manifest_path
+        launched["restart_only"] = restart_only
+
+    monkeypatch.setattr(UpdateService, "_launch_worker", _fake_launch)
+    service = UpdateService()
+
+    result = service.restart_app(reason="model_dependency_install")
+
+    assert result == {"status": "scheduled", "launcher": launcher_name}
+    assert launched["restart_only"] is True
+    payload = json.loads(Path(launched["manifest_path"]).read_text(encoding="utf-8"))
+    assert payload["launcher_path"] == str(launcher.resolve())
+    assert payload["current_pid"] == os.getpid()
+    assert payload["reason"] == "model_dependency_install"
+    assert payload["package_root"] == str(tmp_path.resolve())
+    assert isinstance(payload["created_at"], int)
+
+
+def test_restart_app_does_not_spawn_worker_when_testing_flag_is_set(
+    monkeypatch, tmp_path: Path
+):
+    monkeypatch.setattr(us, "PACKAGE_ROOT", tmp_path)
+    monkeypatch.setattr(us, "UPDATE_DIR", tmp_path / "update")
+    monkeypatch.delenv("SD_IMAGE_SORTER_LAUNCHER", raising=False)
+    monkeypatch.setenv("SD_SORTER_TESTING", "1")
+    launcher_name = "run.bat" if us.sys.platform == "win32" else "run.sh"
+    (tmp_path / launcher_name).write_text("echo restart\n", encoding="utf-8")
+    launched: dict = {}
+
+    def _fake_launch(self, manifest_path, *, restart_only=False):
+        launched["manifest_path"] = manifest_path
+        launched["restart_only"] = restart_only
+
+    monkeypatch.setattr(UpdateService, "_launch_worker", _fake_launch)
+    service = UpdateService()
+
+    result = service.restart_app(reason="model_dependency_install")
+
+    assert result["status"] == "scheduled"
+    assert launched == {}
+
+
+def test_update_worker_main_without_restart_only_applies_the_payload(monkeypatch, tmp_path: Path):
+    import update_worker
+
+    manifest = tmp_path / "pending.json"
+    manifest.write_text("{}", encoding="utf-8")
+    called: list[tuple[str, str]] = []
+    monkeypatch.setattr(
+        sys, "argv", ["update_worker.py", "--manifest", str(manifest)]
+    )
+    monkeypatch.setattr(
+        update_worker,
+        "apply_update",
+        lambda path: called.append(("apply", str(path))) or 0,
+    )
+    monkeypatch.setattr(
+        update_worker,
+        "restart_only",
+        lambda path: called.append(("restart", str(path))) or 0,
+    )
+
+    assert update_worker.main() == 0
+    assert called == [("apply", str(manifest.resolve()))]
+
+
+def test_restart_only_worker_waits_for_the_old_process_then_relaunches(
+    monkeypatch, tmp_path: Path
+):
+    import update_worker
+
+    launcher = tmp_path / "run.sh"
+    launcher.write_text("echo restart\n", encoding="utf-8")
+    manifest_path = tmp_path / "pending-restart.json"
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "created_at": 1700000000,
+                "current_pid": 4242,
+                "launcher_path": str(launcher),
+                "log_path": str(tmp_path / "restart.log"),
+                "reason": "model_dependency_install",
+            }
+        ),
+        encoding="utf-8",
+    )
+    calls: list = []
+
+    monkeypatch.setattr(
+        update_worker,
+        "_wait_for_pid_exit",
+        lambda pid, *, timeout_seconds, log_path: calls.append(("wait", pid)),
+    )
+    monkeypatch.setattr(
+        update_worker,
+        "_relaunch",
+        lambda path, *, log_path: calls.append(("relaunch", path)),
+    )
+
+    exit_code = update_worker.restart_only(manifest_path)
+
+    assert exit_code == 0
+    assert calls == [("wait", 4242), ("relaunch", launcher.resolve())]
+    # The manifest is single-use so a crashed launcher cannot loop forever.
+    assert not manifest_path.exists()
 
 
 def test_pending_manifest_path_sanitizes_version_into_filename(

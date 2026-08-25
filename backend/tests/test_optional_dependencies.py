@@ -200,12 +200,16 @@ def test_ensure_group_installs_missing_or_too_old_packages(monkeypatch):
         lambda package: "5.5.0" if package == "transformers" else _release_locked_version(package),
     )
     monkeypatch.setattr(optional_dependencies, "install_packages", _fake_install(installed))
+    monkeypatch.setattr(
+        optional_dependencies, "_restart_reason_after_install", lambda **kwargs: ""
+    )
 
     result = optional_dependencies.ensure_group("sam3")
 
     assert installed == ["transformers==5.6.2"]
     assert result.installed_packages == ("transformers==5.6.2",)
-    assert result.restart_recommended is True
+    # Nothing in this group was imported yet, so the upgrade is usable now.
+    assert result.restart_recommended is False
 
 def test_ensure_group_upgrades_torch_to_release_lock(monkeypatch):
     installed = []
@@ -263,12 +267,15 @@ def test_toriigate_requires_transformers_version_with_qwen35_support(monkeypatch
         lambda package: "5.5.0" if package == "transformers" else _release_locked_version(package),
     )
     monkeypatch.setattr(optional_dependencies, "install_packages", _fake_install(installed))
+    monkeypatch.setattr(
+        optional_dependencies, "_restart_reason_after_install", lambda **kwargs: ""
+    )
 
     result = optional_dependencies.ensure_group("toriigate")
 
     assert installed == ["transformers==5.6.2"]
     assert result.installed_packages == ("transformers==5.6.2",)
-    assert result.restart_recommended is True
+    assert result.restart_recommended is False
 
 
 def test_ensure_group_skips_already_satisfied_packages(monkeypatch):
@@ -291,12 +298,154 @@ def test_translation_group_installs_translators_runtime(monkeypatch):
 
     monkeypatch.setattr(optional_dependencies.importlib.util, "find_spec", lambda module: None if module == "translators" else object())
     monkeypatch.setattr(optional_dependencies, "install_packages", _fake_install(installed))
+    monkeypatch.setattr(
+        optional_dependencies, "_restart_reason_after_install", lambda **kwargs: ""
+    )
 
     result = optional_dependencies.ensure_group("translation")
 
     assert installed == ["translators==6.0.4"]
     assert result.installed_packages == ("translators==6.0.4",)
+    assert result.restart_recommended is False
+
+
+# ---------------------------------------------------------------------------
+# Restart must be proven, not assumed.
+#
+# Installing a package this process has never imported does not need a fresh
+# interpreter: pip writes into site-packages and ``invalidate_caches()`` makes
+# it importable straight away -- ``dataset_translate_providers`` already relies
+# on exactly that. A restart is only genuinely required when the install
+# REPLACED a module this process had already imported (sys.modules keeps the
+# old module object, and native extensions cannot be swapped in place), when
+# Windows refused to overwrite a locked DLL, or when the new module imports in
+# a clean interpreter but not in this one.
+# ---------------------------------------------------------------------------
+
+
+def test_restart_reason_is_empty_for_fresh_module_that_imports_now(monkeypatch):
+    monkeypatch.setattr(optional_dependencies.importlib, "invalidate_caches", lambda: None)
+    monkeypatch.setattr(
+        optional_dependencies.importlib, "import_module", lambda name: types.ModuleType(name)
+    )
+
+    reason = optional_dependencies._restart_reason_after_install(
+        modules_to_verify=("fastembed",),
+        preloaded_modules=(),
+        dll_locked=False,
+    )
+
+    assert reason == ""
+
+
+def test_restart_reason_flags_module_already_loaded_before_install(monkeypatch):
+    def _unexpected_import(name):
+        raise AssertionError("a replaced loaded module must not be probed in-process")
+
+    monkeypatch.setattr(optional_dependencies.importlib, "import_module", _unexpected_import)
+
+    reason = optional_dependencies._restart_reason_after_install(
+        modules_to_verify=("transformers",),
+        preloaded_modules=("transformers",),
+        dll_locked=False,
+    )
+
+    assert reason == optional_dependencies.RESTART_REASON_LOADED_MODULE
+
+
+def test_restart_reason_flags_windows_dll_lock():
+    reason = optional_dependencies._restart_reason_after_install(
+        modules_to_verify=("nudenet",),
+        preloaded_modules=(),
+        dll_locked=True,
+    )
+
+    assert reason == optional_dependencies.RESTART_REASON_DLL_LOCK
+
+
+def test_restart_reason_flags_import_that_only_works_in_a_clean_process(monkeypatch):
+    def _failing_import(name):
+        raise ImportError(f"cannot import {name} yet")
+
+    monkeypatch.setattr(optional_dependencies.importlib, "invalidate_caches", lambda: None)
+    monkeypatch.setattr(optional_dependencies.importlib, "import_module", _failing_import)
+    monkeypatch.setattr(
+        optional_dependencies, "_probe_import_in_clean_process", lambda name: True
+    )
+
+    reason = optional_dependencies._restart_reason_after_install(
+        modules_to_verify=("torch",),
+        preloaded_modules=(),
+        dll_locked=False,
+    )
+
+    assert reason == optional_dependencies.RESTART_REASON_IMPORT_NEEDS_FRESH_PROCESS
+
+
+def test_restart_reason_raises_when_the_install_is_broken_everywhere(monkeypatch):
+    def _failing_import(name):
+        raise ImportError(f"cannot import {name}")
+
+    monkeypatch.setattr(optional_dependencies.importlib, "invalidate_caches", lambda: None)
+    monkeypatch.setattr(optional_dependencies.importlib, "import_module", _failing_import)
+    monkeypatch.setattr(
+        optional_dependencies, "_probe_import_in_clean_process", lambda name: False
+    )
+
+    with pytest.raises(optional_dependencies.OptionalDependencyImportError):
+        optional_dependencies._restart_reason_after_install(
+            modules_to_verify=("torch",),
+            preloaded_modules=(),
+            dll_locked=False,
+        )
+
+
+def test_ensure_group_does_not_require_restart_for_a_fresh_install(monkeypatch):
+    installed = []
+
+    monkeypatch.setattr(
+        optional_dependencies.importlib.util,
+        "find_spec",
+        lambda module: None if module == "translators" else object(),
+    )
+    monkeypatch.setattr(optional_dependencies, "install_packages", _fake_install(installed))
+    monkeypatch.setattr(
+        optional_dependencies, "_restart_reason_after_install", lambda **kwargs: ""
+    )
+
+    result = optional_dependencies.ensure_group("translation")
+
+    assert result.installed_packages == ("translators==6.0.4",)
+    assert result.restart_recommended is False
+    assert result.restart_reason == ""
+
+
+def test_ensure_group_reports_restart_reason_when_a_loaded_module_is_replaced(monkeypatch):
+    installed = []
+    seen = {}
+
+    monkeypatch.setattr(optional_dependencies.platform, "system", lambda: "Windows")
+    monkeypatch.setattr(optional_dependencies.importlib.util, "find_spec", lambda module: object())
+    monkeypatch.setitem(sys.modules, "transformers", types.ModuleType("transformers"))
+    monkeypatch.setattr(
+        optional_dependencies.importlib.metadata,
+        "version",
+        lambda package: "5.5.0" if package == "transformers" else _release_locked_version(package),
+    )
+    monkeypatch.setattr(optional_dependencies, "install_packages", _fake_install(installed))
+
+    def _record(**kwargs):
+        seen.update(kwargs)
+        return optional_dependencies.RESTART_REASON_LOADED_MODULE
+
+    monkeypatch.setattr(optional_dependencies, "_restart_reason_after_install", _record)
+
+    result = optional_dependencies.ensure_group("toriigate")
+
+    assert installed == ["transformers==5.6.2"]
+    assert seen["preloaded_modules"] == ("transformers",)
     assert result.restart_recommended is True
+    assert result.restart_reason == optional_dependencies.RESTART_REASON_LOADED_MODULE
 
 
 def test_install_packages_refuses_system_python_without_opt_in(monkeypatch):

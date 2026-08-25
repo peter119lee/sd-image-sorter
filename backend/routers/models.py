@@ -52,6 +52,7 @@ def _empty_prepare_result() -> Dict[str, Any]:
         "external_url": "",
         "restart_recommended": False,
         "installed_packages": [],
+        "restart_reason": "",
     }
 
 
@@ -286,6 +287,7 @@ def _run_prepare_blocking(service: ModelService, model_id: str, source: Optional
                 error="",
                 restart_recommended=bool(result.get("restart_recommended")),
                 installed_packages=list(result.get("installed_packages") or []),
+                restart_reason=str(result.get("restart_reason") or ""),
             )
         _logger.info(
             "[MODEL] prepare_finished model_id=%s status=%s restart=%s packages=%s",

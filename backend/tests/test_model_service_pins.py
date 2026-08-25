@@ -466,6 +466,22 @@ def test_dependency_restart_result_reports_needs_restart_when_installed():
     assert "torch>=2.0.0" in result["message"]
 
 
+def test_dependency_restart_result_lets_prepare_continue_when_no_restart_is_needed():
+    # Packages were installed, but optional_dependencies proved they import in
+    # this process. Returning None is what lets the same click go on to
+    # download the model weights instead of stopping at "restart and retry".
+    assert (
+        model_service._dependency_restart_result(
+            "clip",
+            model_service.DependencyInstallResult(
+                installed_packages=("fastembed==0.8.0",),
+                restart_recommended=False,
+            ),
+        )
+        is None
+    )
+
+
 # ===========================================================================
 # Error contracts: exceptions + rich-error payload builders
 # ===========================================================================

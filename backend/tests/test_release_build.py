@@ -1000,8 +1000,12 @@ def test_prepare_flow_frontend_warns_when_restart_is_needed():
     assert "withRestartReminder" in app_js
     assert "restart_recommended" in app_js
     assert "installed_packages" in app_js
+    assert "restartApp" in app_js
+    assert "/api/updates/restart" in app_js
     assert "models.restartAfterInstallWithPackages" in en_js
+    assert "models.restartNowAndContinue" in en_js
     assert "使用这个功能前请重启应用" in zh_js
+    assert "立即重启并继续" in zh_js
 
 
 def test_dev_requirements_keep_platform_specific_wheels_guarded():

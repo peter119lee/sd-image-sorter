@@ -2296,6 +2296,44 @@ textarea:focus,
     line-height: 1.5;
 }
 
+.prepare-restart-banner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px 16px;
+    margin: 0 0 16px;
+    padding: 14px 16px;
+    border: 1px solid var(--accent, #d39f64);
+    border-radius: 14px;
+    background: rgba(211, 159, 100, 0.12);
+}
+
+.prepare-restart-banner-copy {
+    flex: 1 1 280px;
+    min-width: 0;
+}
+
+.prepare-restart-banner-copy strong {
+    display: block;
+    color: var(--text-primary);
+    font-size: 14px;
+}
+
+.prepare-restart-banner-copy p {
+    margin: 6px 0 0;
+    color: var(--text-secondary);
+    font-size: 12.5px;
+    line-height: 1.5;
+}
+
+.prepare-restart-banner-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+}
+
 .bulk-download-list {
     display: flex;
     flex-direction: column;

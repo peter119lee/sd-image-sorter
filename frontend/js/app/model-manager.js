@@ -40,6 +40,10 @@ async function openModelManager(initialTab) {
         }
     }
 
+    if (typeof maybeResumePrepareQueue === 'function') {
+        maybeResumePrepareQueue();
+    }
+
     // Wire the "Download all" button. Idempotent — re-binding on each
     // openModelManager() call is fine because the previous handler was
     // removed when the DOM survived (the button is static markup).
@@ -387,7 +391,9 @@ async function runBulkDownload(items) {
                 const pr = p?.prepare_result;
                 if (pr && !pr.active && pr.model_id === item.id && pr.status) {
                     finished = true;
-                    if (pr.restart_recommended || pr.status === 'needs_restart') {
+                    if (typeof prepareResultNeedsRestart === 'function'
+                        ? prepareResultNeedsRestart(pr)
+                        : (pr.restart_recommended || pr.status === 'needs_restart')) {
                         needsRestart = true;
                         break;
                     }
@@ -435,7 +441,11 @@ async function runBulkDownload(items) {
         }
         completed += 1;
         if (needsRestart) {
-            showToast(appT('models.bulkNeedsRestart', 'Restart required — close and reopen the app, then resume the remaining selections.'), 'warning');
+            const remaining = items.slice(itemIndex);
+            if (typeof showPrepareRestartPrompt === 'function') {
+                showPrepareRestartPrompt({ items: remaining });
+            }
+            showToast(appT('models.bulkNeedsRestart', 'Restart required — click Restart now and continue, or close and reopen the app.'), 'warning');
             break;
         }
         // Notify per-model completion so user knows progress even if modal is closed
@@ -471,11 +481,7 @@ async function runBulkDownload(items) {
     // Update banner with final result
     if (banner) {
         if (needsRestart) {
-            banner.style.borderColor = 'var(--color-warning, var(--accent))';
-            banner.style.background = 'rgba(245, 158, 11, 0.1)';
-            // Plain-text fallback only: this string goes through escapeHtml, so
-            // any markup here would be shown to the user as literal source.
-            banner.innerHTML = `<strong>${escapeHtml(appT('models.bulkNeedsRestart', 'Restart required'))}</strong><br>${escapeHtml(appT('models.bulkRestartExplain', 'A feature installed Python packages. Close and restart the app, then reopen the model selector to continue the remaining downloads.'))}`;
+            banner.remove();
         } else if (failures.length === 0) {
             banner.style.borderColor = 'var(--color-success, #4A9D69)';
             banner.style.background = 'rgba(34, 197, 94, 0.1)';
@@ -487,11 +493,16 @@ async function runBulkDownload(items) {
         }
     }
 
+    if (!needsRestart && typeof clearPrepareResumeQueue === 'function') {
+        clearPrepareResumeQueue();
+        if (typeof hidePrepareRestartBanner === 'function' && failures.length === 0) {
+            hidePrepareRestartBanner();
+        }
+    }
+
     if (failures.length === 0 && !needsRestart) {
         showToast(appT('models.bulkDoneAll', 'All {count} model(s) downloaded successfully.', { count: total }), 'success');
-    } else if (needsRestart) {
-        showToast(appT('models.bulkNeedsRestart', 'Restart required — close and reopen the app, then click Download again.'), 'warning');
-    } else {
+    } else if (!needsRestart) {
         const okCount = total - failures.length;
         showToast(appT(
             'models.bulkDoneMixed',
@@ -500,3 +511,17 @@ async function runBulkDownload(items) {
         ), 'warning');
     }
 }
+
+window.addEventListener('sd-image-sorter-ready', () => {
+    const resume = (typeof readPrepareResumeQueue === 'function')
+        ? readPrepareResumeQueue()
+        : null;
+    if (!resume?.items?.length) return;
+    if (typeof openModelManager === 'function') {
+        Promise.resolve(openModelManager('models')).then(() => {
+            if (typeof maybeResumePrepareQueue === 'function') {
+                maybeResumePrepareQueue({ resumeNow: true });
+            }
+        });
+    }
+});

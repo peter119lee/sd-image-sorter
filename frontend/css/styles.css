@@ -2906,6 +2906,18 @@ body::before {
         transition: width 0.2s ease;
     }
 
+    .feature-model-install-actions {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 8px;
+        margin-top: 16px;
+    }
+
+    .feature-model-install-actions[hidden] {
+        display: none;
+    }
+
     .guide-backdrop {
         position: absolute;
         inset: 0;

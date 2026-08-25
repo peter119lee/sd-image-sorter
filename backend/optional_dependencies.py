@@ -38,6 +38,28 @@ from runtime_dependency_check import (
 class DependencyInstallResult:
     installed_packages: tuple[str, ...]
     restart_recommended: bool = False
+    restart_reason: str = ""
+
+
+# Why a restart can be genuinely unavoidable. Anything not covered by these
+# three cases is importable straight away, so the feature must keep going in
+# this process instead of sending the user back to the launcher.
+#
+#   LOADED_MODULE  sys.modules already holds the module object. Re-importing
+#                  returns the stale one no matter what pip wrote to disk, and
+#                  a loaded native extension cannot be swapped in place.
+#   DLL_LOCK       Windows refused to overwrite a file another loaded library
+#                  is holding, so the install landed only partially.
+#   FRESH_PROCESS  The module imports in a clean interpreter but not in this
+#                  one (stale package metadata, .pth side effects).
+RESTART_REASON_LOADED_MODULE = "replaced_loaded_module"
+RESTART_REASON_DLL_LOCK = "windows_dll_lock"
+RESTART_REASON_IMPORT_NEEDS_FRESH_PROCESS = "import_needs_fresh_process"
+
+# Importing torch on a cold filesystem cache is slow but not unbounded. The
+# probe exists to answer a yes/no question, so cap it rather than letting a
+# wedged interpreter hang the Prepare thread forever.
+_CLEAN_IMPORT_PROBE_TIMEOUT_SECONDS = 300
 
 
 class UnsafeDependencyInstallError(RuntimeError):
@@ -538,6 +560,65 @@ def _install_without_dependencies(
     importlib.invalidate_caches()
 
 
+def _clean_process_import_command(module_name: str) -> list[str]:
+    return [
+        sys.executable,
+        "-c",
+        f"import importlib; importlib.import_module({module_name!r})",
+    ]
+
+
+def _probe_import_in_clean_process(module_name: str) -> bool:
+    """Return True when a freshly started interpreter can import the module."""
+    try:
+        subprocess.run(
+            _clean_process_import_command(module_name),
+            check=True,
+            text=True,
+            capture_output=True,
+            timeout=_CLEAN_IMPORT_PROBE_TIMEOUT_SECONDS,
+        )
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError):
+        return False
+    return True
+
+
+def _restart_reason_after_install(
+    *,
+    modules_to_verify: Sequence[str],
+    preloaded_modules: Sequence[str],
+    dll_locked: bool,
+) -> str:
+    """Return why this install needs a fresh interpreter, or "" if it does not.
+
+    Historically every install that touched a single package told the user to
+    restart, which also meant Prepare stopped before downloading any model
+    weights. Installing a package this process has never imported does not
+    need a new interpreter, so ask the runtime instead of assuming.
+    """
+    if dll_locked:
+        return RESTART_REASON_DLL_LOCK
+    if preloaded_modules:
+        # An in-process import here would happily return the stale module and
+        # report success, so do not even try.
+        return RESTART_REASON_LOADED_MODULE
+
+    importlib.invalidate_caches()
+    for module_name in modules_to_verify:
+        try:
+            importlib.import_module(module_name)
+        except (ImportError, OSError) as error:
+            if _probe_import_in_clean_process(module_name):
+                return RESTART_REASON_IMPORT_NEEDS_FRESH_PROCESS
+            raise OptionalDependencyImportError(
+                f"Installed the packages for module {module_name!r}, but neither "
+                f"this process nor a clean Python process can import it "
+                f"({type(error).__name__}: {error}). The install is incomplete - "
+                "check the preceding pip output, then run Prepare again."
+            ) from error
+    return ""
+
+
 def _import_optional_package(package_name: str, module_name: str) -> None:
     importlib.invalidate_caches()
     try:
@@ -548,16 +629,14 @@ def _import_optional_package(package_name: str, module_name: str) -> None:
             f"{module_name!r} failed with {type(error).__name__}: {error}. Check the "
             "preceding pip output and reinstall the feature from the application lock."
         ) from error
-    probe_code = (
-        "import importlib; "
-        f"importlib.import_module({module_name!r})"
-    )
+    probe_code = _clean_process_import_command(module_name)
     try:
         subprocess.run(
-            [sys.executable, "-c", probe_code],
+            probe_code,
             check=True,
             text=True,
             capture_output=True,
+            timeout=_CLEAN_IMPORT_PROBE_TIMEOUT_SECONDS,
         )
     except subprocess.CalledProcessError as error:
         output = "\n".join(
@@ -772,29 +851,56 @@ def _ensure_tipo_group() -> DependencyInstallResult:
     packages = OPTIONAL_DEPENDENCY_GROUPS["tipo"]
     imports = GROUP_IMPORTS["tipo"]
     packages_to_install: list[str] = []
+    modules_to_verify: list[str] = []
     for module_name, package in zip(imports, packages):
         locked_package = _lock_package_spec(package)
         if _needs_install(module_name, locked_package) and locked_package not in packages_to_install:
             packages_to_install.append(locked_package)
+            modules_to_verify.append(module_name)
+    # llama_cpp is deliberately absent: _import_optional_package above already
+    # proved it imports both here and in a clean interpreter.
+    preloaded_modules = tuple(name for name in modules_to_verify if name in sys.modules)
     dll_locked = install_packages(packages_to_install)
 
+    installed = tuple(llama_packages + packages_to_install)
+    if not installed and not dll_locked:
+        return DependencyInstallResult(installed_packages=())
+
+    restart_reason = _restart_reason_after_install(
+        modules_to_verify=tuple(modules_to_verify),
+        preloaded_modules=preloaded_modules,
+        dll_locked=dll_locked,
+    )
     return DependencyInstallResult(
-        installed_packages=tuple(llama_packages + packages_to_install),
-        restart_recommended=bool(packages_to_install or llama_packages) or dll_locked,
+        installed_packages=installed,
+        restart_recommended=bool(restart_reason),
+        restart_reason=restart_reason,
     )
 
 
 def ensure_imports(module_names: Iterable[str]) -> DependencyInstallResult:
     packages = []
+    modules_to_verify = []
     for module_name in module_names:
         package_spec = IMPORT_TO_PACKAGE_HINT.get(module_name, module_name)
         locked_package = _lock_package_spec(package_spec)
         if _needs_install(module_name, locked_package) and locked_package not in packages:
             packages.append(locked_package)
+            modules_to_verify.append(module_name)
+    preloaded_modules = tuple(name for name in modules_to_verify if name in sys.modules)
     dll_locked = install_packages(packages)
+    if not packages and not dll_locked:
+        return DependencyInstallResult(installed_packages=())
+
+    restart_reason = _restart_reason_after_install(
+        modules_to_verify=tuple(modules_to_verify),
+        preloaded_modules=preloaded_modules,
+        dll_locked=dll_locked,
+    )
     return DependencyInstallResult(
         installed_packages=tuple(packages),
-        restart_recommended=bool(packages) or dll_locked,
+        restart_recommended=bool(restart_reason),
+        restart_reason=restart_reason,
     )
 
 
@@ -808,15 +914,30 @@ def ensure_group(group: str) -> DependencyInstallResult:
         raise ValueError(f"Unknown optional dependency group: {group}")
 
     packages_to_install = []
+    modules_to_verify = []
     for module_name, package in zip(imports, packages):
         locked_package = _lock_package_spec(package)
         if _needs_install(module_name, locked_package) and locked_package not in packages_to_install:
             packages_to_install.append(locked_package)
+            modules_to_verify.append(module_name)
+
+    # Captured before pip runs: once a module is in sys.modules, replacing the
+    # files under it cannot affect this process.
+    preloaded_modules = tuple(name for name in modules_to_verify if name in sys.modules)
 
     dll_locked = install_packages(packages_to_install)
+    if not packages_to_install and not dll_locked:
+        return DependencyInstallResult(installed_packages=())
+
+    restart_reason = _restart_reason_after_install(
+        modules_to_verify=tuple(modules_to_verify),
+        preloaded_modules=preloaded_modules,
+        dll_locked=dll_locked,
+    )
     return DependencyInstallResult(
         installed_packages=tuple(packages_to_install),
-        restart_recommended=bool(packages_to_install) or dll_locked,
+        restart_recommended=bool(restart_reason),
+        restart_reason=restart_reason,
     )
 
 
@@ -836,13 +957,20 @@ def ensure_group_with_soft_deps(group: str) -> DependencyInstallResult:
         return result
 
     soft_installed: list[str] = []
+    soft_restart_reason = ""
     for module_name, package_spec in soft_entries:
         locked_package = _lock_package_spec(package_spec)
         if not _needs_install(module_name, locked_package):
             continue
+        preloaded = (module_name,) if module_name in sys.modules else ()
         try:
-            install_packages([locked_package])
+            dll_locked = install_packages([locked_package])
             soft_installed.append(locked_package)
+            soft_restart_reason = soft_restart_reason or _restart_reason_after_install(
+                modules_to_verify=(module_name,),
+                preloaded_modules=preloaded,
+                dll_locked=dll_locked,
+            )
         except Exception as exc:
             _dep_logger.warning(
                 "Optional package %s could not be installed (non-fatal): %s",
@@ -851,7 +979,9 @@ def ensure_group_with_soft_deps(group: str) -> DependencyInstallResult:
             )
 
     all_installed = list(result.installed_packages) + soft_installed
+    restart_reason = result.restart_reason or soft_restart_reason
     return DependencyInstallResult(
         installed_packages=tuple(all_installed),
-        restart_recommended=bool(all_installed),
+        restart_recommended=bool(restart_reason),
+        restart_reason=restart_reason,
     )
