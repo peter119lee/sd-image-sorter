@@ -654,9 +654,12 @@ class TestExcludeFilters:
         assert c == [
             "(LOWER(REPLACE(COALESCE(i.prompt, ''), '_', ' ')) NOT LIKE ? ESCAPE '\\'"
             " AND LOWER(REPLACE(COALESCE(i.sidecar_caption, ''), '_', ' ')) "
+            "NOT LIKE ? ESCAPE '\\'"
+            " AND LOWER(REPLACE(COALESCE(json_extract(i.metadata_json, "
+            "'$._parsed.character_prompt_text'), ''), '_', ' ')) "
             "NOT LIKE ? ESCAPE '\\')"
         ]
-        assert p == ["%cat%", "%cat%"]
+        assert p == ["%cat%", "%cat%", "%cat%"]
 
     def test_exclude_ratings_keeps_unrated_via_is_null_arm(self):
         c, p = _apply_exclude_ratings_filter([], [], ["Explicit"])

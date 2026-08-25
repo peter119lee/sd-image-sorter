@@ -58,6 +58,26 @@ from .webui import WebUIMixin
 
 logger = logging.getLogger(__name__)
 
+
+def join_character_prompt_text(character_prompts: Any) -> Optional[str]:
+    """Join NAI character-slot prompts for gallery search/filter, not as ``prompt``.
+
+    The base caption stays in ``prompt``. Slot text is stored on ``_parsed`` so
+    scan, search, and prompt filters can use it after import.
+    """
+    if not isinstance(character_prompts, list):
+        return None
+    parts: list[str] = []
+    for entry in character_prompts:
+        if not isinstance(entry, dict):
+            continue
+        for key in ("prompt", "negative_prompt"):
+            text = str(entry.get(key) or "").strip()
+            if text:
+                parts.append(text)
+    return ", ".join(parts) if parts else None
+
+
 _SIDECAR_FALLBACK_FIELDS = (
     "prompt",
     "negative_prompt",
@@ -430,12 +450,14 @@ class MetadataParser(
                 result["civitai_resources"] = parsed["civitai_resources"]
 
             # Store structured parsed data in metadata for frontend access
+            character_prompts = parsed.get("character_prompts")
             result["metadata"]["_parsed"] = {
                 "version": PARSED_METADATA_VERSION,
                 "generation_params": parsed.get("generation_params"),
                 "is_img2img": parsed.get("is_img2img", False),
                 "img2img_info": parsed.get("img2img_info"),
-                "character_prompts": parsed.get("character_prompts"),
+                "character_prompts": character_prompts,
+                "character_prompt_text": join_character_prompt_text(character_prompts),
                 "prompt_nodes": parsed.get("prompt_nodes"),
                 "model_assets": parsed.get("model_assets"),
                 "civitai_resources": parsed.get("civitai_resources"),
@@ -511,10 +533,8 @@ class MetadataParser(
         if value is None:
             return None
         if isinstance(value, str):
-            text = value
-            if text.startswith("ASCII") or text.startswith("UNICODE"):
-                text = text[7:].strip("\0 ")
-            return text.strip() or None
+            text = self._peel_exif_charset_prefix(value)
+            return text or None
         if not isinstance(value, bytes):
             text = str(value).strip()
             return text or None
@@ -530,7 +550,120 @@ class MetadataParser(
             text = self._decode_exif_text_bytes(value)
 
         text = text.strip("\0 ")
-        return text or None
+        return self._repair_utf16_nul_text(text) or None
+
+    def _peel_exif_charset_prefix(self, text: str) -> str:
+        """Drop EXIF UserComment charset marks after a messy decode."""
+        if not isinstance(text, str):
+            return ""
+        peeled = self._repair_utf16_nul_text(text).strip().lstrip("\x00").strip()
+        for prefix in ("ASCII", "UNICODE", "JIS"):
+            if peeled.startswith(prefix):
+                peeled = peeled[len(prefix):].lstrip("\x00 ").strip()
+                break
+        return peeled
+
+    def _repair_utf16_nul_text(self, text: str) -> str:
+        """Recover UTF-16-LE prompts that were decoded as UTF-8/latin-1.
+
+        Common JPEG UserComment shape: ASCII letters separated by NUL
+        (``n\\x00s\\x00f\\x00w\\x00,\\x00 ...``), sometimes prefixed with
+        U+FFFD from a misdecoded BOM. Compact NULs when they dominate.
+        """
+        if not isinstance(text, str) or "\x00" not in text:
+            return text
+        nul_count = text.count("\x00")
+        if nul_count < max(4, len(text) // 5):
+            return text
+        compacted = text.replace("\ufffd", "").replace("\x00", "").strip(" ,")
+        return compacted or text
+
+    def _promote_carrier_payloads(self, metadata: dict) -> dict:
+        """Lift Workflow:/Prompt: payloads out of any EXIF/text carrier.
+
+        Infinite Image Browser splits EXIF on NUL and looks for ``workflow:``
+        / ``prompt:`` prefixes. WebP savers often store
+        ``Workflow: {json}`` in ImageDescription instead of PNG tEXt.
+        """
+        if not isinstance(metadata, dict):
+            return metadata
+        promoted = dict(metadata)
+
+        def lift_fragment(stripped: str) -> None:
+            if not stripped:
+                return
+            head = stripped[:48].lower()
+            if head.startswith("workflow:") and "workflow" not in promoted:
+                body = stripped.split(":", 1)[1].strip()
+                if body.startswith("{") or body.startswith("["):
+                    promoted["workflow"] = body
+            elif head.startswith("prompt:") and "prompt" not in promoted:
+                body = stripped.split(":", 1)[1].strip()
+                if body.startswith("{") or body.startswith("["):
+                    promoted["prompt"] = body
+            elif (
+                "workflow" not in promoted
+                and stripped.startswith("{")
+                and re.search(r'"nodes"\s*:\s*\[', stripped[:500])
+            ):
+                # ComfyUI UI workflows use a nodes *array*. InvokeAI graphs
+                # use a nodes *object* and must stay on invokeai_graph.
+                promoted["workflow"] = stripped
+            elif (
+                "prompt" not in promoted
+                and stripped.startswith("{")
+                and "class_type" in stripped[:800]
+            ):
+                promoted["prompt"] = stripped
+
+        for key, value in list(promoted.items()):
+            if isinstance(value, bytes):
+                decoded = self._decode_exif_user_comment(value)
+                if decoded:
+                    promoted[key] = decoded
+                    value = decoded
+            if not isinstance(value, str) or not value.strip():
+                continue
+            repaired = self._repair_utf16_nul_text(value)
+            if repaired != value:
+                promoted[key] = repaired
+                value = repaired
+            lift_fragment(value.strip())
+            if "\x00" in value:
+                for part in value.split("\x00"):
+                    lift_fragment(part.strip())
+        return promoted
+
+    def _has_comfyui_graph_carrier(self, metadata: dict) -> bool:
+        """True when a ComfyUI API prompt or UI workflow is already in metadata.
+
+        Used so a full A1111 ``parameters`` blob (Steps + Sampler) does not
+        short-circuit before the graph walk. IIB prefers parameters on hybrid
+        files; we still parse the graph and then merge, keeping generator=comfyui.
+        """
+        if not isinstance(metadata, dict):
+            return False
+        for key in ("prompt", "workflow"):
+            payload = metadata.get(key)
+            parsed = payload
+            if isinstance(payload, str):
+                stripped = payload.strip()
+                if stripped[:1] not in "{[":
+                    continue
+                try:
+                    parsed = json.loads(stripped)
+                except (json.JSONDecodeError, TypeError, ValueError):
+                    if _looks_like_damaged_json_document(stripped):
+                        return True
+                    continue
+            if not isinstance(parsed, dict):
+                continue
+            if self._looks_like_comfyui_prompt_dict(parsed):
+                return True
+            nodes = parsed.get("nodes")
+            if isinstance(nodes, list) and nodes:
+                return True
+        return False
 
     def _decode_exif_unicode_payload(self, payload: bytes) -> str:
         """Decode the non-standard-but-common UNICODE UserComment payload."""
@@ -588,6 +721,8 @@ class MetadataParser(
         Returns a dict with keys: generator, prompt, negative_prompt, checkpoint, loras,
         generation_params, is_img2img, img2img_info, character_prompts, prompt_nodes.
         """
+        metadata = self._promote_carrier_payloads(metadata)
+
         base: Dict[str, Any] = {
             "generator": "unknown",
             "prompt": None,
@@ -608,9 +743,16 @@ class MetadataParser(
         }
 
         # === Check for WebUI/Forge 'parameters' text chunk first ===
+        # Skip this early return when a ComfyUI graph is also present: parse
+        # the graph, then merge parameters as executed geninfo so generator
+        # stays comfyui (IIB hybrid, without letting a decoy blob win).
         if "parameters" in metadata:
             params = metadata["parameters"]
-            if isinstance(params, str) and ("Steps:" in params and "Sampler:" in params):
+            if (
+                isinstance(params, str)
+                and ("Steps:" in params and "Sampler:" in params)
+                and not self._has_comfyui_graph_carrier(metadata)
+            ):
                 prompt, neg, cp, lr, gen_params = self._parse_webui_parameters(params)
                 generator = self._detect_webui_family_generator(params, metadata, gen_params)
                 base.update({
@@ -713,20 +855,12 @@ class MetadataParser(
                         neg = self._flatten_text_value(comment_data.get("uc"))
 
                         v4_prompt = comment_data.get("v4_prompt")
-                        if not prompt and isinstance(v4_prompt, dict):
-                            prompt = self._flatten_text_value(
-                                v4_prompt.get("prompt")
-                                or v4_prompt.get("caption")
-                                or v4_prompt
-                            )
+                        if not prompt:
+                            prompt = self._flatten_nai_structured_prompt(v4_prompt)
 
                         v4_negative = comment_data.get("v4_negative_prompt")
                         if not neg:
-                            neg = self._flatten_text_value(
-                                v4_negative.get("prompt") if isinstance(v4_negative, dict) else v4_negative
-                            )
-                            if not neg and isinstance(v4_negative, dict):
-                                neg = self._flatten_text_value(v4_negative.get("caption") or v4_negative)
+                            neg = self._flatten_nai_structured_prompt(v4_negative)
 
                         base.update({"generator": "nai", "prompt": prompt, "negative_prompt": neg})
                         base["checkpoint"] = self._extract_metadata_model_identifier(metadata)
@@ -805,6 +939,11 @@ class MetadataParser(
                         isinstance(v, dict) and "class_type" in v
                         for v in prompt_data.values()
                     )
+                    if not has_nodes:
+                        converted = self._workflow_ui_to_prompt_data(prompt_data)
+                        if converted:
+                            prompt_data = converted
+                            has_nodes = True
                     if has_nodes:
                         pos, neg, cp, lr, gen_params, prompt_nodes, img2img, model_assets, civitai_resources = self._extract_comfyui_data_extended(prompt_data, workflow_data)
                         base.update({
@@ -842,6 +981,7 @@ class MetadataParser(
                                 source_keys[field] = "workflow"
                             else:
                                 source_keys[field] = "prompt"
+                        self._merge_parameters_prompt_blob(base, metadata)
                         return _with_sidecar_field_source_keys(
                             base,
                             source_keys,
@@ -857,20 +997,20 @@ class MetadataParser(
                     damaged_prompt_chunk = f"ComfyUI 'prompt' chunk is not valid JSON: {e}"
 
             if damaged_prompt_chunk:
-                # Mirror the 'workflow' chunk path below: name the generator,
-                # decline to invent a prompt out of the damaged bytes, and
-                # record the failure. Falling through instead reaches the
-                # Reader's plain-text handler, which accepts ANY string, so the
-                # raw chunk used to be stored as the image's prompt with no
-                # error at all. An empty prompt keeps the row inside the
-                # re-parse job's scope and triggers raw-chunk retention.
+                # Name the generator and keep the error. Do not return when a
+                # UI ``workflow`` is also present — fall through so CLIP
+                # widgets can still fill the prompt. Only return empty when
+                # this damaged chunk is the only ComfyUI carrier, otherwise
+                # the Reader plain-text handler would store raw JSON as prompt.
                 logger.debug("%s", damaged_prompt_chunk)
                 base["generator"] = "comfyui"
                 base["metadata_error"] = damaged_prompt_chunk
-                return _with_sidecar_field_source_keys(
-                    base,
-                    {field: "prompt" for field in _SIDECAR_FALLBACK_FIELDS},
-                )
+                self._merge_parameters_prompt_blob(base, metadata)
+                if not metadata.get("workflow"):
+                    return _with_sidecar_field_source_keys(
+                        base,
+                        {field: "prompt" for field in _SIDECAR_FALLBACK_FIELDS},
+                    )
 
         # === Check for ComfyUI workflow key without prompt data ===
         if "workflow" in metadata:
@@ -908,6 +1048,7 @@ class MetadataParser(
                 if img2img:
                     base["is_img2img"] = True
                     base["img2img_info"] = img2img
+                self._merge_parameters_prompt_blob(base, metadata)
                 return _with_sidecar_field_source_keys(
                     base,
                     {field: "workflow" for field in _SIDECAR_FALLBACK_FIELDS},
@@ -915,6 +1056,7 @@ class MetadataParser(
             except Exception as e:
                 logger.debug("Failed to parse ComfyUI workflow: %s", e)
                 base["generator"] = "comfyui"
+                self._merge_parameters_prompt_blob(base, metadata)
                 return _with_sidecar_field_source_keys(
                     base,
                     {field: "workflow" for field in _SIDECAR_FALLBACK_FIELDS},
@@ -1036,6 +1178,41 @@ class MetadataParser(
                 base,
                 _ai_provider_field_source_keys(metadata, base),
             )
+
+        # Truncated A1111 parameters (prompt + Negative prompt, no Steps/Sampler)
+        # still carry a usable prompt. Infinite Image Browser reads these; we
+        # only claim webui here when nothing else already identified the file.
+        self._merge_parameters_prompt_blob(base, metadata)
+
+        # JPEG/WebP UserComment often holds a raw tag/NL prompt with no
+        # Steps/Sampler trailer. After UTF-16 repair, treat prompt-shaped
+        # comments as the prompt instead of leaving the image empty.
+        if not (base.get("prompt") or "").strip():
+            for key in ("UserCommentText", "UserComment", "XPComment", "Comment"):
+                value = metadata.get(key)
+                if not isinstance(value, str):
+                    continue
+                text = self._peel_exif_charset_prefix(value)
+                if not text:
+                    continue
+                nai_result = self._parse_nai_usercomment_extended(text, metadata)
+                if nai_result and (nai_result.get("prompt") or nai_result.get("negative_prompt")):
+                    base.update({
+                        k: v for k, v in nai_result.items()
+                        if v is not None or k in ("prompt", "negative_prompt", "checkpoint")
+                    })
+                    base.setdefault("loras", nai_result.get("loras") or [])
+                    break
+                if text.startswith("{") or text.lower().startswith("workflow:"):
+                    continue
+                if self._looks_like_a1111_prompt_blob(text):
+                    self._merge_parameters_prompt_blob(base, {**metadata, "parameters": text})
+                    break
+                if self._prompt_text_is_usable(text):
+                    base["prompt"] = text
+                    if base.get("generator") in (None, "unknown"):
+                        base["generator"] = "others"
+                    break
 
         # Has metadata but unrecognized generator → "others"
         if base["generator"] == "unknown" and any((base.get("prompt"), base.get("negative_prompt"), base.get("checkpoint"), base.get("loras"))):

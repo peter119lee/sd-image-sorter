@@ -191,3 +191,91 @@ def generate_auto_mask(image_id: int, method: str = "rembg") -> Dict[str, Any]:
         "data_url": data_url,
         "saved": False,
     }
+
+
+def generate_and_save_auto_mask(
+    image_id: int,
+    method: str = "lucida",
+    *,
+    overwrite: bool = False,
+) -> Dict[str, Any]:
+    """Generate a subject mask and persist it for training export."""
+    if has_mask(image_id) and not overwrite:
+        record = _require_image_record(image_id)
+        return {
+            "image_id": int(image_id),
+            "method": str(method or "").strip().lower(),
+            "saved": False,
+            "skipped": True,
+            "reason": "exists",
+            "filename": record.get("filename"),
+        }
+    preview = generate_auto_mask(image_id, method)
+    saved = save_mask_from_data_url(image_id, preview["data_url"])
+    return {
+        **saved,
+        "method": preview["method"],
+        "skipped": False,
+    }
+
+
+def run_auto_mask_batch(
+    image_ids: List[int],
+    method: str = "lucida",
+    *,
+    overwrite: bool = False,
+    cancellation_requested=None,
+    progress_callback=None,
+) -> Dict[str, Any]:
+    """Generate+save masks for many gallery images. Skips existing unless overwrite."""
+    ids: List[int] = []
+    seen = set()
+    for value in image_ids or []:
+        image_id = int(value)
+        if image_id <= 0 or image_id in seen:
+            continue
+        seen.add(image_id)
+        ids.append(image_id)
+    if not ids:
+        raise MaskError("No gallery image ids were provided. / 没有提供图库图片 ID。")
+
+    saved = 0
+    skipped = 0
+    errors: List[Dict[str, Any]] = []
+    total = len(ids)
+    for index, image_id in enumerate(ids, start=1):
+        if cancellation_requested and cancellation_requested():
+            break
+        try:
+            result = generate_and_save_auto_mask(
+                image_id,
+                method,
+                overwrite=overwrite,
+            )
+            if result.get("skipped"):
+                skipped += 1
+            else:
+                saved += 1
+        except LookupError as exc:
+            errors.append({"image_id": image_id, "error": str(exc)})
+        except MaskError as exc:
+            errors.append({"image_id": image_id, "error": str(exc)})
+        if progress_callback:
+            progress_callback(
+                processed=index,
+                total=total,
+                saved=saved,
+                skipped=skipped,
+                errors=len(errors),
+                current_image_id=image_id,
+            )
+    return {
+        "method": str(method or "").strip().lower(),
+        "overwrite": bool(overwrite),
+        "total": total,
+        "saved": saved,
+        "skipped": skipped,
+        "error_count": len(errors),
+        "errors": errors[:20],
+        "cancelled": bool(cancellation_requested and cancellation_requested()),
+    }

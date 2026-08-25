@@ -103,7 +103,7 @@ def test_inventory_exposes_florence2_as_optional_local_captioner(monkeypatch):
     inventory = model_service.ModelService().build_model_inventory()
     florence = next(item for item in inventory if item["id"] == "florence2")
 
-    assert florence["group"] == "Tagging"
+    assert florence["group"] == "Captioning"
     assert florence["recommended"] is True
     assert florence["default_variant"] == "base"
     assert florence["default_model"] == "florence-community/Florence-2-base"

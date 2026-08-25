@@ -305,3 +305,71 @@ class TestMaskExport:
             "mask_export": "diffusers",
         })
         assert response.status_code == 400
+
+
+class TestMaskAutoBatch:
+    def test_lucida_batch_saves_and_skips_existing(
+        self, test_client, staged_image, masks_dir, monkeypatch
+    ):
+        image_id, _ = staged_image
+        calls = []
+
+        def generate_subject_mask(image, use_gpu):
+            del use_gpu
+            calls.append(image.size)
+            return Image.new("L", image.size, color=77)
+
+        monkeypatch.setattr(mask_service.config, "LUCIDA_USE_GPU", False, raising=False)
+        monkeypatch.setitem(
+            sys.modules,
+            "lucida_matting",
+            SimpleNamespace(
+                LucidaError=RuntimeError,
+                generate_subject_mask=generate_subject_mask,
+            ),
+        )
+
+        started = test_client.post(
+            "/api/masks/auto-batch",
+            json={"image_ids": [image_id], "method": "lucida", "overwrite": False},
+        )
+        assert started.status_code == 202, started.text
+        job_id = started.json()["job_id"]
+        body = None
+        for _ in range(40):
+            body = test_client.get(f"/api/bulk-jobs/{job_id}").json()
+            if body.get("status") in {"done", "error", "cancelled"}:
+                break
+            import time
+            time.sleep(0.05)
+        assert body is not None
+        assert body["status"] == "done", body
+        result = body.get("result") or {}
+        assert result.get("saved") == 1
+        assert result.get("skipped") == 0
+        assert mask_service.has_mask(image_id)
+        assert calls == [(32, 32)]
+
+        started_again = test_client.post(
+            "/api/masks/auto-batch",
+            json={"image_ids": [image_id], "method": "lucida", "overwrite": False},
+        )
+        job_id = started_again.json()["job_id"]
+        for _ in range(40):
+            body = test_client.get(f"/api/bulk-jobs/{job_id}").json()
+            if body.get("status") in {"done", "error", "cancelled"}:
+                break
+            import time
+            time.sleep(0.05)
+        assert body["status"] == "done", body
+        assert (body.get("result") or {}).get("skipped") == 1
+        assert (body.get("result") or {}).get("saved") == 0
+        assert calls == [(32, 32)]
+
+    def test_auto_batch_rejects_unknown_method(self, test_client, staged_image):
+        image_id, _ = staged_image
+        response = test_client.post(
+            "/api/masks/auto-batch",
+            json={"image_ids": [image_id], "method": "nope"},
+        )
+        assert response.status_code == 400

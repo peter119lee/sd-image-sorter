@@ -534,12 +534,15 @@ def get_filtered_image_ids(
         normalized_prompt_match_mode = normalize_prompt_match_mode(prompt_match_mode)
         needs_prompt_post_filter = bool(prompt_terms) and normalized_prompt_match_mode == PROMPT_MATCH_MODE_EXACT
         needs_post_filter = needs_prompt_post_filter or bool(loras)
-        # sidecar_caption rides along because _matches_exact_post_filters reads
-        # it as a second source of prompt terms (migration 042); without it the
-        # post-filter would drop every row whose text a rescan relocated, and
-        # this is the id set batch move and delete-selected act on.
+        # sidecar_caption and compact metadata_json ride along because
+        # _matches_exact_post_filters reads caption text and NAI character
+        # slots as extra prompt-term sources; without them the post-filter
+        # would drop rows whose text a rescan relocated, and this is the id
+        # set batch move and delete-selected act on.
         select_cols = (
-            "i.id, i.prompt, i.sidecar_caption, i.loras" if needs_post_filter else "i.id"
+            "i.id, i.prompt, i.sidecar_caption, i.loras, i.metadata_json"
+            if needs_post_filter
+            else "i.id"
         )
         query = _build_base_query(sort_by, select_cols)
 

@@ -581,13 +581,11 @@ def test_all_five_release_archives_use_packaged_release_notes(monkeypatch, tmp_p
 
 def test_stable_release_notes_follow_in_app_summary_sop():
     app_version = _read_app_version()
-    stable_version = _stable_base_version(app_version)
-
-    notes_path = ROOT / "docs" / f"RELEASE_NOTES_v{stable_version}.md"
+    notes_path = ROOT / "docs" / f"RELEASE_NOTES_v{app_version}.md"
     notes = notes_path.read_text(encoding="utf-8")
     lines = notes.splitlines()
 
-    assert lines[0].startswith(f"## v{stable_version} — ")
+    assert lines[0].startswith(f"## v{app_version} — ")
     assert len(lines[0]) <= 80
 
     first_200 = notes[:200]

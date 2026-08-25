@@ -29,7 +29,7 @@ class ModelAssetsMixin:
             lower = text.lower()
             if self._looks_like_model_filename(text):
                 return text
-            if any(token in lower for token in ("novelai diffusion", "stable diffusion")):
+            if any(token in lower for token in ("novelai diffusion", "stable diffusion", "nai-diffusion")):
                 return text
             if "novelai" in software and re.match(r"^(sdxl|nai|stable diffusion)\b", text, flags=re.IGNORECASE):
                 return text

@@ -216,7 +216,9 @@ test.describe('Image Reader live parse', () => {
     await expect.poll(() => saveStatuses.join(','), { timeout: 30000 }).toBe('200')
 
     const firstSaved = await parseImageViaApi(request, outputPath)
-    expect(firstSaved.generator).toBe('webui')
+    // Reader still writes an A1111 parameters blob, but a remaining ComfyUI
+    // graph must keep generator=comfyui. The edited prompt is executed text.
+    expect(firstSaved.generator).toBe('comfyui')
     expect(firstSaved.prompt).toBe('browser real test prompt v1')
     expect(firstSaved.negative_prompt).toBe('browser real test negative v1')
     expect(String(firstSaved.checkpoint || '')).toContain('z_image_turbo_bf16')

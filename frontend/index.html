@@ -1398,6 +1398,15 @@
                                 </div>
                                 <div id="reader-category-tags" class="reader-category-tags"></div>
                             </div>
+                            <div class="reader-section" id="reader-characters-section" style="display: none;">
+                                <div class="reader-section-header">
+                                    <button type="button" class="reader-section-toggle" data-target="reader-characters-list" data-collapse-key="characters">
+                                        <span class="reader-section-title" data-i18n="reader.characterPrompts">Character Prompts</span>
+                                        <span class="collapse-icon">▼</span>
+                                    </button>
+                                </div>
+                                <div id="reader-characters-list"></div>
+                            </div>
                             <div class="reader-section" id="reader-negative-section">
                                 <div class="reader-section-header">
                                     <button type="button" class="reader-section-toggle" data-target="reader-negative-text" data-collapse-key="negative">
@@ -4050,6 +4059,9 @@
                                     <button type="button" class="btn btn-ghost btn-small" id="btn-dataset-mask-edit"
                                             title="Masked training: paint which regions the trainer learns from"
                                             data-i18n-title="dataset.maskEditButtonTip"><svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg> <span data-i18n="dataset.maskEditButton">Training mask</span></button>
+                                    <button type="button" class="btn btn-ghost btn-small" id="btn-dataset-mask-auto-all"
+                                            title="Generate Lucida/rembg masks for every gallery image in this set. Existing masks are skipped."
+                                            data-i18n-title="dataset.maskAutoAllTip"><svg class="icon" aria-hidden="true"><use href="#i-cpu"/></svg> <span data-i18n="dataset.maskAutoAll">Auto-mask all</span></button>
                                     <span class="dataset-mask-state" id="dataset-mask-state"></span>
                                 </div>
 
@@ -4141,7 +4153,12 @@
                                     <button class="btn btn-secondary btn-small" id="btn-dataset-next-image"><span data-i18n="dataset.nextImage">Next</span> <svg class="icon" aria-hidden="true"><use href="#i-arrow-right"/></svg></button>
                                     <button class="btn btn-ghost btn-small" id="btn-dataset-revert-caption" data-i18n="dataset.revertCaption">Revert</button>
                                     <button class="btn btn-ghost btn-small" id="btn-dataset-undo-caption" data-i18n="dataset.undoCaption">Undo</button>
+                                    <button class="btn btn-ghost btn-small" id="btn-dataset-drop-image"
+                                            data-i18n="dataset.dropForReview"
+                                            data-i18n-title="dataset.dropForReviewTip"
+                                            title="Remove from this set without a confirm dialog. Z undoes the last drop.">Drop (X)</button>
                                     <button class="btn btn-danger btn-small" id="btn-dataset-remove-image" data-i18n="dataset.removeFromDataset">Remove</button>
+                                    <p class="dataset-review-keys" data-i18n="dataset.reviewKeys">A/D next · X drop · Z undo drop · Delete asks first</p>
                                 </div>
                             </div>
                         </section>

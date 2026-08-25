@@ -426,8 +426,15 @@ class TestWebPIntegration:
 
         assert result["width"] == 512
         assert result["height"] == 512
-        # NAI detection should work via fast path
-        assert result["generator"] in {"nai", "unknown"}  # May be unknown if EXIF parsing differs
+        # This fixture puts UserComment on IFD0 instead of the Exif sub-IFD
+        # NovelAI actually uses. Fast-path extract may not recover a prompt;
+        # it must not invent one from the charset prefix either.
+        assert result["generator"] in {"nai", "unknown"}
+        if result["generator"] == "nai":
+            assert result["prompt"] == "test prompt"
+            assert result["negative_prompt"] == "test negative"
+        else:
+            assert not (result.get("prompt") or "").strip()
 
     def _create_minimal_webp(self, width: int, height: int, exif_data: bytes = b"", xmp_data: bytes = b"") -> bytes:
         """Create a minimal valid WEBP file."""

@@ -105,6 +105,33 @@ def probe_png_stealth_signature(
     return None
 
 
+def probe_pillow_stealth_signature(image: PillowImage) -> Optional[bytes]:
+    """Read only the signed magic from Pillow pixels (WebP/JPEG/PNG fallback)."""
+    if image.mode == "RGBA":
+        alpha_signature = _signature_from_pillow_channel(image, "alpha")
+        if alpha_signature in {b"stealth_pnginfo", b"stealth_pngcomp"}:
+            return alpha_signature
+    if image.mode in {"RGB", "RGBA"}:
+        rgb_signature = _signature_from_pillow_channel(image, "rgb")
+        if rgb_signature in {b"stealth_rgbinfo", b"stealth_rgbcomp"}:
+            return rgb_signature
+    return None
+
+
+def _signature_from_pillow_channel(
+    image: PillowImage,
+    channel: _StealthChannel,
+) -> Optional[bytes]:
+    try:
+        return _read_exact_bytes(
+            _iter_channel_bits(image, channel),
+            PNG_STEALTH_SIGNATURE_BYTES,
+            "signature",
+        )
+    except PNGStealthMetadataError:
+        return None
+
+
 def decode_png_stealth_metadata(
     image: PillowImage,
     expected_signature: bytes,

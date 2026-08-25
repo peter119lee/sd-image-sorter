@@ -25,6 +25,11 @@ from db_helpers import (
     normalize_checkpoint_name,
 )
 
+_CHARACTER_PROMPT_TEXT_NORMALIZED_SQL = (
+    "LOWER(REPLACE(COALESCE(json_extract(i.metadata_json, "
+    "'$._parsed.character_prompt_text'), ''), '_', ' '))"
+)
+
 
 def _apply_exclude_tags_filter(conditions: List[str], params: List[Any],
                                exclude_tags: Optional[List[str]]) -> tuple:
@@ -149,11 +154,11 @@ def _apply_exclude_prompts_filter(conditions: List[str], params: List[Any],
             conditions.append(
                 "(LOWER(REPLACE(COALESCE(i.prompt, ''), '_', ' ')) NOT LIKE ? ESCAPE '\\'"
                 " AND LOWER(REPLACE(COALESCE(i.sidecar_caption, ''), '_', ' ')) "
-                "NOT LIKE ? ESCAPE '\\')"
+                "NOT LIKE ? ESCAPE '\\'"
+                f" AND {_CHARACTER_PROMPT_TEXT_NORMALIZED_SQL} NOT LIKE ? ESCAPE '\\')"
             )
             like_pattern = f"%{escape_like_pattern(normalized_term)}%"
-            params.append(like_pattern)
-            params.append(like_pattern)
+            params.extend([like_pattern, like_pattern, like_pattern])
         else:
             # v3.4.0 FIX: exact mode must compare whole normalized tokens.
             # The include filter uses a broad LIKE pre-filter because it is

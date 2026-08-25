@@ -121,7 +121,7 @@ def test_parsed_metadata_version_is_current_value():
     """image_manager gates re-parse on `stored_version < PARSED_METADATA_VERSION`
     (image_manager.py:256). Pin the current wire value so a bump is a deliberate,
     visible change rather than an accident of the module move."""
-    assert PARSED_METADATA_VERSION == 8
+    assert PARSED_METADATA_VERSION == 10
     assert isinstance(PARSED_METADATA_VERSION, int)
 
 
@@ -179,7 +179,7 @@ def test_parse_result_top_level_keys(tmp_path):
 
 
 def test_parsed_block_exact_key_set(tmp_path):
-    """metadata['_parsed'] carries EXACTLY these 8 keys on every parse.
+    """metadata['_parsed'] carries EXACTLY these keys on every parse.
 
     This is the structured payload the frontend reads (generation_params,
     is_img2img, character_prompts, prompt_nodes, model_assets, civitai_resources)
@@ -196,6 +196,7 @@ def test_parsed_block_exact_key_set(tmp_path):
         "is_img2img",
         "img2img_info",
         "character_prompts",
+        "character_prompt_text",
         "prompt_nodes",
         "model_assets",
         "civitai_resources",

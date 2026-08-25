@@ -1,6 +1,6 @@
 ﻿# SD Image Sorter API Documentation
 
-**Version:** 3.5.0-beta.5
+**Version:** 3.5.0-beta.6
 **Base URL:** `http://127.0.0.1:8487` (default; configurable via `SD_IMAGE_SORTER_PORT`)
 **Interactive Docs:** `http://127.0.0.1:8487/docs` (Swagger UI, same port as runtime)
 
@@ -753,6 +753,9 @@ Which of these images carry a stored mask. Body: `{image_ids: [..]}`. Returns `{
 
 #### POST /api/masks/{image_id}/auto
 Generate a subject mask for canvas preview — NOT saved until the user saves the edited result. Body: `{method: "rembg" | "lucida"}`; omitted `method` defaults to `rembg`. rembg is an opt-in dependency: ONNX Runtime is already bundled, but rembg itself must be installed into the backend environment (`pip install rembg`; the u2net model, ~170 MB, downloads on first use into `DATA_DIR/models/rembg`). Lucida returns a soft-alpha grayscale mask and must first be downloaded from Model Manager at the application-pinned revision. A missing runtime/checkpoint or failed inference returns 400 with an actionable bilingual error. Returns `{image_id, method, width, height, data_url, saved: false}`.
+
+#### POST /api/masks/auto-batch
+Queue Lucida/rembg mask generation for many gallery images (Dataset Maker “Auto-mask all”). Body: `{image_ids: [..], method: "lucida"|"rembg", overwrite?: false}`. Existing mask files are skipped unless `overwrite` is true, so a cancelled or interrupted run can resume. Returns `202` with `{job_id, kind: "mask_auto_batch", status, total}`; poll `GET /api/bulk-jobs/{job_id}`. `409` if another auto-mask batch is already running. Max 5000 ids.
 
 #### GET /api/prompts/library
 Get prompt token library. Optional query params: `q=<text>`, `limit=<n>`. Search runs across the full prompt-token index before applying `limit`.
@@ -1519,6 +1522,9 @@ Set custom update channel proxy configuration.
 
 #### DELETE /api/updates/channel
 Reset update channel to default.
+
+#### POST /api/updates/restart
+Restart the app through the original launcher without applying an update. Feature Setup uses this after an install replaced an already-loaded module. Body: `{reason: string}` (`reason` max 200 chars, may be empty). Returns `{status, launcher}` where `status` is `scheduled` or `unsupported`. A scheduled restart exits this process after the response; `unsupported` does not exit.
 
 #### POST /api/updates/apply
 Apply a downloaded update package.

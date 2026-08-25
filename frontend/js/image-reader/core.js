@@ -40,6 +40,7 @@
         _collapsedState: {
             prompt: true,
             negative: false,
+            characters: true,
             params: false,
             modelAssets: false,
             loras: false,

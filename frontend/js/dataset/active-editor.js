@@ -167,6 +167,64 @@
         this._saveSession();
     };
 
+    DM._reviewUndoStack = [];
+
+    DM._dropImageForReview = function (imageId) {
+        const id = Number(imageId);
+        const idx = this.imageIds.indexOf(id);
+        if (idx < 0) return;
+        const snapshot = {
+            id,
+            index: idx,
+            caption: this.captions.get(id),
+            captionEdit: this.captionEdits.get(id),
+            nlCaption: this.nlCaptions?.get?.(id),
+            nlEdit: this.nlEdits?.get?.(id),
+            captionType: this.captionType?.get?.(id),
+            localPath: this.localItemPaths?.get?.(id),
+            localDsId: this.localItemDsIds?.get?.(id),
+        };
+        this._removeImageById(id, { confirm: false });
+        this._reviewUndoStack.push(snapshot);
+        this._saveSession();
+        this._toast?.(
+            this._t('dataset.droppedForReview', 'Dropped from dataset (Z to undo)'),
+            'info',
+            1800
+        );
+    };
+
+    DM._undoReviewDrop = function () {
+        const snapshot = this._reviewUndoStack.pop();
+        if (!snapshot) {
+            this._toast?.(
+                this._t('dataset.nothingToUndoDrop', 'Nothing to undo'),
+                'info',
+                1400
+            );
+            return;
+        }
+        const insertAt = Math.min(snapshot.index, this.imageIds.length);
+        this.imageIds.splice(insertAt, 0, snapshot.id);
+        if (snapshot.caption != null) this.captions.set(snapshot.id, snapshot.caption);
+        if (snapshot.captionEdit != null) this.captionEdits.set(snapshot.id, snapshot.captionEdit);
+        if (snapshot.nlCaption != null) this.nlCaptions?.set?.(snapshot.id, snapshot.nlCaption);
+        if (snapshot.nlEdit != null) this.nlEdits?.set?.(snapshot.id, snapshot.nlEdit);
+        if (snapshot.captionType != null) this.captionType?.set?.(snapshot.id, snapshot.captionType);
+        if (snapshot.localPath != null) this.localItemPaths?.set?.(snapshot.id, snapshot.localPath);
+        if (snapshot.localDsId != null) this.localItemDsIds?.set?.(snapshot.id, snapshot.localDsId);
+        this._renderQueue();
+        this._updateCount();
+        this._updateExportEnabled();
+        this._setActive(snapshot.id);
+        this._saveSession();
+        this._toast?.(
+            this._t('dataset.undidReviewDrop', 'Restored last dropped image'),
+            'info',
+            1800
+        );
+    };
+
     DM._removeImageById = function (imageId, options = {}) {
         const id = Number(imageId);
         if (!this.imageIds.includes(id)) return;
@@ -343,6 +401,17 @@
             case 'Delete':
                 e.preventDefault();
                 DM._removeActive();
+                break;
+            case 'x':
+            case 'X':
+                e.preventDefault();
+                if (DM.activeId != null) DM._dropImageForReview(DM.activeId);
+                break;
+            case 'z':
+            case 'Z':
+                if (e.ctrlKey || e.metaKey) break;
+                e.preventDefault();
+                DM._undoReviewDrop();
                 break;
         }
     });

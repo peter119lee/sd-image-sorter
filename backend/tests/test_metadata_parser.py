@@ -1443,6 +1443,36 @@ Steps: 30, Sampler: DPM++ 2M Karras, CFG scale: 7.0, Seed: 123456789, Size: 512x
         assert result["generator"] == "webui"
         assert result["checkpoint"] == "Model hash 925997e9"
 
+    def test_settings_only_comfyui_parameters_recover_checkpoint_without_inventing_prompt(
+        self, tmp_path: Path
+    ):
+        """ComfyUI Save Image may write only Clip skip / Model hash / Version.
+
+        SPR treats that settings line as the positive prompt. We must recover
+        the checkpoint for gallery filters and keep prompt empty.
+        """
+        from PIL import Image
+        from PIL.PngImagePlugin import PngInfo
+
+        img_path = tmp_path / "comfyui_settings_only.png"
+        img = Image.new("RGB", (64, 64), color="navy")
+        parameters = (
+            "\nClip skip: 1, Model hash: BD43B7CFFE, Model: anima-base-v1.0, "
+            'Hashes: {"model":"BD43B7CFFE"}, Version: ComfyUI'
+        )
+        metadata = PngInfo()
+        metadata.add_text("parameters", parameters)
+        img.save(img_path, pnginfo=metadata)
+
+        result = parse_image(str(img_path))
+
+        assert result["parse_error"] is None
+        assert result["prompt"] in (None, "")
+        assert result["checkpoint"] == "anima-base-v1.0"
+        assert result["generator"] == "comfyui"
+        assert "Clip skip" not in (result["prompt"] or "")
+        assert "Model hash" not in (result["prompt"] or "")
+
     def test_parse_webui_recovers_lora_names_from_lora_hashes(self, tmp_path: Path):
         """LoRA names should be recovered from the Lora hashes field even without inline tags."""
         from PIL import Image
@@ -1520,7 +1550,7 @@ Steps: 30, Sampler: DPM++ 2M Karras, CFG scale: 7.0, Seed: 123456789, Size: 512x
         assert model_assets.get("yolo_models") == ["face_yolov8n.pt", "hand_yolov8s.pt"]
 
     def test_parse_webui_merges_explicit_workflow_widget_loras_when_parameters_have_none(self, tmp_path: Path):
-        """Hybrid files with WebUI params plus ComfyUI workflow should still recover explicit workflow LoRAs."""
+        """Hybrid files keep generator=comfyui and still recover workflow LoRAs plus the parameters checkpoint."""
         from PIL import Image
         from PIL.PngImagePlugin import PngInfo
 
@@ -1556,8 +1586,10 @@ Steps: 30, Sampler: DPM++ 2M Karras, CFG scale: 7.0, Seed: 123456789, Size: 512x
         result = parse_image(str(img_path))
         model_assets = result["metadata"]["_parsed"].get("model_assets") or {}
 
-        assert result["generator"] == "webui"
+        assert result["generator"] == "comfyui"
         assert result["checkpoint"] == "JANKUV5NSFWTrainedNoobai_v50.safetensors"
+        assert result["prompt"] == "masterpiece"
+        assert result["negative_prompt"] == "low quality"
         assert result["loras"] == [
             "illustriousXLv01_stabilizer_v1.198.safetensors",
             "AddMicroDetails_Illustrious_v5.safetensors",

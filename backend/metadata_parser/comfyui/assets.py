@@ -191,7 +191,21 @@ class ComfyUIAssetsMixin:
             return "unet"
         if "diffusion" in node_type_lower:
             return "diffusion_model"
-        if any(token in node_type_lower for token in ("checkpoint", "ckpt", "efficient loader", "comfyloader")):
+        if "vae" in node_type_lower:
+            return "vae"
+        if "clip" in node_type_lower and "loader" in node_type_lower:
+            return "clip"
+        if any(token in node_type_lower for token in (
+            "controlnet", "control_net", "ipadapter", "ip-adapter",
+            "instantid", "pulid", "gligen",
+        )):
+            return None
+        # Any remaining *Loader / *Checkpoint node holding a weight file is
+        # a primary model. Do not require the word "Checkpoint" — custom
+        # booster/base loaders use arbitrary class names.
+        if any(token in node_type_lower for token in (
+            "checkpoint", "ckpt", "loader", "efficient loader", "comfyloader",
+        )):
             return "checkpoint"
 
         return None

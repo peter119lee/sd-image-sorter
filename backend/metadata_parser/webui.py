@@ -180,8 +180,12 @@ class WebUIMixin:
         # Extract positive prompt
         if neg_start > 0:
             prompt = "\n".join(lines[:neg_start]).strip()
+        elif neg_start == 0:
+            prompt = None
         elif param_start > 0:
             prompt = "\n".join(lines[:param_start]).strip()
+        elif self._looks_like_settings_only_parameters(params):
+            prompt = None
         else:
             prompt = params  # Just use everything
 
@@ -197,6 +201,9 @@ class WebUIMixin:
         if param_start >= 0:
             params_line = "\n".join(lines[param_start:])
             gen_params = self._parse_gen_params_line(params_line)
+            checkpoint = self._extract_webui_checkpoint_identifier(gen_params, params)
+        elif self._looks_like_settings_only_parameters(params):
+            gen_params = self._parse_gen_params_line(params.strip())
             checkpoint = self._extract_webui_checkpoint_identifier(gen_params, params)
 
         extra_loras = self._extract_webui_loras_from_metadata(params, gen_params)
@@ -321,4 +328,163 @@ class WebUIMixin:
                 result[key_lower] = value
 
         return result
+
+    def _looks_like_a1111_prompt_blob(self, params: Any) -> bool:
+        """True for A1111-style parameters even when Steps/Sampler were truncated.
+
+        Infinite Image Browser treats a PNG ``parameters`` chunk as gen-info
+        without requiring the ``Steps:`` / ``Sampler:`` trailer. We keep the
+        strict trailer for *claiming* webui over ComfyUI, but this helper
+        identifies a usable prompt+negative blob for fallback fill.
+        """
+        if not isinstance(params, str) or not params.strip():
+            return False
+        if re.search(r"(?m)^Negative prompt:", params):
+            return True
+        return "Steps:" in params and "Sampler:" in params
+
+    def _looks_like_settings_only_parameters(self, params: Any) -> bool:
+        """True when ``parameters`` is gen-info with no positive prompt text.
+
+        ComfyUI's Save Image node can write only ``Clip skip`` / ``Model hash``
+        / ``Version: ComfyUI``. That is still a real checkpoint carrier; it is
+        not a prompt.
+        """
+        if not isinstance(params, str):
+            return False
+        text = params.strip()
+        if not text:
+            return False
+        if re.search(r"(?m)^Negative prompt:", text):
+            return False
+        if re.search(r"(?m)^Steps:\s*\d+", text):
+            return False
+        has_model = re.search(r"(?i)(?:^|,\s*)Model(?: hash)?:\s*\S", text) is not None
+        if not has_model:
+            return False
+        first_line = text.split("\n", 1)[0].strip()
+        return bool(re.match(r"^(Clip skip|Model hash|Model|Hashes|Version)\s*:", first_line, flags=re.IGNORECASE))
+
+    def _prompt_text_is_usable(self, text: Any) -> bool:
+        """True when ``text`` is generation prompt, not a path/label/sampler name."""
+        if not isinstance(text, str) or not text.strip():
+            return False
+        try:
+            from prompt_text_scorer import (
+                PROMPT_SCORE_FLOOR,
+                looks_like_non_prompt_value,
+                score_prompt_likeness,
+            )
+
+            if looks_like_non_prompt_value(text):
+                return False
+            return score_prompt_likeness(text)["score"] >= PROMPT_SCORE_FLOOR
+        except Exception:
+            return len(text.strip()) >= 12
+
+    def _prefer_prompt_text(self, current: Any, candidate: Any) -> Optional[str]:
+        """Pick between graph-traced text and an executed geninfo blob.
+
+        Ladder taken from Infinite Image Browser + sd-prompt-reader, with
+        one correction: unrelated decoy ``parameters`` must not replace a
+        real encoder prompt.
+
+        1. Missing side takes the other.
+        2. Usable geninfo beats non-prompt junk the graph returned
+           (bus titles, ``否 (false)``, widget enums).
+        3. If one string is a longer assembled form of the other, keep
+           the longer (truncated parameters vs fuller ShowText).
+        4. Otherwise keep the graph value.
+        """
+        cur = current.strip() if isinstance(current, str) else ""
+        cand = candidate.strip() if isinstance(candidate, str) else ""
+        if not cand:
+            return cur or None
+        if not cur:
+            return cand
+        cand_ok = self._prompt_text_is_usable(cand)
+        cur_ok = self._prompt_text_is_usable(cur)
+        if cand_ok and not cur_ok:
+            return cand
+        if cur_ok and not cand_ok:
+            return cur
+        if self._is_completed_prompt_form(cand, cur):
+            return cand
+        if self._is_completed_prompt_form(cur, cand):
+            return cur
+        return cur
+
+    def _merge_parameters_prompt_blob(self, base: Dict[str, Any], metadata: dict) -> None:
+        """Merge A1111-style ``parameters`` as executed geninfo (IIB hybrid).
+
+        Does not change ``generator`` when it is already claimed. An unknown
+        generator is promoted to webui/forge only when this blob is the first
+        successful parse.
+
+        Complete blobs (``Steps:`` + ``Sampler:``) are executed geninfo or a
+        Reader edit: they win over a usable graph unless the graph is a longer
+        completed form of the same prompt. Truncated blobs only fill junk/empty
+        graph text so a decoy cannot replace an encoder prompt.
+        """
+        params = metadata.get("parameters")
+        settings_only = self._looks_like_settings_only_parameters(params)
+        if not self._looks_like_a1111_prompt_blob(params) and not settings_only:
+            return
+        prompt, neg, cp, extra_loras, gen_params = self._parse_webui_parameters(params)
+        if settings_only:
+            prompt = None
+        if prompt and "Negative prompt:" in prompt:
+            prompt = None
+        current_pos = (base.get("prompt") or "").strip() if isinstance(base.get("prompt"), str) else ""
+        current_neg = (base.get("negative_prompt") or "").strip() if isinstance(base.get("negative_prompt"), str) else ""
+        complete = (
+            isinstance(params, str)
+            and "Steps:" in params
+            and "Sampler:" in params
+        )
+
+        def choose(current: str, candidate: Any) -> Optional[str]:
+            cand = candidate.strip() if isinstance(candidate, str) else ""
+            if not complete:
+                return self._prefer_prompt_text(current, candidate)
+            # Complete geninfo / Reader edits are executed text. Do not
+            # format-gate them: a short edit like "EDITED prompt" is still
+            # the value the user saved. Keep the graph only when it is a
+            # longer assembled form of this blob.
+            if cand:
+                if current and self._is_completed_prompt_form(current, cand):
+                    return current
+                return cand
+            return current or None
+
+        chosen_pos = choose(current_pos, prompt)
+        chosen_neg = choose(current_neg, neg)
+        if chosen_pos:
+            base["prompt"] = chosen_pos
+        if chosen_neg:
+            base["negative_prompt"] = chosen_neg
+        if gen_params and not base.get("generation_params"):
+            base["generation_params"] = gen_params
+        if cp and not str(base.get("checkpoint") or "").strip():
+            base["checkpoint"] = cp
+        if extra_loras:
+            base["loras"] = self._normalize_lora_names([
+                *(base.get("loras") or []),
+                *extra_loras,
+            ])
+        claimed = bool(chosen_pos or chosen_neg)
+        if claimed and base.get("generator") in (None, "unknown"):
+            base["generator"] = self._detect_webui_family_generator(params, metadata, gen_params)
+        elif (
+            settings_only
+            and base.get("generator") in (None, "unknown")
+            and str((gen_params or {}).get("version") or "").strip().lower() == "comfyui"
+        ):
+            base["generator"] = "comfyui"
+            if cp:
+                base["model_assets"] = self._build_explicit_model_assets(
+                    source="comfyui_parameters",
+                    checkpoint=cp,
+                    loras=base.get("loras") or extra_loras,
+                )
 

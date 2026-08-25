@@ -38,10 +38,14 @@ class ComfyUIExtractMixin:
                 prompt_data = json.loads(prompt_data) if isinstance(prompt_data, str) else {}
             except Exception as e:
                 logger.debug('Failed to parse ComfyUI prompt_data (extended): %s', e)
-                return (None, None, None, [], None, None, None, None, None)
+                prompt_data = {}
 
         if not prompt_data:
-            return (None, None, None, [], None, None, None, None, None)
+            converted = self._workflow_ui_to_prompt_data(workflow_data)
+            if converted:
+                prompt_data = converted
+            else:
+                return (None, None, None, [], None, None, None, None, None)
 
         checkpoint = None
         loras = []
@@ -93,8 +97,8 @@ class ComfyUIExtractMixin:
                         gen_params["lora_details"] = []
                     gen_params["lora_details"].extend(multi_details)
 
-            # KSampler params
-            if any(st in class_type for st in ["KSampler", "SamplerCustom"]):
+            # KSampler params (and custom *Sampler nodes with the same fields)
+            if self._is_comfyui_sampler_node(class_type, inputs):
                 if "seed" in inputs:
                     seed_val = inputs["seed"]
                     if isinstance(seed_val, (int, float)):
@@ -165,10 +169,43 @@ class ComfyUIExtractMixin:
         # Fallback — fill ONLY the missing side. The old unconditional
         # unpack overwrote a traced negative with the fallback's (possibly
         # None) value whenever the positive was missing.
-        if not positive_text or not negative_text:
-            fallback_pos, fallback_neg = self._collect_text_from_nodes(nodes)
-            positive_text = positive_text or fallback_pos
-            negative_text = negative_text or fallback_neg
+        # Also upgrade a traced fragment to a longer completed form found
+        # elsewhere (ShowText executed cache, concat result).
+        fallback_pos, fallback_neg = self._collect_text_from_nodes(nodes)
+        if not positive_text:
+            positive_text = fallback_pos
+        elif fallback_pos and self._is_completed_prompt_form(fallback_pos, positive_text):
+            positive_text = fallback_pos
+        if not negative_text:
+            negative_text = fallback_neg
+        elif fallback_neg and self._is_completed_prompt_form(fallback_neg, negative_text):
+            negative_text = fallback_neg
+
+        # Saved WebP/JPEG often embed a *subgraph* API ``prompt`` (upscale /
+        # SaveImage only) plus the full UI ``workflow`` that still has CLIP
+        # widgets. Tracing the subgraph yields nothing; fill from the UI graph.
+        if (not positive_text or not negative_text) and workflow_data:
+            converted = self._workflow_ui_to_prompt_data(workflow_data)
+            if converted:
+                ui_pos, ui_neg = self._trace_sampler_prompts(converted)
+                if not ui_pos or not ui_neg:
+                    harvest_pos, harvest_neg = self._collect_text_from_nodes(converted)
+                    if not ui_pos:
+                        ui_pos = harvest_pos
+                    elif harvest_pos and self._is_completed_prompt_form(harvest_pos, ui_pos):
+                        ui_pos = harvest_pos
+                    if not ui_neg:
+                        ui_neg = harvest_neg
+                    elif harvest_neg and self._is_completed_prompt_form(harvest_neg, ui_neg):
+                        ui_neg = harvest_neg
+                if not positive_text:
+                    positive_text = ui_pos
+                elif ui_pos and self._is_completed_prompt_form(ui_pos, positive_text):
+                    positive_text = ui_pos
+                if not negative_text:
+                    negative_text = ui_neg
+                elif ui_neg and self._is_completed_prompt_form(ui_neg, negative_text):
+                    negative_text = ui_neg
 
         workflow_assets = self._extract_comfyui_model_assets_from_workflow_widgets(workflow_data)
 

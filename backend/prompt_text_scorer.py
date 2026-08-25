@@ -47,6 +47,48 @@ NON_PROMPT_KEYS = frozenset({
     "extension", "path", "directory", "folder", "custom_layer_filter",
 })
 
+# Node class_types whose strings are never generation prompts (tagger dumps,
+# loaders). ShowText that is *fed by* a tagger is skipped separately.
+HARVEST_SKIP_CLASS_MARKERS = (
+    "WD14Tagger",
+    "CLIPLoader",
+    "VAELoader",
+    "CheckpointLoader",
+    "UNETLoader",
+    "DiffusionModelLoader",
+)
+
+_BUS_NODE_TYPES = frozenset({"GetNode", "Get", "SetNode", "Set", "Reroute"})
+
+
+def _source_chain_has_tagger(
+    nodes: Dict[str, dict],
+    ref: Any,
+    seen: Optional[set] = None,
+) -> bool:
+    """True when a ShowText (or similar) is fed by a Tagger through Get/Set buses."""
+    if seen is None:
+        seen = set()
+    if not isinstance(ref, (list, tuple)) or not ref:
+        return False
+    node_id = str(ref[0])
+    if node_id in seen:
+        return False
+    node = nodes.get(node_id)
+    if not isinstance(node, dict):
+        return False
+    seen.add(node_id)
+    class_type = str(node.get("class_type") or "")
+    if "Tagger" in class_type:
+        return True
+    if class_type not in _BUS_NODE_TYPES and "Reroute" not in class_type:
+        return False
+    inputs = node.get("inputs") if isinstance(node.get("inputs"), dict) else {}
+    for value in inputs.values():
+        if _source_chain_has_tagger(nodes, value, seen):
+            return True
+    return False
+
 _NEGATIVE_INDICATORS = (
     "worst quality", "low quality", "bad quality", "lowres",
     "bad anatomy", "worst hands", "bad hands", "deformed", "blurry",
@@ -74,7 +116,7 @@ def tokenize_prompt_text(text: str) -> List[str]:
     cleaned = _LORA_TAG_RE.sub(" ", str(text or ""))
     cleaned = _WEIGHT_SYNTAX_RE.sub(" ", cleaned)
     tokens: List[str] = []
-    for part in cleaned.split(","):
+    for part in re.split(r"[,，、;；]+", cleaned):
         token = re.sub(r"\s+", " ", part).strip().lower()
         if token:
             tokens.append(token)
@@ -93,30 +135,41 @@ def _vocab_hit_ratio(tokens: Sequence[str], vocab: Optional[Dict[str, int]]) -> 
 
 
 def _structure_score(text: str, tokens: Sequence[str]) -> float:
-    """Shape-only score, capped below the vocab path's ceiling."""
-    if not tokens:
-        return 0.0
-    token_count = len(tokens)
+    """Shape-only score for tag lists AND natural-language prompts.
+
+    Comma-token count is the booru/A1111 signal. Word count is the Flux/Krea/
+    Midjourney signal: a paragraph with no commas is still a prompt. The
+    60-char average-token cap only applies when there are *multiple* comma
+    segments — applying it to a single long sentence used to reject every
+    prose prompt over 60 characters.
+    """
     words = str(text).split()
+    word_count = len(words)
+    token_count = len(tokens)
     if token_count >= 5:
         base = 0.5
     elif token_count >= 3:
         base = 0.42
-    elif len(words) >= 8:
-        # A single long natural-language sentence is still prompt-shaped.
-        base = 0.4
+    elif word_count >= 8:
+        base = 0.48
+    elif word_count >= 6:
+        base = 0.42
     else:
         return 0.1
-    lengths = [len(t) for t in tokens]
-    average = sum(lengths) / len(lengths)
-    if not 2 <= average <= 60:
-        return 0.15
-    return min(0.55, base + min(0.05, token_count * 0.005))
+    if token_count >= 2:
+        lengths = [len(t) for t in tokens]
+        average = sum(lengths) / len(lengths)
+        if not 2 <= average <= 80:
+            return 0.15
+    return min(0.55, base + min(0.05, max(token_count, word_count // 4) * 0.005))
 
 
 def looks_like_non_prompt_value(text: str) -> bool:
     """Values that are clearly configuration: paths, URLs, model files, JSON."""
-    stripped = str(text or "").strip()
+    stripped = str(text or "").strip().lstrip("\x00").strip()
+    if stripped.startswith("ASCII") or stripped.startswith("UNICODE"):
+        stripped = stripped.split("\x00", 1)[-1] if "\x00" in stripped else stripped[6:].lstrip()
+        stripped = stripped.lstrip("\x00 ").strip()
     if len(stripped) < MIN_CANDIDATE_LENGTH:
         return True
     if _URL_RE.match(stripped):
@@ -130,11 +183,20 @@ def looks_like_non_prompt_value(text: str) -> bool:
         return True
     if re.fullmatch(r"[\d\s.,:x×-]+", stripped):
         return True
+    # kjnodes Set/Get bus titles and other UI labels, not generation text.
+    if "【" in stripped and "】" in stripped and not re.search(r"[,，、]", stripped):
+        return True
     return False
 
 
 def score_prompt_likeness(text: str, vocab: Optional[Dict[str, int]] = None) -> Dict[str, Any]:
-    """Score how much a string reads like an SD prompt (0..1)."""
+    """Score how much a string reads like an SD prompt (0..1).
+
+    Booru tag lists score via vocabulary. Natural-language prompts (Flux,
+    Krea, Midjourney, SD3 T5) score via sentence structure and the shared
+    caption-format classifier — format is a keep signal, never a discard
+    (see caption_format invariant).
+    """
     tokens = tokenize_prompt_text(text)
     if vocab is None:
         vocab = _vocab_index()
@@ -156,41 +218,76 @@ def is_negative_prompt_text(text: str) -> bool:
     return matches >= 3
 
 
+def _widget_strings_for_harvest(value: Any) -> List[str]:
+    """Flatten ShowText-style nested string widgets; skip JSON/token stacks."""
+    if isinstance(value, str):
+        stripped = value.strip()
+        if not stripped or stripped[:1] in "{[":
+            return []
+        return [stripped]
+    if isinstance(value, (list, tuple)):
+        if value and all(isinstance(item, dict) for item in value):
+            return []
+        texts: List[str] = []
+        for item in value:
+            texts.extend(_widget_strings_for_harvest(item))
+        return texts
+    return []
+
+
 def harvest_prompt_candidates(nodes: Dict[str, dict],
                               text_node_types: Iterable[str]) -> List[Dict[str, Any]]:
-    """Collect every plausible prompt string from every node's inputs.
+    """Collect every plausible prompt string from inputs AND widgets.
 
     No node-type knowledge required — that is the point. `text_node_types`
-    only adds a small prior bonus for encoder-ish nodes.
+    only adds a small prior bonus for encoder-ish nodes. Custom prompt UIs
+    that store text only in ``widgets_values`` (unknown class names) are
+    still harvested.
     """
     type_markers = tuple(text_node_types or ())
     vocab = _vocab_index()
     candidates: List[Dict[str, Any]] = []
+    seen_texts: set = set()
+
+    def push(text: str, node_id: str, class_type: str, key: str, is_text_node: bool) -> None:
+        stripped = text.strip()
+        if not stripped or stripped in seen_texts:
+            return
+        if str(key).lower() in NON_PROMPT_KEYS:
+            return
+        if looks_like_non_prompt_value(stripped):
+            return
+        result = score_prompt_likeness(stripped, vocab)
+        score = result["score"] + (TEXT_NODE_BONUS if is_text_node else 0.0)
+        seen_texts.add(stripped)
+        candidates.append({
+            "text": stripped,
+            "score": round(min(1.0, score), 4),
+            "node_id": str(node_id),
+            "class_type": class_type,
+            "key": str(key),
+            "vocab_hit_ratio": result["vocab_hit_ratio"],
+        })
+
     for node_id, node in nodes.items():
         if not isinstance(node, dict):
             continue
-        class_type = str(node.get("class_type", ""))
-        inputs = node.get("inputs", {})
-        if not isinstance(inputs, dict):
+        class_type = str(node.get("class_type") or node.get("type") or "")
+        if any(marker in class_type for marker in HARVEST_SKIP_CLASS_MARKERS):
             continue
+        inputs = node.get("inputs") if isinstance(node.get("inputs"), dict) else {}
+        if "ShowText" in class_type:
+            ref = inputs.get("text") or inputs.get("string")
+            if _source_chain_has_tagger(nodes, ref):
+                continue
         is_text_node = any(marker in class_type for marker in type_markers)
         for key, value in inputs.items():
-            if not isinstance(value, str):
-                continue
-            if str(key).lower() in NON_PROMPT_KEYS:
-                continue
-            if looks_like_non_prompt_value(value):
-                continue
-            result = score_prompt_likeness(value, vocab)
-            score = result["score"] + (TEXT_NODE_BONUS if is_text_node else 0.0)
-            candidates.append({
-                "text": value.strip(),
-                "score": round(min(1.0, score), 4),
-                "node_id": str(node_id),
-                "class_type": class_type,
-                "key": str(key),
-                "vocab_hit_ratio": result["vocab_hit_ratio"],
-            })
+            if isinstance(value, str):
+                push(value, node_id, class_type, key, is_text_node)
+        if class_type in _BUS_NODE_TYPES:
+            continue
+        for index, text in enumerate(_widget_strings_for_harvest(node.get("widgets_values"))):
+            push(text, node_id, class_type, f"widgets_values[{index}]", is_text_node)
     return candidates
 
 
@@ -219,7 +316,9 @@ def pick_positive_negative(candidates: List[Dict[str, Any]],
     def best(pool: List[Dict[str, Any]]) -> Optional[str]:
         if not pool:
             return None
-        pool.sort(key=lambda c: (c["score"], len(c["text"])), reverse=True)
-        return pool[0]["text"]
+        top = max(candidate["score"] for candidate in pool)
+        near = [candidate for candidate in pool if candidate["score"] >= top - 0.15]
+        near.sort(key=lambda c: (len(c["text"]), c["score"]), reverse=True)
+        return near[0]["text"]
 
     return (best(positives), best(negatives))

@@ -619,6 +619,9 @@
                 this._refreshQueueItem(this.activeId);
                 this._renderTagPills();
             });
+            document.getElementById('btn-dataset-drop-image')?.addEventListener('click', () => {
+                if (this.activeId != null) this._dropImageForReview(this.activeId);
+            });
             document.getElementById('btn-dataset-remove-image')?.addEventListener('click', () => this._removeActive());
             document.getElementById('btn-dataset-dedupe-tags')?.addEventListener('click', () => this._dedupeCaptionTags?.());
 

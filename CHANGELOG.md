@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.5.0-beta.6] - 2026-08-25
+
+ComfyUI / WebUI / WebP embedded prompts recover more reliably (UI workflow, Get/Set, Flux t5xxl, EXIF `Workflow:`, UTF-16, NovelAI stealth WebP). Existing library rows need a re-scan to refresh stored prompt fields.
+
+ComfyUI、WebUI、WebP 图里嵌的 prompt 现在读得到（UI workflow、Get/Set、Flux t5xxl、EXIF Workflow:、UTF-16、NovelAI stealth WebP）。旧图库要重扫才会更新已存栏位。
+
+### Fixed / 修复
+- **ComfyUI UI workflow and hybrid geninfo / ComfyUI UI workflow 与 hybrid 参数**: parse UI `workflow` when the API `prompt` chunk is missing or is only an upscale subgraph; keep `generator=comfyui` when a graph is present; use a full A1111 `parameters` trailer as executed text or a Reader edit, without letting a truncated decoy replace a fuller encoder prompt.
+  - 没有 API `prompt`、或只有放大 subgraph 时，从 UI `workflow` 取字。有 ComfyUI graph 时 generator 保持 comfyui。完整 `Steps`/`Sampler` trailer 当 executed text 或 Reader 编辑；截断 decoy 不会盖掉更完整的 encoder prompt。
+- **Off-PNG carriers / 非 PNG 载体**: promote EXIF/WebP `Workflow:` / `Prompt:` prefixes (including NUL-separated fragments) and repair UTF-16 UserComment into the same parse path.
+  - EXIF/WebP 的 `Workflow:` / `Prompt:`（含 NUL 分段）与 UTF-16 UserComment 提升到同一条解析路径。
+- **InvokeAI not stolen as ComfyUI / InvokeAI 不再被当成 ComfyUI**: `invokeai_graph` uses a nodes object; it is no longer promoted as a ComfyUI UI workflow.
+  - `invokeai_graph` 的 nodes 是 object，不再被提升成 ComfyUI UI workflow。
+- **Natural-language and Flux encoder keys / 自然语言与 Flux 编码器字段**: graph position wins over format scoring for `t5xxl` / `text_g` / `text_l` / `populated_text`; harvest still accepts NL sentences without commas and rejects bus titles, paths, and sampler names.
+  - `t5xxl` / `text_g` / `text_l` / `populated_text` 以图位置为准，不靠格式打分。harvest 接受无逗号自然语言，拒绝总线标题、路径、sampler 名。
+- **NovelAI Diffusion V5 character prompts / NovelAI Diffusion V5 角色提示词**: V5 still stores PNG Comment / WebP EXIF in the V4 shape (`v4_prompt`, `params_version` 4). The parser now reads top-level `characterPrompts` and `caption.char_captions` (up to 22 slots) and recognizes `nai-diffusion-5-*` Source names.
+  - V5 仍用 V4 的 Comment/`v4_prompt`。现在会读 `characterPrompts` 与 `char_captions`（最多 22 个），并识别 `nai-diffusion-5-*`。
+- **NovelAI / A1111 stealth WebP / NovelAI 与 A1111 的 WebP stealth**: lossless RGBA/RGB WebP now uses the same signed LSB decoder as PNG (`stealth_pngcomp` / `stealth_pnginfo` / RGB variants). Pixiv-saved NovelAI WebP with no EXIF is readable. Default scan re-parses existing rows (`PARSED_METADATA_VERSION` 10).
+  - 无损 WebP 的 alpha/RGB LSB stealth 与 PNG 同一套解码。没有 EXIF 的 NovelAI WebP（常见于 Pixiv 转档）现在读得到。默认扫描会重解析已索引列。
+- **ComfyUI settings-only parameters / 只有 Model hash 的 ComfyUI PNG**: a `parameters` chunk that is only `Clip skip` / `Model hash` / `Version: ComfyUI` no longer invents a prompt; the checkpoint is recovered for filters.
+  - 只有设定行、没有正向 prompt 的 ComfyUI PNG 不会把 `Clip skip` 当 prompt，但会记下 checkpoint 供筛选。
+- **Gallery uses scanned metadata / 扫完图库就能用新 metadata**: after Scan, gallery search, prompt filters, Auto-Separate selection, and the image detail modal use stored compact `_parsed` (including NovelAI character slots). Slot text is indexed; it is not written into the base `prompt` column.
+  - 扫描后，搜索 / prompt 筛选 / 自动分类选中集 / 详情弹窗都用已存 `_parsed`（含 NovelAI 角色槽）。角色槽会进检索，不会改写正向 `prompt` 栏。
+- **Reader character slots / Reader 角色槽**: NovelAI V4/V5 character prompts now show in Image Reader as cards, matching the gallery preview.
+  - NovelAI 角色提示词在 Reader 里也以卡片显示，和图库预览一致。
+- **Dataset review keys / Dataset 审阅快捷键**: on the Dataset Maker workbench, `X` drops the current image from the set without a confirm dialog, and `Z` undoes the last drop. `A`/`D` still step. Tag pills keep category colors.
+  - 工作台用 `X` 剔除当前图（不弹确认），`Z` 撤销；`A`/`D` 仍翻图。标签颜色分类不变。
+- **Lucida auto-mask batch / Lucida 批量遮罩**: Dataset Maker can generate and save Lucida/rembg masks for the whole set (`POST /api/masks/auto-batch`). Existing masks are skipped so the job is resumable.
+  - Dataset Maker 可对整批图生成并保存 Lucida/rembg 遮罩；已有遮罩会跳过，可中途再跑。
+
 ## [3.5.0-beta.5] - 2026-08-25
 
 Most optional package installs continue downloading model weights in the same click. A restart is required only when a loaded module was replaced, a Windows DLL is locked, or import works only in a clean process — and then Model Center offers Restart now and continue. TIPO ships v2.1 with a public CPU wheel; Gallery chrome stops jumping.

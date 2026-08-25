@@ -51,6 +51,7 @@ from .png_stealth import (
     PNGStealthMetadataError,
     decode_png_stealth_metadata,
     png_stealth_probe_layout,
+    probe_pillow_stealth_signature,
     probe_png_stealth_signature,
     unfilter_png_scanline_prefix,
 )
@@ -127,10 +128,20 @@ class ParserRuntimeMixin:
             if img.format in ('JPEG', 'JPG', 'WEBP'):
                 metadata.update(self._extract_jpeg_sd_metadata(img))
 
+            metadata_error = None
+            # Pixel LSB is only used by NovelAI/A1111 stealth on lossless
+            # RGBA/WebP (and PNG fallback). Do not decode every camera JPEG.
+            if (
+                img.format in {"WEBP", "PNG"} or img.mode == "RGBA"
+            ) and not self._embedded_text_carrier_present(metadata):
+                stealth_metadata, metadata_error = self._decode_pixel_stealth_from_image(img)
+                metadata = {**stealth_metadata, **metadata}
+
             return {
                 "width": img.width,
                 "height": img.height,
                 "metadata": metadata,
+                "metadata_error": metadata_error,
             }
 
     def _load_png_metadata_fast(self, image_path: str) -> Dict[str, Any]:
@@ -280,6 +291,66 @@ class ParserRuntimeMixin:
             return decoded, None
         except PNGStealthMetadataError as exc:
             return {}, f"{PNG_STEALTH_ERROR_PREFIX}{exc}"
+        except (OSError, ValueError) as exc:
+            return {}, f"{PNG_STEALTH_ERROR_PREFIX}pixel decode failed: {exc}"
+
+    def _embedded_text_carrier_present(self, metadata: Dict[str, Any]) -> bool:
+        """Skip pixel stealth when a normal SD text chunk/EXIF field is already present."""
+        for key in ("parameters", "prompt", "workflow"):
+            value = metadata.get(key)
+            if isinstance(value, str) and value.strip():
+                return True
+        for key in ("Comment", "comment"):
+            value = metadata.get(key)
+            if isinstance(value, str) and value.strip().startswith("{"):
+                return True
+        software = str(metadata.get("Software") or "").lower()
+        description = metadata.get("Description") or metadata.get("ImageDescription")
+        if "novelai" in software and isinstance(description, str) and description.strip():
+            return True
+        for key in ("UserComment", "XPComment"):
+            value = metadata.get(key)
+            if isinstance(value, bytes) and b"{" in value[:48]:
+                return True
+            if isinstance(value, str) and "{" in value[:48]:
+                return True
+        return False
+
+    def _decode_pixel_stealth_from_image(
+        self,
+        image: Image.Image,
+    ) -> tuple[Dict[str, Any], Optional[str]]:
+        """Probe signed stealth magics on an already-open Pillow image, then decode."""
+        try:
+            image.load()
+        except (OSError, ValueError) as exc:
+            return {}, f"{PNG_STEALTH_ERROR_PREFIX}pixel decode failed: {exc}"
+        if image.mode not in {"RGB", "RGBA"}:
+            return {}, None
+        signature = probe_pillow_stealth_signature(image)
+        if signature is None:
+            return {}, None
+        try:
+            decoded = decode_png_stealth_metadata(
+                image,
+                signature,
+                _MAX_PNG_CHUNK_BYTES,
+                _MAX_DECOMPRESSED_BYTES,
+            )
+            return decoded, None
+        except PNGStealthMetadataError as exc:
+            return {}, f"{PNG_STEALTH_ERROR_PREFIX}{exc}"
+        except (OSError, ValueError) as exc:
+            return {}, f"{PNG_STEALTH_ERROR_PREFIX}pixel decode failed: {exc}"
+
+    def _load_pixel_stealth_metadata(
+        self,
+        image_path: str,
+    ) -> tuple[Dict[str, Any], Optional[str]]:
+        """Open pixels only when the container path has no prompt-bearing text."""
+        try:
+            with Image.open(image_path) as image:
+                return self._decode_pixel_stealth_from_image(image)
         except (OSError, ValueError) as exc:
             return {}, f"{PNG_STEALTH_ERROR_PREFIX}pixel decode failed: {exc}"
 
@@ -579,6 +650,12 @@ class ParserRuntimeMixin:
 
         if width <= 0 or height <= 0:
             raise ValueError("WEBP dimensions not found or invalid")
+
+        if not self._embedded_text_carrier_present(metadata):
+            stealth_metadata, stealth_error = self._load_pixel_stealth_metadata(image_path)
+            metadata = {**stealth_metadata, **metadata}
+            if stealth_error is not None and metadata_error is None:
+                metadata_error = stealth_error
 
         return {
             "width": width,

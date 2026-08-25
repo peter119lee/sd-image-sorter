@@ -96,7 +96,7 @@ test('window.ImageReader is an unsealed object exposing the load-bearing public 
     // seam; the rest are reached only via `this.` but a bad cut would drop them).
     const requiredFns = [
       'init', 'openLibraryImage',
-      '_handleFile', '_renderResult', '_renderPromptSection', '_buildPromptView',
+      '_handleFile', '_renderResult', '_renderPromptSection', '_renderCharacterPrompts', '_buildPromptView',
       '_getGenParams', '_getLoras', '_getAllHashes', '_getModelAssets', '_cleanModelName',
       '_toggleFormat', '_copy', '_copyPromptCategory', '_clear', '_switchWorkspaceTool',
       '_renderReaderCategoryTags', '_populateMetadataEditor', '_saveEditedMetadata',
@@ -132,7 +132,7 @@ test('window.ImageReader is an unsealed object exposing the load-bearing public 
   expect(probe.histogramMode).toBe('rgb')
   expect(probe.eventsBound).toBe(true)
   expect(probe.collapsedKeys).toEqual([
-    'categoryTags', 'editor', 'hashes', 'loras', 'modelAssets', 'negative', 'params', 'prompt',
+    'categoryTags', 'characters', 'editor', 'hashes', 'loras', 'modelAssets', 'negative', 'params', 'prompt',
   ])
 })
 
@@ -200,6 +200,35 @@ test('a parsed result renders the generator badge, checkpoint clean-name, quick 
   // Empty-state was dropped; the container now carries the image layout flag.
   await expect(page.locator('#reader-drop-zone')).toBeHidden()
   await expect(page.locator('.reader-container')).toHaveClass(/reader-has-image/)
+})
+
+test('NovelAI character slots render in the Reader instead of disappearing after parse', async ({ page }) => {
+  await loadMockParse(page, {
+    generator: 'nai',
+    prompt: '3::blender (medium)::, masterpiece',
+    negative_prompt: 'lowres',
+    checkpoint: 'NovelAI Diffusion V5 0ADF9AB7',
+    width: 832,
+    height: 1216,
+    loras: [],
+    metadata: {
+      _parsed: {
+        generation_params: { steps: 28, sampler: 'k_euler' },
+        character_prompts: [
+          { index: 0, prompt: 'girl, remielle, huge breasts', negative_prompt: 'lowres', center: { x: 0.5, y: 0.5 } },
+          { index: 1, prompt: 'girl, sitting, casual clothes', center: { x: 0.2, y: 0.8 } },
+        ],
+      },
+    },
+  })
+
+  const section = page.locator('#reader-characters-section')
+  await expect(section).toBeVisible()
+  await expect(page.locator('#reader-characters-list .character-card')).toHaveCount(2)
+  await expect(page.locator('#reader-characters-list')).toContainText('remielle')
+  await expect(page.locator('#reader-characters-list')).toContainText('casual clothes')
+  await expect(page.locator('#reader-prompt-text')).toContainText('3::blender (medium)::')
+  await expect(page.locator('#reader-checkpoint')).toHaveText('NovelAI Diffusion V5 0ADF9AB7')
 })
 
 // ---------------------------------------------------------------------------

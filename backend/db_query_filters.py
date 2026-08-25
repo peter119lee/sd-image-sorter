@@ -208,6 +208,10 @@ _PROMPT_NORMALIZED_SQL = "LOWER(REPLACE(COALESCE(i.prompt, ''), '_', ' '))"
 _SIDECAR_CAPTION_NORMALIZED_SQL = (
     "LOWER(REPLACE(COALESCE(i.sidecar_caption, ''), '_', ' '))"
 )
+_CHARACTER_PROMPT_TEXT_NORMALIZED_SQL = (
+    "LOWER(REPLACE(COALESCE(json_extract(i.metadata_json, "
+    "'$._parsed.character_prompt_text'), ''), '_', ' '))"
+)
 
 
 def _apply_search_filter(conditions: List[str], params: List[Any],
@@ -259,8 +263,13 @@ def _apply_search_filter(conditions: List[str], params: List[Any],
     caption_clause = ""
     caption_params: List[Any] = []
     if normalized_search:
-        caption_clause = f" OR {_SIDECAR_CAPTION_NORMALIZED_SQL} LIKE ? ESCAPE '\\'"
-        caption_params.append(f"%{escape_like_pattern(normalized_search)}%")
+        caption_clause = (
+            f" OR {_SIDECAR_CAPTION_NORMALIZED_SQL} LIKE ? ESCAPE '\\'"
+            f" OR {_CHARACTER_PROMPT_TEXT_NORMALIZED_SQL} LIKE ? ESCAPE '\\'"
+        )
+        like = f"%{escape_like_pattern(normalized_search)}%"
+        caption_params.append(like)
+        caption_params.append(like)
 
     conditions.append(
         "("
@@ -315,12 +324,13 @@ def _apply_prompt_terms_filter(conditions: List[str], params: List[Any],
                                prompt_match_mode: str = PROMPT_MATCH_MODE_EXACT) -> tuple:
     """Apply multi-prompt filter (AND logic - image text must contain ALL terms).
 
-    Each term must appear in the image's ``prompt`` OR in its
-    ``sidecar_caption`` (migration 042). The two columns are split by who wrote
+    Each term must appear in the image's ``prompt``, its ``sidecar_caption``
+    (migration 042), or NAI character-slot text stored on
+    ``_parsed.character_prompt_text``. The columns are split by who wrote
     the text, not by what it means, and this filter is a question about
     meaning: a rule written as "prompt contains silver_hair" is the user asking
-    for images of silver hair, and the same image answers that question whether
-    its tags arrived embedded in the PNG or in a ``.txt`` next to it.
+    for images of silver hair, whether those tags arrived in the base caption,
+    a sidecar ``.txt``, or a NovelAI character slot.
 
     Matching both is also the only reading that keeps existing rules stable.
     The scan upsert writes ``prompt = ?`` unconditionally, so a rescan
@@ -369,16 +379,18 @@ def _apply_prompt_terms_filter(conditions: List[str], params: List[Any],
         if match_mode == PROMPT_MATCH_MODE_CONTAINS:
             conditions.append(
                 f"({_PROMPT_NORMALIZED_SQL} LIKE ? ESCAPE '\\'"
-                f" OR {_SIDECAR_CAPTION_NORMALIZED_SQL} LIKE ? ESCAPE '\\')"
+                f" OR {_SIDECAR_CAPTION_NORMALIZED_SQL} LIKE ? ESCAPE '\\'"
+                f" OR {_CHARACTER_PROMPT_TEXT_NORMALIZED_SQL} LIKE ? ESCAPE '\\')"
             )
+            params.extend([like_pattern, like_pattern, like_pattern])
         else:
             conditions.append(
                 "(EXISTS (SELECT 1 FROM image_prompt_tokens ipt "
                 "WHERE ipt.image_id = i.id AND ipt.token LIKE ? ESCAPE '\\')"
-                f" OR {_SIDECAR_CAPTION_NORMALIZED_SQL} LIKE ? ESCAPE '\\')"
+                f" OR {_SIDECAR_CAPTION_NORMALIZED_SQL} LIKE ? ESCAPE '\\'"
+                f" OR {_CHARACTER_PROMPT_TEXT_NORMALIZED_SQL} LIKE ? ESCAPE '\\')"
             )
-        params.append(like_pattern)
-        params.append(like_pattern)
+            params.extend([like_pattern, like_pattern, like_pattern])
 
     return conditions, params
 

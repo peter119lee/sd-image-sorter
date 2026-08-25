@@ -96,6 +96,49 @@ Object.assign(window.ImageReader, {
             if (negSection) {
                 negSection.style.display = (!clipboardMetadataMissing && promptView?.negativeText) ? '' : 'none';
             }
+            this._renderCharacterPrompts(this._currentResult || result, { clipboardMetadataMissing });
+        },
+
+        _renderCharacterPrompts(result, options = {}) {
+            const section = document.getElementById('reader-characters-section');
+            const list = document.getElementById('reader-characters-list');
+            if (!section || !list) return;
+            if (options.clipboardMetadataMissing) {
+                section.style.display = 'none';
+                list.innerHTML = '';
+                return;
+            }
+            const parsed = (result?.metadata && typeof result.metadata === 'object')
+                ? (result.metadata._parsed || {})
+                : {};
+            const chars = Array.isArray(parsed.character_prompts) ? parsed.character_prompts : [];
+            if (!chars.length) {
+                section.style.display = 'none';
+                list.innerHTML = '';
+                return;
+            }
+            const characterLabel = this._t('modal.character', 'Character');
+            const negLabel = this._t('modal.negativeShort', 'Neg');
+            section.style.display = '';
+            list.innerHTML = chars.map((entry, index) => {
+                const prompt = String(entry?.prompt || '').trim();
+                const negative = String(entry?.negative_prompt || '').trim();
+                const center = entry?.center;
+                const centerStr = center
+                    ? ` (${center.x?.toFixed?.(2) || center.x}, ${center.y?.toFixed?.(2) || center.y})`
+                    : '';
+                const slot = entry?.index != null ? entry.index + 1 : index + 1;
+                const negHtml = negative
+                    ? `<div class="char-negative"><strong>${this._escapeHtml(negLabel)}:</strong> ${this._escapeHtml(negative)}</div>`
+                    : '';
+                return `
+                    <div class="character-card">
+                        <div class="character-card-header">${this._escapeHtml(characterLabel)} ${slot}${this._escapeHtml(centerStr)}</div>
+                        <div>${this._escapeHtml(prompt)}</div>
+                        ${negHtml}
+                    </div>
+                `;
+            }).join('');
         },
 
         _renderQuickFacts(result, gp, options = {}) {

@@ -67,6 +67,7 @@ from db_helpers import (
     _path_query_match_clause,
     normalize_checkpoint_name,
     extract_prompt_tokens,
+    character_prompt_search_text,
     extract_lora_names,
     _serialize_loras,
     _normalize_content_fingerprint,
@@ -151,11 +152,15 @@ def _sync_image_prompt_tokens(
     cursor: sqlite3.Cursor,
     image_id: int,
     prompt: Optional[str],
+    extra_text: Optional[str] = None,
 ) -> None:
     """Refresh the normalized image_prompt_tokens rows for an image."""
     cursor.execute("DELETE FROM image_prompt_tokens WHERE image_id = ?", (image_id,))
+    blob = "\n".join(
+        part for part in (str(prompt or ""), str(extra_text or "")) if str(part).strip()
+    )
 
-    for token in extract_prompt_tokens(prompt or ''):
+    for token in extract_prompt_tokens(blob):
         cursor.execute(
             "INSERT OR IGNORE INTO image_prompt_tokens (image_id, token) VALUES (?, ?)",
             (image_id, token),
@@ -420,7 +425,12 @@ def _upsert_image_record(
     stored_path = str(existing_row["path"]) if existing_row is not None else path
     _sync_image_path_identity(cursor, image_id, stored_path)
     _sync_image_loras(cursor, image_id, record.get("loras"), record.get("prompt"))
-    _sync_image_prompt_tokens(cursor, image_id, record.get("prompt"))
+    _sync_image_prompt_tokens(
+        cursor,
+        image_id,
+        record.get("prompt"),
+        extra_text=character_prompt_search_text(record.get("metadata_json")),
+    )
     return image_id, write_status
 
 def _mark_image_tagged(
@@ -648,7 +658,12 @@ def update_image_metadata(
             )
         )
         _sync_image_loras(cursor, image_id, loras, prompt)
-        _sync_image_prompt_tokens(cursor, image_id, prompt)
+        _sync_image_prompt_tokens(
+            cursor,
+            image_id,
+            prompt,
+            extra_text=character_prompt_search_text(metadata_json),
+        )
     _invalidate_tags_cache()
 
 def update_reparsed_prompt_fields(
@@ -705,7 +720,7 @@ def update_reparsed_prompt_fields(
         # The lora/token indexes must mirror the post-COALESCE row, so
         # read the merged values back instead of trusting the arguments.
         final_row = cursor.execute(
-            "SELECT prompt, loras FROM images WHERE id = ?",
+            "SELECT prompt, loras, metadata_json FROM images WHERE id = ?",
             (image_id,),
         ).fetchone()
         final_prompt = final_row["prompt"] if final_row else prompt
@@ -716,7 +731,14 @@ def update_reparsed_prompt_fields(
                 "INSERT OR IGNORE INTO image_loras (image_id, lora_name) VALUES (?, ?)",
                 (image_id, lora_name),
             )
-        _sync_image_prompt_tokens(cursor, image_id, final_prompt)
+        _sync_image_prompt_tokens(
+            cursor,
+            image_id,
+            final_prompt,
+            extra_text=character_prompt_search_text(
+                final_row["metadata_json"] if final_row else None
+            ),
+        )
     _invalidate_tags_cache()
     _invalidate_facet_caches()
 

@@ -31,6 +31,10 @@ class TestValueFilter:
     def test_accepts_prompt_shaped_values(self):
         assert pts.looks_like_non_prompt_value("1girl, black hair, hime cut, purple eyes") is False
 
+    def test_rejects_kjnodes_bus_titles(self):
+        assert pts.looks_like_non_prompt_value("【模型】主生图节点束加载") is True
+        assert pts.looks_like_non_prompt_value("【提示词】最终正面提示词输出") is True
+
 
 class TestScore:
     def test_booru_tag_string_scores_high(self):
@@ -44,6 +48,30 @@ class TestScore:
             "a watercolor painting of a fox resting under maple trees, soft warm light, autumn"
         )
         assert result["score"] >= pts.PROMPT_SCORE_FLOOR
+
+    @pytest.mark.parametrize("text", [
+        "A woman standing in a sunlit garden",
+        "ultra realistic photo of a cat on a windowsill at golden hour",
+        (
+            "The character is sitting on a wooden bench reading a book while "
+            "golden light filters through the trees."
+        ),
+        (
+            "A cinematic photograph of a young woman with silver hair standing "
+            "under cherry blossoms at dusk wearing a traditional embroidered coat"
+        ),
+    ])
+    def test_natural_language_without_commas_still_passes(self, text):
+        """Flux/Krea/MJ prompts are prose, not booru comma lists.
+
+        The old comma-token average-length cap rejected any single sentence
+        over 60 characters. Infinite Image Browser and sd-prompt-reader do
+        not score format at all — graph position is enough — so harvest must
+        at least accept caption_format=natural text.
+        """
+        assert pts.looks_like_non_prompt_value(text) is False
+        result = pts.score_prompt_likeness(text)
+        assert result["score"] >= pts.PROMPT_SCORE_FLOOR, (text, result)
 
     def test_sampler_name_fails_the_floor(self):
         result = pts.score_prompt_likeness("dpmpp_2m_sde_gpu karras")
@@ -106,6 +134,42 @@ class TestHarvestAndPick:
         pos, _neg = pts.pick_positive_negative(candidates)
         # Node 12's text is a strict prefix of node 13's — the longer wins.
         assert pos is not None and "classroom" in pos
+
+    def test_unknown_class_natural_language_widget_is_harvested(self):
+        prose = (
+            "A cinematic photograph of a young woman with silver hair standing "
+            "under cherry blossoms at dusk, looking at the camera with a slight smile."
+        )
+        nodes = {
+            "9": {
+                "class_type": "SomeFluxPromptBoxNobodyHasSeen",
+                "inputs": {},
+                "widgets_values": [prose],
+            },
+        }
+        pos, _neg = pts.pick_positive_negative(
+            pts.harvest_prompt_candidates(nodes, ("CLIPTextEncode",))
+        )
+        assert pos is not None
+        assert "silver hair" in pos
+        assert "cherry blossoms" in pos
+
+    def test_unknown_class_widgets_are_harvested(self):
+        nodes = {
+            "9": {
+                "class_type": "BrandNewPromptPackV9",
+                "inputs": {},
+                "widgets_values": [
+                    "masterpiece, best quality, 1girl, long hair, school uniform, smile"
+                ],
+            },
+        }
+        pos, neg = pts.pick_positive_negative(
+            pts.harvest_prompt_candidates(nodes, ("CLIPTextEncode",))
+        )
+        assert pos is not None
+        assert "school uniform" in pos
+        assert neg is None
 
     def test_decoys_never_win(self):
         nodes = {

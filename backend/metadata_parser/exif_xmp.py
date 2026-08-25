@@ -154,6 +154,8 @@ class ExifXmpMixin:
 
             # Check ImageDescription (tag 0x010E)
             img_desc = exif.get(0x010E)
+            if isinstance(img_desc, bytes):
+                img_desc = self._decode_exif_user_comment(img_desc)
             if img_desc and isinstance(img_desc, str):
                 if "ImageDescription" not in metadata:
                     metadata["ImageDescription"] = img_desc

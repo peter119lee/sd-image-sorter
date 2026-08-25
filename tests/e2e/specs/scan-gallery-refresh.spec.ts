@@ -199,7 +199,12 @@ test.describe('Scan gallery refresh stability', () => {
     await page.waitForLoadState('networkidle')
     await installFetchLog(page)
     await page.evaluate(() => (window as any).App.switchView('sorting'))
-    await startScanFromUi(page, fixtureDir)
+    // Scan lives on Gallery chrome. Off-gallery refresh is started via API so
+    // this test still covers "scan while not looking at Gallery".
+    const scanResponse = await request.post('/api/scan', {
+      data: { folder_path: fixtureDir, recursive: true, quick_import: true },
+    })
+    expect(scanResponse.ok()).toBeTruthy()
 
     let libraryReadySeen = false
     let done = false

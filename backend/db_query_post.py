@@ -22,6 +22,7 @@ from db_helpers import (
     normalize_lora_name,
     extract_prompt_tokens,
     extract_lora_names,
+    character_prompt_search_text,
     _rows_to_dicts,
 )
 
@@ -122,9 +123,10 @@ def _fetch_post_filtered_ids(
             break
 
         for row in rows:
-            # base_query must select i.sidecar_caption alongside i.prompt; a
-            # missing column raises here rather than silently dropping every
-            # caption-only row from a "move all matching" set.
+            # base_query must select i.sidecar_caption and i.metadata_json
+            # alongside i.prompt; a missing column raises here rather than
+            # silently dropping caption-only or character-slot rows from a
+            # "move all matching" set.
             if _matches_exact_post_filters(
                 row["prompt"],
                 row["loras"],
@@ -132,6 +134,7 @@ def _fetch_post_filtered_ids(
                 normalized_loras,
                 prompt_match_mode=prompt_match_mode,
                 sidecar_caption=row["sidecar_caption"],
+                character_prompt_text=character_prompt_search_text(row["metadata_json"]),
             ):
                 matched_ids.append(int(row["id"]))
                 if target_count is not None and len(matched_ids) >= target_count:
@@ -154,6 +157,7 @@ def _matches_exact_post_filters(
     *,
     prompt_match_mode: str = PROMPT_MATCH_MODE_EXACT,
     sidecar_caption: Optional[str] = None,
+    character_prompt_text: Optional[str] = None,
 ) -> bool:
     """Apply the exact prompt/LORA matching semantics used by post-filter paths.
 
@@ -174,6 +178,7 @@ def _matches_exact_post_filters(
             searchable = (
                 normalize_prompt_token(prompt or ""),
                 normalize_prompt_token(sidecar_caption or ""),
+                normalize_prompt_token(character_prompt_text or ""),
             )
             if not all(
                 any(term in text for text in searchable)
@@ -183,6 +188,7 @@ def _matches_exact_post_filters(
         else:
             image_tokens = extract_prompt_tokens(prompt or "")
             image_tokens |= extract_prompt_tokens(sidecar_caption or "")
+            image_tokens |= extract_prompt_tokens(character_prompt_text or "")
             if not all(term in image_tokens for term in normalized_prompt_terms):
                 return False
 
@@ -218,6 +224,10 @@ def _post_filter_results(results: List[Dict[str, Any]],
             normalized_loras,
             prompt_match_mode=prompt_match_mode,
             sidecar_caption=img.get("sidecar_caption"),
+            character_prompt_text=(
+                img.get("character_prompt_text")
+                or character_prompt_search_text(img.get("metadata_json"))
+            ),
         ):
             filtered_results.append(img)
 

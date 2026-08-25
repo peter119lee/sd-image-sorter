@@ -25,6 +25,10 @@ async function enterGalleryLibrary(page: import('@playwright/test').Page) {
   await page.evaluate(() => {
     if (window.App?.switchView) window.App.switchView('gallery')
   })
+  const filtersToggle = page.locator('[data-sidebar-section="filters"] .sidebar-section-toggle')
+  if (await filtersToggle.getAttribute('aria-expanded') === 'false') {
+    await filtersToggle.click()
+  }
   await page.locator('#gallery-scope-select').selectOption('library').catch(async () => {
     await page.evaluate(() => {
       const el = document.querySelector('#gallery-scope-select') as HTMLSelectElement | null

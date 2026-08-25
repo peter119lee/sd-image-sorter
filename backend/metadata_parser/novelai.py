@@ -38,9 +38,7 @@ class NovelAIMixin:
                 else:
                     text = usercomment.decode('utf-8', errors='replace')
             elif isinstance(usercomment, str):
-                text = usercomment
-                if text.startswith("ASCII") or text.startswith("UNICODE"):
-                    text = text[7:].strip("\0 ")
+                text = self._peel_exif_charset_prefix(usercomment)
 
             if not text:
                 return None
@@ -56,8 +54,16 @@ class NovelAIMixin:
             software = data.get("Software", str(metadata.get("Software", "")))
             is_nai = "novelai" in str(software).lower()
             has_nai_keys = "Description" in data or "Source" in data or "Generation time" in data
+            # WebP EXIF UserComment is often the inner Comment JSON
+            # (`prompt`/`uc`/`v4_prompt`), not the PNG wrapper object.
+            looks_like_comment_body = (
+                "uc" in data
+                or "v4_prompt" in data
+                or "v4_negative_prompt" in data
+                or "characterPrompts" in data
+            ) and "negative_prompt" not in data
 
-            if not is_nai and not has_nai_keys:
+            if not is_nai and not has_nai_keys and not looks_like_comment_body:
                 return None
 
             result: Dict[str, Any] = {
@@ -71,7 +77,13 @@ class NovelAIMixin:
                 "img2img_info": None,
             }
 
-            comment = data.get("Comment", "")
+            nested_comment = data.get("Comment")
+            if isinstance(nested_comment, str) and nested_comment.strip():
+                comment = nested_comment
+            elif looks_like_comment_body:
+                comment = json.dumps(data)
+            else:
+                comment = ""
             if isinstance(comment, str) and comment:
                 try:
                     comment_data = json.loads(comment)
@@ -80,29 +92,19 @@ class NovelAIMixin:
                             result["prompt"] = self._flatten_text_value(comment_data["prompt"])
                         result["negative_prompt"] = self._flatten_text_value(comment_data.get("uc", None))
 
-                        # V4 prompt structure
+                        # V4/V4.5/V5 still serialize as v4_prompt (params_version 4).
                         if "v4_prompt" in comment_data:
                             v4_prompt = comment_data["v4_prompt"]
-                            if isinstance(v4_prompt, dict):
-                                if not result["prompt"]:
-                                    result["prompt"] = self._flatten_text_value(
-                                        v4_prompt.get("prompt")
-                                        or v4_prompt.get("caption")
-                                        or v4_prompt
-                                    )
-                                # Extract character prompts
-                                char_prompts = self._extract_nai_character_prompts(comment_data)
-                                if char_prompts:
-                                    result["character_prompts"] = char_prompts
+                            if not result["prompt"]:
+                                result["prompt"] = self._flatten_nai_structured_prompt(v4_prompt)
+                            char_prompts = self._extract_nai_character_prompts(comment_data)
+                            if char_prompts:
+                                result["character_prompts"] = char_prompts
 
                         if "v4_negative_prompt" in comment_data:
                             v4_neg = comment_data["v4_negative_prompt"]
                             if not result["negative_prompt"]:
-                                result["negative_prompt"] = self._flatten_text_value(
-                                    v4_neg.get("prompt") if isinstance(v4_neg, dict) else v4_neg
-                                )
-                                if not result["negative_prompt"] and isinstance(v4_neg, dict):
-                                    result["negative_prompt"] = self._flatten_text_value(v4_neg.get("caption") or v4_neg)
+                                result["negative_prompt"] = self._flatten_nai_structured_prompt(v4_neg)
 
                         # Generation params
                         result["generation_params"] = self._extract_nai_gen_params(comment_data)
@@ -179,40 +181,130 @@ class NovelAIMixin:
 
         return params if params else None
 
+    def _flatten_nai_structured_prompt(self, blob: Any) -> Optional[str]:
+        """Flatten V4/V4.5/V5 ``v4_prompt`` / ``v4_negative_prompt`` JSON.
+
+        Official NovelAI Diffusion V5 (2026-08-21) still writes the V4
+        request shape: ``caption.base_caption`` plus ``char_captions``.
+        There is no first-party ``v5_prompt`` key in
+        ``NovelAI/novelai-image-metadata``.
+        """
+        if isinstance(blob, dict):
+            caption = blob.get("caption")
+            if isinstance(caption, dict) and caption.get("base_caption"):
+                return self._flatten_text_value(caption.get("base_caption"))
+            return self._flatten_text_value(
+                blob.get("prompt") or blob.get("caption") or blob
+            )
+        return self._flatten_text_value(blob)
+
     def _extract_nai_character_prompts(self, comment_data: dict) -> Optional[List[Dict[str, Any]]]:
-        """Extract NAI V4 character prompts from Comment JSON."""
+        """Extract NAI V4/V4.5/V5 character prompts from Comment JSON.
+
+        Live request bodies (V5 still uses ``params_version`` 4) store
+        characters as top-level ``characterPrompts`` and as
+        ``v4_prompt.caption.char_captions``. V5 allows up to 22 slots.
+        Some exporters also nest ``v4_prompt.character_prompts``.
+        """
         if not isinstance(comment_data, dict):
             return None
 
-        v4_prompt = comment_data.get("v4_prompt")
-        if not isinstance(v4_prompt, dict):
-            return None
+        by_index: Dict[int, Dict[str, Any]] = {}
 
-        char_prompts_raw = v4_prompt.get("character_prompts")
-        if not isinstance(char_prompts_raw, list) or len(char_prompts_raw) == 0:
-            return None
+        def ensure(index: int) -> Dict[str, Any]:
+            slot = by_index.get(index)
+            if slot is None:
+                slot = {"index": index, "prompt": "", "negative_prompt": ""}
+                by_index[index] = slot
+            return slot
 
-        characters = []
-        for i, char in enumerate(char_prompts_raw):
-            if not isinstance(char, dict):
-                continue
-            prompt_val = char.get("prompt", "")
-            negative_val = char.get("ucPrompt", char.get("uc", ""))
-            if isinstance(prompt_val, dict):
-                prompt_val = self._flatten_text_value(prompt_val) or ""
-            if isinstance(negative_val, dict):
-                negative_val = self._flatten_text_value(negative_val) or ""
+        def as_text(value: Any) -> str:
+            if isinstance(value, dict):
+                return self._flatten_text_value(value) or ""
+            if isinstance(value, str):
+                return value.strip()
+            return str(value).strip() if value else ""
 
-            char_data = {
-                "index": i,
-                "prompt": prompt_val,
-                "negative_prompt": negative_val,
-            }
-            # Position data if available
-            center = char.get("center")
-            if isinstance(center, dict):
-                char_data["center"] = {"x": center.get("x", 0.5), "y": center.get("y", 0.5)}
-            characters.append(char_data)
+        structured = comment_data.get("v4_prompt")
+        if isinstance(structured, dict):
+            nested = structured.get("character_prompts")
+            if isinstance(nested, list):
+                for index, char in enumerate(nested):
+                    if not isinstance(char, dict):
+                        continue
+                    slot = ensure(index)
+                    prompt_val = as_text(char.get("prompt", ""))
+                    negative_val = as_text(char.get("ucPrompt", char.get("uc", "")))
+                    if prompt_val:
+                        slot["prompt"] = prompt_val
+                    if negative_val:
+                        slot["negative_prompt"] = negative_val
+                    center = char.get("center")
+                    if isinstance(center, dict):
+                        slot["center"] = {
+                            "x": center.get("x", 0.5),
+                            "y": center.get("y", 0.5),
+                        }
 
-        return characters if characters else None
+            caption = structured.get("caption")
+            if isinstance(caption, dict):
+                char_captions = caption.get("char_captions")
+                if isinstance(char_captions, list):
+                    for index, item in enumerate(char_captions):
+                        if not isinstance(item, dict):
+                            continue
+                        slot = ensure(index)
+                        text = as_text(item.get("char_caption") or item.get("prompt"))
+                        if text and not slot["prompt"]:
+                            slot["prompt"] = text
+                        centers = item.get("centers")
+                        if (
+                            isinstance(centers, list)
+                            and centers
+                            and isinstance(centers[0], dict)
+                            and "center" not in slot
+                        ):
+                            slot["center"] = {
+                                "x": centers[0].get("x", 0.5),
+                                "y": centers[0].get("y", 0.5),
+                            }
+
+        v4_neg = comment_data.get("v4_negative_prompt")
+        if isinstance(v4_neg, dict):
+            caption = v4_neg.get("caption") if isinstance(v4_neg.get("caption"), dict) else {}
+            char_captions = caption.get("char_captions") if isinstance(caption, dict) else None
+            if isinstance(char_captions, list):
+                for index, item in enumerate(char_captions):
+                    if not isinstance(item, dict):
+                        continue
+                    slot = ensure(index)
+                    text = as_text(item.get("char_caption") or item.get("uc"))
+                    if text and not slot["negative_prompt"]:
+                        slot["negative_prompt"] = text
+
+        top = comment_data.get("characterPrompts") or comment_data.get("character_prompts")
+        if isinstance(top, list):
+            for index, char in enumerate(top):
+                if not isinstance(char, dict):
+                    continue
+                slot = ensure(index)
+                prompt_val = as_text(char.get("prompt") or char.get("char_caption"))
+                negative_val = as_text(char.get("uc") or char.get("ucPrompt"))
+                if prompt_val:
+                    slot["prompt"] = prompt_val
+                if negative_val:
+                    slot["negative_prompt"] = negative_val
+                center = char.get("center")
+                if isinstance(center, dict):
+                    slot["center"] = {
+                        "x": center.get("x", 0.5),
+                        "y": center.get("y", 0.5),
+                    }
+
+        characters = [
+            by_index[index]
+            for index in sorted(by_index)
+            if by_index[index].get("prompt") or by_index[index].get("negative_prompt")
+        ]
+        return characters or None
 

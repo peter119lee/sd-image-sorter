@@ -418,6 +418,45 @@ def normalize_checkpoint_name(checkpoint_name: Optional[str]) -> Optional[str]:
     return _normalize_checkpoint_name(checkpoint_name)
 
 
+def character_prompt_search_text(metadata_json: Any) -> str:
+    """Searchable NAI character-slot text from compact ``metadata_json``.
+
+    Gallery ``prompt`` stays the base caption. After scan, search and prompt
+    filters still need the slot strings that live on ``_parsed``.
+    """
+    metadata = metadata_json
+    if isinstance(metadata, bytes):
+        metadata = metadata.decode("utf-8", errors="replace")
+    if isinstance(metadata, str):
+        text = metadata.strip()
+        if not text:
+            return ""
+        try:
+            metadata = json.loads(text)
+        except (TypeError, ValueError, json.JSONDecodeError):
+            return ""
+    if not isinstance(metadata, dict):
+        return ""
+    parsed = metadata.get("_parsed")
+    if not isinstance(parsed, dict):
+        return ""
+    stored = parsed.get("character_prompt_text")
+    if isinstance(stored, str) and stored.strip():
+        return stored.strip()
+    characters = parsed.get("character_prompts")
+    if not isinstance(characters, list):
+        return ""
+    parts: List[str] = []
+    for entry in characters:
+        if not isinstance(entry, dict):
+            continue
+        for key in ("prompt", "negative_prompt"):
+            value = str(entry.get(key) or "").strip()
+            if value:
+                parts.append(value)
+    return ", ".join(parts)
+
+
 def extract_prompt_tokens(prompt: str) -> set:
     """Extract normalized tokens from a prompt string.
 

@@ -5663,6 +5663,10 @@ test.describe('Smoke Tests', () => {
 
     await page.locator('#btn-filter-by-artist').click()
     await expect(page.locator('#view-gallery.active')).toBeVisible()
+    const filtersToggle = page.locator('[data-sidebar-section="filters"] .sidebar-section-toggle')
+    if (await filtersToggle.getAttribute('aria-expanded') === 'false') {
+      await filtersToggle.click()
+    }
     await expect(page.locator('#artist-filter-row')).toBeVisible()
     await expect(page.locator('#summary-artist')).toContainText('Mock Artist')
 

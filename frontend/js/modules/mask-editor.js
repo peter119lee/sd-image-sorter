@@ -68,6 +68,7 @@
             document.getElementById('mask-tool-invert')?.addEventListener('click', () => this._invert());
             document.getElementById('mask-tool-fill')?.addEventListener('click', () => this._fillWhite());
             document.getElementById('mask-tool-auto')?.addEventListener('click', () => this._autoMask());
+            document.getElementById('btn-dataset-mask-auto-all')?.addEventListener('click', () => this._autoMaskAll());
             document.getElementById('mask-auto-method')?.addEventListener('change', syncLucidaLicense);
             syncLucidaLicense();
             const size = document.getElementById('mask-brush-size');
@@ -317,6 +318,65 @@
                     '自动遮罩完成 — 可用画笔修整后保存。'));
             } catch (e) {
                 this._status(String(e.message || e));
+            } finally {
+                if (button) button.disabled = false;
+            }
+        },
+
+        async _autoMaskAll() {
+            const ids = (this.dm?.imageIds || []).filter((id) => Number.isSafeInteger(id) && id > 0);
+            if (!ids.length) {
+                window.App?.showToast?.(t('Add gallery images first', '请先加入图库图片'), 'warning');
+                return;
+            }
+            let method;
+            try {
+                method = selectedAutoMethod();
+            } catch (e) {
+                window.App?.showToast?.(String(e.message || e), 'error');
+                return;
+            }
+            const button = document.getElementById('btn-dataset-mask-auto-all');
+            const state = document.getElementById('dataset-mask-state');
+            if (button) button.disabled = true;
+            try {
+                const started = await fetch('/api/masks/auto-batch', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image_ids: ids, method, overwrite: false }),
+                });
+                const startBody = await started.json().catch(() => ({}));
+                if (started.status === 409) {
+                    throw new Error(t(
+                        'An auto-mask batch is already running',
+                        '已有批量遮罩任务在跑',
+                    ));
+                }
+                if (!started.ok) {
+                    throw new Error(startBody.detail || startBody.error || `HTTP ${started.status}`);
+                }
+                const jobId = startBody.job_id || startBody.id;
+                let body = startBody;
+                for (let i = 0; i < 600; i += 1) {
+                    const polled = await fetch(`/api/bulk-jobs/${jobId}`);
+                    body = await polled.json().catch(() => ({}));
+                    if (state && body.message) state.textContent = body.message;
+                    if (['done', 'error', 'cancelled'].includes(String(body.status || ''))) break;
+                    await new Promise((resolve) => setTimeout(resolve, 400));
+                }
+                if (body.status !== 'done') {
+                    throw new Error(body.message || body.status || 'Auto-mask batch failed');
+                }
+                const result = body.result || {};
+                const summary = t(
+                    `Auto-mask done: saved ${result.saved || 0}, skipped ${result.skipped || 0}, errors ${result.error_count || 0}`,
+                    `自动遮罩完成：保存 ${result.saved || 0}，跳过 ${result.skipped || 0}，错误 ${result.error_count || 0}`,
+                );
+                if (state) state.textContent = summary;
+                window.App?.showToast?.(summary, result.error_count ? 'warning' : 'success');
+                if (this.dm?.activeId != null) this._refreshEntry(Number(this.dm.activeId));
+            } catch (e) {
+                window.App?.showToast?.(String(e.message || e), 'error');
             } finally {
                 if (button) button.disabled = false;
             }
